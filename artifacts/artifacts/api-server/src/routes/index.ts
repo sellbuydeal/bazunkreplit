@@ -1,0 +1,46 @@
+import { Router, type IRouter } from "express";
+import healthRouter from "./health.js";
+import stripeRouter from "./stripe.js";
+import adminRouter from "./admin.js";
+import setupRouter from "./setup.js";
+import productsRouter from "./products.js";
+import disputesRouter from "./disputes.js";
+import ordersRouter from "./orders.js";
+import returnsRouter from "./returns.js";
+import auctionsRouter from "./auctions.js";
+import flashSalesRouter from "./flashSales.js";
+import treasureHuntRouter from "./treasureHunt.js";
+import listingsRouter from "./listings.js";
+import livekitRouter from "./livekit.js";
+import supplierRouter from "./supplier.js";
+import classifiedsRouter from "./classifieds.js";
+import promotionsRouter from "./promotions.js";
+import supportRouter from "./support.js";
+import rewardsRouter from "./rewards.js";
+import verificationRouter from "./verification.js";
+import userImporterRouter from "./userImporter.js";
+
+const router: IRouter = Router();
+
+router.use(healthRouter);
+router.use(stripeRouter);
+router.use(adminRouter);
+router.use(setupRouter);
+router.use(productsRouter);
+router.use(disputesRouter);
+router.use(ordersRouter);
+router.use(returnsRouter);
+router.use(auctionsRouter);
+router.use(flashSalesRouter);
+router.use(treasureHuntRouter);
+router.use(listingsRouter);
+router.use(livekitRouter);
+router.use(supplierRouter);
+router.use(classifiedsRouter);
+router.use(promotionsRouter);
+router.use(supportRouter);
+router.use(rewardsRouter);
+router.use(verificationRouter);
+router.use(userImporterRouter);
+
+export default router;

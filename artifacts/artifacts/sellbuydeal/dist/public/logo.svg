@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" fill="none">
+  <rect width="36" height="36" x="6" y="6" rx="9" fill="#F26B21"/>
+  <text x="24" y="28" font-family="Arial,sans-serif" font-size="16" font-weight="900" fill="white" text-anchor="middle">SBD</text>
+  <text x="56" y="20" font-family="Arial,sans-serif" font-size="13" font-weight="900" fill="#F26B21" letter-spacing="-0.3">Sell</text>
+  <text x="86" y="20" font-family="Arial,sans-serif" font-size="13" font-weight="900" fill="#4A5CE8" letter-spacing="-0.3">Buy</text>
+  <text x="116" y="20" font-family="Arial,sans-serif" font-size="13" font-weight="900" fill="white" letter-spacing="-0.3">Deal</text>
+  <text x="56" y="35" font-family="Arial,sans-serif" font-size="9" fill="rgba(255,255,255,0.45)" letter-spacing="0.5">UK P2P MARKETPLACE</text>
+</svg>
