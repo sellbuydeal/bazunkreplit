@@ -74,5 +74,12 @@ app.use(
 );
 
 app.use("/api", router);
-
+// Global Error Handler - Logs runtime errors directly to stdout/Render logs
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error("🚨 UNCAUGHT EXPRESS ERROR:", err.stack || err);
+  res.status(500).json({
+    error: err.message || "Internal Server Error",
+    stack: err.stack,
+  });
+});
 export default app;
