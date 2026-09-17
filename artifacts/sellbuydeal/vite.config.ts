@@ -8,6 +8,7 @@ const rawPort = process.env.PORT;
 const port = rawPort ? Number(rawPort) : 3000;
 
 const basePath = process.env.BASE_PATH ?? "/";
+const isDev = process.env.NODE_ENV !== "production";
 
 const noCachePlugin = {
   name: "no-cache-headers",
@@ -27,7 +28,7 @@ export default defineConfig({
     noCachePlugin,
     react(),
     tailwindcss({ optimize: false }),
-    runtimeErrorOverlay(),
+    isDev && runtimeErrorOverlay(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -41,7 +42,7 @@ export default defineConfig({
           ),
         ]
       : []),
-  ],
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
@@ -51,7 +52,7 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname),
   build: {
-    outDir: path.resolve(import.meta.dirname, "dist/public"),
+    outDir: path.resolve(import.meta.dirname, "dist"),
     emptyOutDir: true,
   },
   server: {
