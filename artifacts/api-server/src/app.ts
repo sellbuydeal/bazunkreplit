@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
@@ -29,7 +29,7 @@ app.post(
 app.post(
   "/api/stripe/webhook",
   express.raw({ type: "application/json" }),
-  async (req, res) => {
+  async (req: Request, res: Response): Promise<void> => {
     const signature = req.headers["stripe-signature"];
     if (!signature) {
       res.status(400).json({ error: "Missing stripe-signature header" });
@@ -39,7 +39,7 @@ app.post(
       const sig = Array.isArray(signature) ? signature[0] : signature;
       await WebhookHandlers.processWebhook(req.body as Buffer, sig);
       res.status(200).json({ received: true });
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error({ err }, "Webhook processing error");
       res.status(400).json({ error: "Webhook processing error" });
     }
@@ -74,12 +74,14 @@ app.use(
 );
 
 app.use("/api", router);
+
 // Global Error Handler - Logs runtime errors directly to stdout/Render logs
-app.use((err: any, req: any, res: any, next: any) => {
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error("🚨 UNCAUGHT EXPRESS ERROR:", err.stack || err);
   res.status(500).json({
     error: err.message || "Internal Server Error",
-    stack: err.stack,
+    stack: process.env.NODE_NODE_ENV === "development" ? err.stack : undefined,
   });
 });
+
 export default app;
