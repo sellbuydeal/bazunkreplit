@@ -1,46 +1,36 @@
-import { useState } from "react";
-import { Mail, Lock, Eye, EyeOff, Shield } from "lucide-react";
-
+```tsx
+import { useLocation } from "wouter";
+import { useAdmin } from "@/context/AdminContext";
+```
+```tsx
 export function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { login } = useAdmin();
+  const [, setLocation] = useLocation();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     e.stopPropagation();
-
     setLoading(true);
     setError("");
-
     try {
-      const response = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (response.ok) {
-        if (data.token) {
-          localStorage.setItem("admin_token", data.token);
-        }
-        localStorage.setItem("isAdminAuthenticated", "true");
-
-        // Redirect directly to dashboard
-        window.location.replace("/admin/dashboard");
+      const ok = await login(email, password);
+      if (ok) {
+        setLocation("/admin/dashboard");
       } else {
-        setError(data.message || "Invalid email or password.");
+        setError("Invalid email or password.");
       }
-    } catch (err) {
+    } catch {
       setError("Network error. Could not connect to authentication server.");
     } finally {
       setLoading(false);
     }
   };
+  // ...rest of the component unchanged
 
   return (
     <div className="min-h-screen bg-[#0D0E12] flex items-center justify-center p-4">
