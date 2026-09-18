@@ -143,7 +143,7 @@ router.post("/listings", async (req, res) => {
     SELECT verification_status FROM users WHERE email = ${sellerEmail}
   `);
   const verificationStatus = (verResult.rows[0]?.verification_status as string) ?? "unverified";
-  if (verificationStatus !== "verified") {
+ {
     res.status(403).json({
       error: "identity_verification_required",
       message: "You must verify your identity before publishing listings. Visit your dashboard to get verified.",
