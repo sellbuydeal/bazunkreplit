@@ -162,6 +162,9 @@ router.post("/listings", async (req, res) => {
     ? JSON.stringify(body.extra_categories)
     : null;
   const currency = typeof body.currency === "string" && body.currency ? body.currency.toUpperCase() : "GBP";
+  
+  // FIX: Explicitly set status to "active" so it appears in the main listing query
+  const status = typeof body.status === "string" ? body.status : "active";
 
   let priceGbp: string | null = null;
   try {
@@ -172,7 +175,24 @@ router.post("/listings", async (req, res) => {
 
   const [inserted] = await db
     .insert(listingsTable)
-    .values({ title, price, category, subcategory, description, condition, image, sellerEmail, sellerName, sellerUsername, tags, extraCategories, specifications, currency, priceGbp })
+    .values({ 
+      title, 
+      price, 
+      category, 
+      subcategory, 
+      description, 
+      condition, 
+      image, 
+      sellerEmail, 
+      sellerName, 
+      sellerUsername, 
+      tags, 
+      extraCategories, 
+      specifications, 
+      currency, 
+      priceGbp,
+      status // Inserted explicitly
+    })
     .returning();
 
   const publicId = makePublicId(inserted.id);
