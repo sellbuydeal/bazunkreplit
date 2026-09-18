@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Mail, Lock, Eye, EyeOff, Shield } from "lucide-react";
 
-export default function AdminLogin() {
+export function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
@@ -25,7 +25,6 @@ export default function AdminLogin() {
       const data = await response.json().catch(() => ({}));
 
       if (response.ok) {
-        // Save auth data to localStorage if returned by backend
         if (data.token) {
           localStorage.setItem("admin_token", data.token);
         }
