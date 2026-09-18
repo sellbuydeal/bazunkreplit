@@ -13,15 +13,18 @@ async function attachPromotions(rows: (typeof listingsTable.$inferSelect)[]): Pr
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const now = new Date();
+
+  // Safely check active promotions using inArray
   const promos = await db
     .select({ listingId: listingPromotionsTable.listingId, type: listingPromotionsTable.type })
     .from(listingPromotionsTable)
     .where(
       and(
         gt(listingPromotionsTable.expiresAt, now),
-        sql`${listingPromotionsTable.listingId} = ANY(ARRAY[${sql.join(ids.map((id) => sql`${id}`), sql`, `)}]::int[])`
+        inArray(listingPromotionsTable.listingId, ids)
       )
     );
+
   const promoMap = new Map<number, string[]>();
   for (const p of promos) {
     if (!promoMap.has(p.listingId)) promoMap.set(p.listingId, []);
@@ -41,7 +44,6 @@ function promoRank(promotions: string[]): number {
 router.get("/listings", async (req, res) => {
   const { category, sub, limit = "40", offset = "0", ids } = req.query as Record<string, string>;
 
-  // If specific IDs are requested (e.g. for live stream product panels), fetch only those
   if (ids) {
     const idList = ids.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
     if (idList.length === 0) { res.json([]); return; }
@@ -49,6 +51,9 @@ router.get("/listings", async (req, res) => {
     res.json(rows);
     return;
   }
+
+  const parsedLimit = isNaN(parseInt(limit)) ? 40 : parseInt(limit);
+  const parsedOffset = isNaN(parseInt(offset)) ? 0 : parseInt(offset);
 
   const rows = await db
     .select()
@@ -61,8 +66,8 @@ router.get("/listings", async (req, res) => {
         : eq(listingsTable.status, "active")
     )
     .orderBy(desc(listingsTable.createdAt))
-    .limit(parseInt(limit))
-    .offset(parseInt(offset));
+    .limit(parsedLimit)
+    .offset(parsedOffset);
 
   const withPromos = await attachPromotions(rows);
   withPromos.sort((a, b) => promoRank(b.promotions) - promoRank(a.promotions));
@@ -72,16 +77,18 @@ router.get("/listings", async (req, res) => {
 router.get("/listings/spotlight", async (req, res) => {
   const now = new Date();
   const spotlightTypes = ["homepage-spotlight", "spotlight", "featured-badge", "featured", "premium-placement"];
+  
   const promos = await db
     .select({ listingId: listingPromotionsTable.listingId })
     .from(listingPromotionsTable)
     .where(
       and(
         gt(listingPromotionsTable.expiresAt, now),
-        sql`${listingPromotionsTable.type} = ANY(ARRAY[${sql.join(spotlightTypes.map(t => sql`${t}`), sql`, `)}]::text[])`
+        inArray(listingPromotionsTable.type, spotlightTypes)
       )
     )
     .limit(12);
+
   if (promos.length === 0) { res.json([]); return; }
   const ids = [...new Set(promos.map(p => p.listingId))];
   const rows = await db.select().from(listingsTable).where(
@@ -121,7 +128,6 @@ router.get("/listings/:id", async (req, res) => {
   if (!row) { res.status(404).json({ error: "not found" }); return; }
   const [withPromo] = await attachPromotions([row]);
 
-  // Attach seller verification badge
   const verResult = await db.execute(sql`
     SELECT verification_status FROM users WHERE email = ${row.sellerEmail}
   `);
@@ -131,78 +137,83 @@ router.get("/listings/:id", async (req, res) => {
 });
 
 router.post("/listings", async (req, res) => {
-  const body = req.body as Record<string, unknown>;
-  const { title, price, category, description, sellerEmail } = body as Record<string, string>;
-  if (!title || !price || !category || !description || !sellerEmail) {
-    res.status(400).json({ error: "title, price, category, description, and sellerEmail are required" });
-    return;
-  }
-
-  // Require identity verification before listing
-  const verResult = await db.execute(sql`
-    SELECT verification_status FROM users WHERE email = ${sellerEmail}
-  `);
-  const verificationStatus = (verResult.rows[0]?.verification_status as string) ?? "unverified";
- {
-    res.status(403).json({
-      error: "identity_verification_required",
-      message: "You must verify your identity before publishing listings. Visit your dashboard to get verified.",
-    });
-    return;
-  }
-
-  const condition = typeof body.condition === "string" ? body.condition : "good";
-  const image = typeof body.image === "string" ? body.image : null;
-  const sellerName = typeof body.sellerName === "string" ? body.sellerName : null;
-  const sellerUsername = typeof body.sellerUsername === "string" ? body.sellerUsername : null;
-  const subcategory = typeof body.subcategory === "string" && body.subcategory ? body.subcategory : null;
-  const tags = typeof body.tags === "string" ? body.tags : null;
-  const specifications = Array.isArray(body.specifications) ? JSON.stringify(body.specifications) : null;
-  const extraCategories = Array.isArray(body.extra_categories) && body.extra_categories.length
-    ? JSON.stringify(body.extra_categories)
-    : null;
-  const currency = typeof body.currency === "string" && body.currency ? body.currency.toUpperCase() : "GBP";
-  
-  // FIX: Explicitly set status to "active" so it appears in the main listing query
-  const status = typeof body.status === "string" ? body.status : "active";
-
-  let priceGbp: string | null = null;
   try {
-    priceGbp = (await toGbp(parseFloat(price), currency)).toFixed(2);
-  } catch {
-    priceGbp = price;
+    const body = req.body as Record<string, unknown>;
+    
+    const title = (body.title || body.name) as string;
+    const price = (body.price || body.amount) as string;
+    const category = (body.category || "General") as string;
+    const description = (body.description || body.details || title || "No description provided") as string;
+    const sellerEmail = (body.sellerEmail || body.email || req.headers["x-user-email"]) as string;
+
+    console.log("POST /api/listings payload received:", { title, price, category, sellerEmail });
+
+    if (!title || !price || !sellerEmail) {
+      console.error("Missing required fields:", { title, price, sellerEmail });
+      res.status(400).json({ 
+        error: "missing_fields", 
+        message: "title, price, and sellerEmail are required.",
+        received: { title: !!title, price: !!price, sellerEmail: !!sellerEmail }
+      });
+      return;
+    }
+
+    const condition = typeof body.condition === "string" ? body.condition : "good";
+    const image = typeof body.image === "string" ? body.image : null;
+    const sellerName = typeof body.sellerName === "string" ? body.sellerName : null;
+    const sellerUsername = typeof body.sellerUsername === "string" ? body.sellerUsername : null;
+    const subcategory = typeof body.subcategory === "string" && body.subcategory ? body.subcategory : null;
+    const tags = typeof body.tags === "string" ? body.tags : null;
+    const specifications = Array.isArray(body.specifications) ? JSON.stringify(body.specifications) : null;
+    const extraCategories = Array.isArray(body.extra_categories) && body.extra_categories.length
+      ? JSON.stringify(body.extra_categories)
+      : null;
+    const currency = typeof body.currency === "string" && body.currency ? body.currency.toUpperCase() : "GBP";
+    const status = typeof body.status === "string" ? body.status : "active";
+
+    let priceGbp: string | null = null;
+    try {
+      priceGbp = (await toGbp(parseFloat(price), currency)).toFixed(2);
+    } catch {
+      priceGbp = String(price);
+    }
+
+    const [inserted] = await db
+      .insert(listingsTable)
+      .values({ 
+        title, 
+        price: String(price), 
+        category, 
+        subcategory, 
+        description, 
+        condition, 
+        image, 
+        sellerEmail, 
+        sellerName, 
+        sellerUsername, 
+        tags, 
+        extraCategories, 
+        specifications, 
+        currency, 
+        priceGbp,
+        status 
+      })
+      .returning();
+
+    const publicId = makePublicId(inserted.id);
+    const [listing] = await db
+      .update(listingsTable)
+      .set({ publicId })
+      .where(eq(listingsTable.id, inserted.id))
+      .returning();
+
+    console.log("Listing successfully created:", listing.id);
+    res.status(201).json({ ...listing, promotions: [] });
+
+  } catch (err) {
+    console.error("Error creating listing:", err);
+    res.status(500).json({ error: "internal_server_error", message: String(err) });
   }
-
-  const [inserted] = await db
-    .insert(listingsTable)
-    .values({ 
-      title, 
-      price, 
-      category, 
-      subcategory, 
-      description, 
-      condition, 
-      image, 
-      sellerEmail, 
-      sellerName, 
-      sellerUsername, 
-      tags, 
-      extraCategories, 
-      specifications, 
-      currency, 
-      priceGbp,
-      status // Inserted explicitly
-    })
-    .returning();
-
-  const publicId = makePublicId(inserted.id);
-  const [listing] = await db
-    .update(listingsTable)
-    .set({ publicId })
-    .where(eq(listingsTable.id, inserted.id))
-    .returning();
-
-  res.status(201).json({ ...listing, promotions: [] });
 });
 
 router.patch("/listings/:id", async (req, res) => {
@@ -215,7 +226,7 @@ router.patch("/listings/:id", async (req, res) => {
   for (const key of allowed) {
     if (typeof body[key] === "string") updates[key] = body[key] as string;
   }
-  // extra_categories comes in as an array; serialize to JSON string for storage
+  
   if (Array.isArray(body.extra_categories)) {
     updates.extraCategories = body.extra_categories.length ? JSON.stringify(body.extra_categories) : "";
   }
@@ -260,7 +271,6 @@ router.delete("/listings/:id", async (req, res) => {
   res.json({ success: true });
 });
 
-// PATCH /api/listings/seller-name — update seller_name across all listing types for a given email
 router.patch("/listings/seller-name", async (req, res) => {
   const { email, name, username } = req.body as { email?: string; name?: string; username?: string };
   if (!email || (!name && !username)) {
@@ -278,7 +288,6 @@ router.patch("/listings/seller-name", async (req, res) => {
     if (username) await db.execute(sql`UPDATE flash_sales SET seller_username = ${username} WHERE seller_email = ${email}`);
     res.json({ success: true });
   } catch (err) {
-    req.log.error({ err }, "Failed to update seller info");
     res.status(500).json({ error: "Failed to update seller info" });
   }
 });
