@@ -1,3 +1,25 @@
+import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react'; // Optional icon library
+
+export default function BuyerProtection() {
+  return (
+    <div className="relative min-h-screen bg-[#0d141c] text-white">
+      {/* Top Left Navigation Link */}
+      <Link 
+        to="/dashboard" 
+        className="absolute top-6 left-6 flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        <span>Back to Dashboard</span>
+      </Link>
+
+      {/* Main Page Content */}
+      <main className="pt-20 text-center">
+        {/* Your existing hero header & badges */}
+      </main>
+    </div>
+  );
+}
 import { Shield, Clock, RotateCcw, Lock, CheckCircle2, AlertCircle, Phone } from 'lucide-react';
 import { Link } from 'wouter';
 
