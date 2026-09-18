@@ -105,6 +105,12 @@ router.get("/listings/mine", async (req, res) => {
     res.status(400).json({ error: "email required" });
     return;
   }
+
+  // Prevent 304 Caching Issues on newly posted items
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+
   const rows = await db
     .select()
     .from(listingsTable)
@@ -283,7 +289,7 @@ router.patch("/listings/seller-name", async (req, res) => {
     if (username) updates.sellerUsername = username;
     await db.update(listingsTable).set(updates).where(eq(listingsTable.sellerEmail, email));
     if (name) await db.execute(sql`UPDATE auctions SET seller_name = ${name} WHERE seller_email = ${email}`);
-    if (username) await db.execute(sql`UPDATE auctions SET seller_username = ${username} WHERE seller_email = ${email}`);
+    if (username) await db.execute(sql`UPDATE flash_sales SET seller_username = ${username} WHERE seller_email = ${email}`);
     if (name) await db.execute(sql`UPDATE flash_sales SET seller_name = ${name} WHERE seller_email = ${email}`);
     if (username) await db.execute(sql`UPDATE flash_sales SET seller_username = ${username} WHERE seller_email = ${email}`);
     res.json({ success: true });
