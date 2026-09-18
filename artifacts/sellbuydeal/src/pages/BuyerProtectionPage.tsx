@@ -1,26 +1,4 @@
-import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react'; // Optional icon library
-
-export default function BuyerProtection() {
-  return (
-    <div className="relative min-h-screen bg-[#0d141c] text-white">
-      {/* Top Left Navigation Link */}
-      <Link 
-        to="/dashboard" 
-        className="absolute top-6 left-6 flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>Back to Dashboard</span>
-      </Link>
-
-      {/* Main Page Content */}
-      <main className="pt-20 text-center">
-        {/* Your existing hero header & badges */}
-      </main>
-    </div>
-  );
-}
-import { Shield, Clock, RotateCcw, Lock, CheckCircle2, AlertCircle, Phone } from 'lucide-react';
+import { Shield, Clock, RotateCcw, Lock, AlertCircle, Phone, ArrowLeft } from 'lucide-react';
 import { Link } from 'wouter';
 
 const GUARANTEES = [
@@ -60,9 +38,20 @@ const HOW_IT_WORKS = [
 export default function BuyerProtectionPage() {
   return (
     <div className="min-h-screen bg-[#1A1D2E] text-white">
-      {/* Hero */}
+      {/* Hero Section */}
       <div className="relative overflow-hidden bg-gradient-to-br from-emerald-900/50 via-[#1A1D2E] to-[#1A1D2E] pt-20 pb-16 px-6">
+        
+        {/* Top-Left Back to Dashboard Link */}
+        <Link 
+          href="/dashboard" 
+          className="absolute top-6 left-6 z-20 flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors bg-white/5 border border-white/10 px-4 py-2 rounded-full backdrop-blur-md"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Back to Dashboard</span>
+        </Link>
+
         <div className="absolute top-0 right-0 w-[50vw] h-[50vw] bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+        
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold px-5 py-2 rounded-full text-sm mb-6">
             <Shield className="w-4 h-4" />
