@@ -1,44 +1,55 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
-import { Lock, Eye, EyeOff, ShieldCheck, Mail } from "lucide-react";
-import { useAdmin } from "@/context/AdminContext";
+import { Mail, Lock, Eye, EyeOff, Shield } from "lucide-react";
 
-export function AdminLoginPage() {
-  const { login } = useAdmin();
-  const [, setLocation] = useLocation();
+export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const ok = await login(email, password);
-    if (ok) {
-      setLocation("/admin/dashboard");
-    } else {
-      setError("Incorrect email or password. Please try again.");
+
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok) {
+        // Save auth data to localStorage if returned by backend
+        if (data.token) {
+          localStorage.setItem("admin_token", data.token);
+        }
+        localStorage.setItem("isAdminAuthenticated", "true");
+
+        // Hard browser reload forces navigation and bypasses Clerk router interference
+        window.location.href = "/admin/dashboard";
+      } else {
+        setError(data.message || "Invalid email or password.");
+      }
+    } catch (err) {
+      setError("Network error. Could not connect to authentication server.");
+    } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-[#1A1D2E] flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="inline-flex mb-4">
-            <img src="/bazunk-logo.png" alt="Bazunk" className="h-10 w-auto object-contain rounded-lg bg-white px-3 py-1.5" />
-          </div>
-          <p className="text-gray-400 text-sm">Admin Panel</p>
-        </div>
-
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-[#F26B21]/20 flex items-center justify-center">
-              <ShieldCheck className="w-5 h-5 text-[#F26B21]" />
+    <div className="min-h-screen bg-[#0D0E12] flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="bg-[#16181E] border border-white/10 rounded-2xl p-6 shadow-2xl">
+          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-white/10">
+            <div className="w-10 h-10 rounded-xl bg-[#F26B21]/10 border border-[#F26B21]/20 flex items-center justify-center text-[#F26B21]">
+              <Shield className="w-5 h-5" />
             </div>
             <div>
               <h1 className="text-white font-bold text-lg">Admin Login</h1>
@@ -48,7 +59,9 @@ export function AdminLoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Email Address</label>
+              <label className="block text-sm text-gray-400 mb-1.5">
+                Email Address
+              </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <input
@@ -65,7 +78,9 @@ export function AdminLoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Password</label>
+              <label className="block text-sm text-gray-400 mb-1.5">
+                Password
+              </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <input
@@ -82,7 +97,11 @@ export function AdminLoginPage() {
                   onClick={() => setShow(!show)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
                 >
-                  {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {show ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
             </div>
@@ -104,7 +123,9 @@ export function AdminLoginPage() {
         </div>
 
         <p className="text-center text-gray-600 text-xs mt-6">
-          Credentials set via <code className="text-gray-500">ADMIN_EMAIL</code> &amp; <code className="text-gray-500">ADMIN_PASSWORD</code> env vars
+          Credentials set via{" "}
+          <code className="text-gray-500">ADMIN_EMAIL</code> &amp;{" "}
+          <code className="text-gray-500">ADMIN_PASSWORD</code> env vars
         </p>
       </div>
     </div>
