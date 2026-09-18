@@ -1,8 +1,8 @@
-```tsx
+import { useState } from "react";
 import { useLocation } from "wouter";
+import { Mail, Lock, Eye, EyeOff, Shield } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
-```
-```tsx
+
 export function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,8 +15,10 @@ export function AdminLoginPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     e.stopPropagation();
+
     setLoading(true);
     setError("");
+
     try {
       const ok = await login(email, password);
       if (ok) {
@@ -24,13 +26,12 @@ export function AdminLoginPage() {
       } else {
         setError("Invalid email or password.");
       }
-    } catch {
+    } catch (err) {
       setError("Network error. Could not connect to authentication server.");
     } finally {
       setLoading(false);
     }
   };
-  // ...rest of the component unchanged
 
   return (
     <div className="min-h-screen bg-[#0D0E12] flex items-center justify-center p-4">
