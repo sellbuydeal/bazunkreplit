@@ -8,17 +8,17 @@ export function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+
     setLoading(true);
     setError("");
 
     try {
       const response = await fetch("/api/admin/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
@@ -30,8 +30,8 @@ export function AdminLoginPage() {
         }
         localStorage.setItem("isAdminAuthenticated", "true");
 
-        // Hard browser reload forces navigation and bypasses Clerk router interference
-        window.location.href = "/admin/dashboard";
+        // Redirect directly to dashboard
+        window.location.replace("/admin/dashboard");
       } else {
         setError(data.message || "Invalid email or password.");
       }
@@ -75,39 +75,7 @@ export function AdminLoginPage() {
                 />
               </div>
             </div>
-const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault(); // MUST BE FIRST LINE
-  e.stopPropagation();
 
-  setLoading(true);
-  setError("");
-
-  try {
-    const response = await fetch("/api/admin/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (response.ok) {
-      if (data.token) {
-        localStorage.setItem("admin_token", data.token);
-      }
-      localStorage.setItem("isAdminAuthenticated", "true");
-
-      // Redirect directly to dashboard
-      window.location.replace("/admin/dashboard");
-    } else {
-      setError(data.message || "Invalid email or password.");
-    }
-  } catch (err) {
-    setError("Network error. Could not connect to authentication server.");
-  } finally {
-    setLoading(false);
-  }
-};
             <div>
               <label className="block text-sm text-gray-400 mb-1.5">
                 Password
