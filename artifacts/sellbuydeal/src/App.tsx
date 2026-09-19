@@ -85,19 +85,7 @@ import { ShippingLabelsPage } from "@/pages/ShippingLabelsPage";
 import BuyerProtectionPage from "@/pages/BuyerProtectionPage";
 import CashbackPage from "@/pages/CashbackPage";
 
-// src/app/layout.tsx
-import IntroSplash from '@/components/IntroSplash';
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <IntroSplash />
-        {children}
-      </body>
-    </html>
-  );
-}
 // ─── Clerk setup ─────────────────────────────────────────────────────────────
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
