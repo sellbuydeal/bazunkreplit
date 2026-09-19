@@ -30,10 +30,6 @@ async function initStripe() {
 
     const stripeSync = await getStripeSync();
 
-    const webhookBase = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
-    await stripeSync.findOrCreateManagedWebhook(`${webhookBase}/api/stripe/webhook`);
-    logger.info("Stripe webhook configured");
-
     stripeSync.syncBackfill()
       .then(() => logger.info("Stripe backfill complete"))
       .catch((err: unknown) => logger.error({ err }, "Stripe backfill error"));
