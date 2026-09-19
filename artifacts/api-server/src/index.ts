@@ -20,11 +20,11 @@ if (Number.isNaN(port) || port <= 0) {
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
-    logger.warn("DATABASE_URL not set â€” skipping Stripe initialization");
+    logger.warn("DATABASE_URL not set — skipping Stripe initialization");
     return;
   }
   try {
-    logger.info("Initializing Stripe schemaâ€¦");
+    logger.info("Initializing Stripe schema…");
     await runMigrations({ databaseUrl });
     logger.info("Stripe schema ready");
 
@@ -273,7 +273,7 @@ async function runAppMigrations() {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       description TEXT NOT NULL,
-      icon TEXT NOT NULL DEFAULT 'ðŸŽ®',
+      icon TEXT NOT NULL DEFAULT '🎮',
       enabled BOOLEAN NOT NULL DEFAULT TRUE,
       credits_min INTEGER NOT NULL DEFAULT 5,
       credits_max INTEGER NOT NULL DEFAULT 50,
@@ -296,15 +296,15 @@ async function runAppMigrations() {
   await run(sql`
     INSERT INTO reward_games (id, name, description, icon, enabled, credits_min, credits_max, daily_plays_per_user)
     VALUES
-      ('daily-checkin',  'Daily Check-In',   'Show up every day and earn free credits instantly.',                              'ðŸ“…', TRUE, 10, 10,  1),
-      ('spin-wheel',     'Spin the Wheel',   'Give the wheel a spin and land on a random credit prize.',                       'ðŸŽ¡', TRUE,  5, 50,  1),
-      ('daily-quiz',     'Daily Quiz',       'Answer today''s marketplace question correctly to earn credits.',                'â“', TRUE, 15, 15,  1),
-      ('scratch-card',   'Scratch Card',     'Scratch to reveal your prize â€” 70% chance of winning each card.',               'ðŸŽ', TRUE,  5, 30,  3),
-      ('word-scramble',  'Word Scramble',    'Unscramble the daily marketplace word to pocket the credits.',                   'ðŸ”¤', TRUE, 20, 20,  1)
+      ('daily-checkin',  'Daily Check-In',   'Show up every day and earn free credits instantly.',                              '📅', TRUE, 10, 10,  1),
+      ('spin-wheel',     'Spin the Wheel',   'Give the wheel a spin and land on a random credit prize.',                       '🎡', TRUE,  5, 50,  1),
+      ('daily-quiz',     'Daily Quiz',       'Answer today''s marketplace question correctly to earn credits.',                '❓', TRUE, 15, 15,  1),
+      ('scratch-card',   'Scratch Card',     'Scratch to reveal your prize — 70% chance of winning each card.',               '🎁', TRUE,  5, 30,  3),
+      ('word-scramble',  'Word Scramble',    'Unscramble the daily marketplace word to pocket the credits.',                   '🔤', TRUE, 20, 20,  1)
     ON CONFLICT (id) DO NOTHING
   `, "reward_games.seed");
 
-  // â”€â”€ Didit KYC verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Didit KYC verification ──────────────────────────────────────────────
   await run(sql`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_status TEXT NOT NULL DEFAULT 'unverified'
   `, "users.verification_status");
@@ -341,7 +341,7 @@ async function runAppMigrations() {
     CREATE INDEX IF NOT EXISTS idx_vwl_created_at   ON verification_webhook_logs (created_at DESC)
   `, "idx_vwl_created_at");
 
-  // Seed default fee rates (5% for all categories) â€” DO NOTHING if already set
+  // Seed default fee rates (5% for all categories) — DO NOTHING if already set
   await run(sql`
     INSERT INTO site_settings (key, value, updated_at) VALUES
       ('fee_rate_default',              '5', NOW()),
