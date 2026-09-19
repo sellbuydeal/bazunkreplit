@@ -14,16 +14,23 @@ async function attachPromotions(rows: (typeof listingsTable.$inferSelect)[]): Pr
   const ids = rows.map((r) => r.id);
   const now = new Date();
 
-  // Safely check active promotions using inArray
-  const promos = await db
-    .select({ listingId: listingPromotionsTable.listingId, type: listingPromotionsTable.type })
-    .from(listingPromotionsTable)
-    .where(
-      and(
-        gt(listingPromotionsTable.expiresAt, now),
-        inArray(listingPromotionsTable.listingId, ids)
-      )
-    );
+  // If listing_promotions is missing or the query fails for any reason,
+  // fall back to showing listings with no promotions rather than letting
+  // the failure take down the whole listings grid.
+  let promos: { listingId: number; type: string }[] = [];
+  try {
+    promos = await db
+      .select({ listingId: listingPromotionsTable.listingId, type: listingPromotionsTable.type })
+      .from(listingPromotionsTable)
+      .where(
+        and(
+          gt(listingPromotionsTable.expiresAt, now),
+          inArray(listingPromotionsTable.listingId, ids)
+        )
+      );
+  } catch (err) {
+    console.error("attachPromotions: listing_promotions query failed, continuing without promotions:", err);
+  }
 
   const promoMap = new Map<number, string[]>();
   for (const p of promos) {
@@ -42,104 +49,129 @@ function promoRank(promotions: string[]): number {
 }
 
 router.get("/listings", async (req, res) => {
-  const { category, sub, limit = "40", offset = "0", ids } = req.query as Record<string, string>;
+  try {
+    const { category, sub, limit = "40", offset = "0", ids } = req.query as Record<string, string>;
 
-  if (ids) {
-    const idList = ids.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
-    if (idList.length === 0) { res.json([]); return; }
-    const rows = await db.select().from(listingsTable).where(inArray(listingsTable.id, idList));
-    res.json(rows);
-    return;
+    if (ids) {
+      const idList = ids.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
+      if (idList.length === 0) { res.json([]); return; }
+      const rows = await db.select().from(listingsTable).where(inArray(listingsTable.id, idList));
+      res.json(rows);
+      return;
+    }
+
+    const parsedLimit = isNaN(parseInt(limit)) ? 40 : parseInt(limit);
+    const parsedOffset = isNaN(parseInt(offset)) ? 0 : parseInt(offset);
+
+    const rows = await db
+      .select()
+      .from(listingsTable)
+      .where(
+        category && category !== "all"
+          ? sub
+            ? and(eq(listingsTable.status, "active"), eq(listingsTable.category, category), eq(listingsTable.subcategory, sub))
+            : and(eq(listingsTable.status, "active"), eq(listingsTable.category, category))
+          : eq(listingsTable.status, "active")
+      )
+      .orderBy(desc(listingsTable.createdAt))
+      .limit(parsedLimit)
+      .offset(parsedOffset);
+
+    const withPromos = await attachPromotions(rows);
+    withPromos.sort((a, b) => promoRank(b.promotions) - promoRank(a.promotions));
+    res.json(withPromos);
+  } catch (err) {
+    console.error("Error fetching listings:", err);
+    res.status(500).json({ error: "internal_server_error", message: String(err) });
   }
-
-  const parsedLimit = isNaN(parseInt(limit)) ? 40 : parseInt(limit);
-  const parsedOffset = isNaN(parseInt(offset)) ? 0 : parseInt(offset);
-
-  const rows = await db
-    .select()
-    .from(listingsTable)
-    .where(
-      category && category !== "all"
-        ? sub
-          ? and(eq(listingsTable.status, "active"), eq(listingsTable.category, category), eq(listingsTable.subcategory, sub))
-          : and(eq(listingsTable.status, "active"), eq(listingsTable.category, category))
-        : eq(listingsTable.status, "active")
-    )
-    .orderBy(desc(listingsTable.createdAt))
-    .limit(parsedLimit)
-    .offset(parsedOffset);
-
-  const withPromos = await attachPromotions(rows);
-  withPromos.sort((a, b) => promoRank(b.promotions) - promoRank(a.promotions));
-  res.json(withPromos);
 });
 
 router.get("/listings/spotlight", async (req, res) => {
-  const now = new Date();
-  const spotlightTypes = ["homepage-spotlight", "spotlight", "featured-badge", "featured", "premium-placement"];
-  
-  const promos = await db
-    .select({ listingId: listingPromotionsTable.listingId })
-    .from(listingPromotionsTable)
-    .where(
-      and(
-        gt(listingPromotionsTable.expiresAt, now),
-        inArray(listingPromotionsTable.type, spotlightTypes)
-      )
-    )
-    .limit(12);
+  try {
+    const now = new Date();
+    const spotlightTypes = ["homepage-spotlight", "spotlight", "featured-badge", "featured", "premium-placement"];
 
-  if (promos.length === 0) { res.json([]); return; }
-  const ids = [...new Set(promos.map(p => p.listingId))];
-  const rows = await db.select().from(listingsTable).where(
-    and(eq(listingsTable.status, "active"), inArray(listingsTable.id, ids))
-  );
-  const withPromos = await attachPromotions(rows);
-  withPromos.sort((a, b) => promoRank(b.promotions) - promoRank(a.promotions));
-  res.json(withPromos);
+    const promos = await db
+      .select({ listingId: listingPromotionsTable.listingId })
+      .from(listingPromotionsTable)
+      .where(
+        and(
+          gt(listingPromotionsTable.expiresAt, now),
+          inArray(listingPromotionsTable.type, spotlightTypes)
+        )
+      )
+      .limit(12);
+
+    if (promos.length === 0) { res.json([]); return; }
+    const ids = [...new Set(promos.map(p => p.listingId))];
+    const rows = await db.select().from(listingsTable).where(
+      and(eq(listingsTable.status, "active"), inArray(listingsTable.id, ids))
+    );
+    const withPromos = await attachPromotions(rows);
+    withPromos.sort((a, b) => promoRank(b.promotions) - promoRank(a.promotions));
+    res.json(withPromos);
+  } catch (err) {
+    console.error("Error fetching spotlight listings:", err);
+    res.status(500).json({ error: "internal_server_error", message: String(err) });
+  }
 });
 
 router.get("/listings/mine", async (req, res) => {
-  const { email } = req.query as Record<string, string>;
-  if (!email) {
-    res.status(400).json({ error: "email required" });
-    return;
+  try {
+    const { email } = req.query as Record<string, string>;
+    if (!email) {
+      res.status(400).json({ error: "email required" });
+      return;
+    }
+
+    // Prevent 304 Caching Issues on newly posted items
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+
+    const rows = await db
+      .select()
+      .from(listingsTable)
+      .where(eq(listingsTable.sellerEmail, email))
+      .orderBy(desc(listingsTable.createdAt))
+      .limit(100);
+    const withPromos = await attachPromotions(rows);
+    res.json(withPromos);
+  } catch (err) {
+    console.error("Error fetching my listings:", err);
+    res.status(500).json({ error: "internal_server_error", message: String(err) });
   }
-
-  // Prevent 304 Caching Issues on newly posted items
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
-
-  const rows = await db
-    .select()
-    .from(listingsTable)
-    .where(eq(listingsTable.sellerEmail, email))
-    .orderBy(desc(listingsTable.createdAt))
-    .limit(100);
-  const withPromos = await attachPromotions(rows);
-  res.json(withPromos);
 });
 
 router.get("/listings/:id", async (req, res) => {
-  const rawId = req.params.id;
-  const numId = parseInt(rawId);
-  let row;
-  if (!isNaN(numId)) {
-    [row] = await db.select().from(listingsTable).where(eq(listingsTable.id, numId)).limit(1);
-  }
-  if (!row) {
-    [row] = await db.select().from(listingsTable).where(eq(listingsTable.publicId, rawId)).limit(1);
-  }
-  if (!row) { res.status(404).json({ error: "not found" }); return; }
-  const [withPromo] = await attachPromotions([row]);
+  try {
+    const rawId = req.params.id;
+    const numId = parseInt(rawId);
+    let row;
+    if (!isNaN(numId)) {
+      [row] = await db.select().from(listingsTable).where(eq(listingsTable.id, numId)).limit(1);
+    }
+    if (!row) {
+      [row] = await db.select().from(listingsTable).where(eq(listingsTable.publicId, rawId)).limit(1);
+    }
+    if (!row) { res.status(404).json({ error: "not found" }); return; }
+    const [withPromo] = await attachPromotions([row]);
 
-  const verResult = await db.execute(sql`
-    SELECT verification_status FROM users WHERE email = ${row.sellerEmail}
-  `);
-  const sellerVerified = verResult.rows[0]?.verification_status === "verified";
+    let sellerVerified = false;
+    try {
+      const verResult = await db.execute(sql`
+        SELECT verification_status FROM users WHERE email = ${row.sellerEmail}
+      `);
+      sellerVerified = verResult.rows[0]?.verification_status === "verified";
+    } catch (err) {
+      console.error("Error checking seller verification, defaulting to unverified:", err);
+    }
 
-  res.json({ ...withPromo, sellerVerified });
+    res.json({ ...withPromo, sellerVerified });
+  } catch (err) {
+    console.error("Error fetching listing:", err);
+    res.status(500).json({ error: "internal_server_error", message: String(err) });
+  }
 });
 
 router.post("/listings", async (req, res) => {
@@ -223,58 +255,68 @@ router.post("/listings", async (req, res) => {
 });
 
 router.patch("/listings/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const { email } = req.query as Record<string, string>;
-  if (!email) { res.status(400).json({ error: "email required" }); return; }
-  const body = req.body as Record<string, unknown>;
-  const allowed = ["title", "price", "description", "condition", "category", "subcategory", "image", "status", "currency"] as const;
-  const updates: Partial<Record<typeof allowed[number] | "extraCategories", string>> = {};
-  for (const key of allowed) {
-    if (typeof body[key] === "string") updates[key] = body[key] as string;
-  }
-  
-  if (Array.isArray(body.extra_categories)) {
-    updates.extraCategories = body.extra_categories.length ? JSON.stringify(body.extra_categories) : "";
-  }
-  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "no fields to update" }); return; }
-
-  if (updates.price || updates.currency) {
-    const [current] = await db.select({ price: listingsTable.price, currency: listingsTable.currency })
-      .from(listingsTable).where(eq(listingsTable.id, id)).limit(1);
-    if (current) {
-      const price = updates.price ?? current.price;
-      const currency = (updates.currency ?? current.currency ?? "GBP").toUpperCase();
-      try {
-        (updates as Record<string, string>).priceGbp = (await toGbp(parseFloat(price), currency)).toFixed(2);
-      } catch { /* keep existing */ }
+  try {
+    const id = parseInt(req.params.id);
+    const { email } = req.query as Record<string, string>;
+    if (!email) { res.status(400).json({ error: "email required" }); return; }
+    const body = req.body as Record<string, unknown>;
+    const allowed = ["title", "price", "description", "condition", "category", "subcategory", "image", "status", "currency"] as const;
+    const updates: Partial<Record<typeof allowed[number] | "extraCategories", string>> = {};
+    for (const key of allowed) {
+      if (typeof body[key] === "string") updates[key] = body[key] as string;
     }
-  }
 
-  const updated = await db
-    .update(listingsTable)
-    .set(updates)
-    .where(and(eq(listingsTable.id, id), eq(listingsTable.sellerEmail, email)))
-    .returning();
-  if (updated.length === 0) { res.status(404).json({ error: "Listing not found or not yours" }); return; }
-  res.json(updated[0]);
+    if (Array.isArray(body.extra_categories)) {
+      updates.extraCategories = body.extra_categories.length ? JSON.stringify(body.extra_categories) : "";
+    }
+    if (Object.keys(updates).length === 0) { res.status(400).json({ error: "no fields to update" }); return; }
+
+    if (updates.price || updates.currency) {
+      const [current] = await db.select({ price: listingsTable.price, currency: listingsTable.currency })
+        .from(listingsTable).where(eq(listingsTable.id, id)).limit(1);
+      if (current) {
+        const price = updates.price ?? current.price;
+        const currency = (updates.currency ?? current.currency ?? "GBP").toUpperCase();
+        try {
+          (updates as Record<string, string>).priceGbp = (await toGbp(parseFloat(price), currency)).toFixed(2);
+        } catch { /* keep existing */ }
+      }
+    }
+
+    const updated = await db
+      .update(listingsTable)
+      .set(updates)
+      .where(and(eq(listingsTable.id, id), eq(listingsTable.sellerEmail, email)))
+      .returning();
+    if (updated.length === 0) { res.status(404).json({ error: "Listing not found or not yours" }); return; }
+    res.json(updated[0]);
+  } catch (err) {
+    console.error("Error updating listing:", err);
+    res.status(500).json({ error: "internal_server_error", message: String(err) });
+  }
 });
 
 router.delete("/listings/:id", async (req, res) => {
-  const id = parseInt(req.params.id);
-  const { email } = req.query as Record<string, string>;
-  if (!email) {
-    res.status(400).json({ error: "email required" });
-    return;
+  try {
+    const id = parseInt(req.params.id);
+    const { email } = req.query as Record<string, string>;
+    if (!email) {
+      res.status(400).json({ error: "email required" });
+      return;
+    }
+    const deleted = await db
+      .delete(listingsTable)
+      .where(and(eq(listingsTable.id, id), eq(listingsTable.sellerEmail, email)))
+      .returning();
+    if (deleted.length === 0) {
+      res.status(404).json({ error: "Listing not found or not yours" });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Error deleting listing:", err);
+    res.status(500).json({ error: "internal_server_error", message: String(err) });
   }
-  const deleted = await db
-    .delete(listingsTable)
-    .where(and(eq(listingsTable.id, id), eq(listingsTable.sellerEmail, email)))
-    .returning();
-  if (deleted.length === 0) {
-    res.status(404).json({ error: "Listing not found or not yours" });
-    return;
-  }
-  res.json({ success: true });
 });
 
 router.patch("/listings/seller-name", async (req, res) => {
