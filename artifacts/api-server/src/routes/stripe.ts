@@ -18,13 +18,23 @@ const PACKAGES: Record<string, { price: number; bonus: number; name: string }> =
   business: { price: 100, bonus: 20,   name: "Business Package" },
 };
 
+// Falls back to a real, valid URL instead of "https://undefined" (which Stripe
+// rejects) when there's no Origin header and PUBLIC_BASE_URL isn't set.
+function resolveOrigin(req: import("express").Request): string {
+  return (
+    req.headers.origin ||
+    process.env.PUBLIC_BASE_URL ||
+    "https://bazunk-web.onrender.com"
+  );
+}
+
 router.get("/stripe/publishable-key", async (_req, res) => {
   try {
     const publishableKey = await getStripePublishableKey();
     res.json({ publishableKey });
   } catch (err) {
     logger.error({ err }, "Failed to get publishable key");
-    res.status(500).json({ error: "Failed to get publishable key" });
+    res.status(500).json({ error: "Failed to get publishable key", message: String(err) });
   }
 });
 
@@ -36,7 +46,7 @@ router.get("/stripe/balance/:email", async (req, res) => {
     res.json({ balance });
   } catch (err) {
     logger.error({ err }, "Failed to get balance");
-    res.status(500).json({ error: "Failed to get balance" });
+    res.status(500).json({ error: "Failed to get balance", message: String(err) });
   }
 });
 
@@ -49,7 +59,7 @@ router.post("/stripe/sync-user", async (req, res) => {
     res.json({ balance });
   } catch (err) {
     logger.error({ err }, "Failed to sync user");
-    res.status(500).json({ error: "Failed to sync user" });
+    res.status(500).json({ error: "Failed to sync user", message: String(err) });
   }
 });
 
@@ -95,7 +105,7 @@ router.post("/stripe/checkout", async (req, res) => {
       stripeCustomerId = customer.id;
     }
 
-    const origin = req.headers.origin || `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
+    const origin = resolveOrigin(req);
 
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
@@ -125,7 +135,7 @@ router.post("/stripe/checkout", async (req, res) => {
     res.json({ url: session.url });
   } catch (err) {
     logger.error({ err }, "Failed to create checkout session");
-    res.status(500).json({ error: "Failed to create checkout session" });
+    res.status(500).json({ error: "Failed to create checkout session", message: String(err) });
   }
 });
 
@@ -202,7 +212,7 @@ router.post("/stripe/checkout-cart", async (req, res) => {
       stripeCustomerId = customer.id;
     }
 
-    const origin = req.headers.origin || `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
+    const origin = resolveOrigin(req);
 
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
@@ -222,7 +232,7 @@ router.post("/stripe/checkout-cart", async (req, res) => {
     res.json({ url: session.url });
   } catch (err) {
     logger.error({ err }, "Failed to create cart checkout session");
-    res.status(500).json({ error: "Failed to create checkout session" });
+    res.status(500).json({ error: "Failed to create checkout session", message: String(err) });
   }
 });
 
@@ -275,7 +285,7 @@ router.post("/stripe/confirm-cart-payment", async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     logger.error({ err }, "Failed to confirm cart payment");
-    res.status(500).json({ error: "Failed to confirm payment" });
+    res.status(500).json({ error: "Failed to confirm payment", message: String(err) });
   }
 });
 
@@ -303,7 +313,7 @@ router.post("/stripe/connect/onboard", async (req, res) => {
       await storage.setStripeAccountId(email, accountId);
     }
 
-    const origin = returnUrl ?? req.headers.origin ?? `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
+    const origin = returnUrl ?? resolveOrigin(req);
     const link = await stripe.accountLinks.create({
       account: accountId,
       refresh_url: `${origin}/dashboard?section=seller-payouts&connect=refresh`,
@@ -314,7 +324,7 @@ router.post("/stripe/connect/onboard", async (req, res) => {
     res.json({ url: link.url, accountId });
   } catch (err) {
     logger.error({ err }, "Failed to create Connect onboarding link");
-    res.status(500).json({ error: "Failed to start onboarding" });
+    res.status(500).json({ error: "Failed to start onboarding", message: String(err) });
   }
 });
 
@@ -340,7 +350,7 @@ router.get("/stripe/connect/status/:email", async (req, res) => {
     });
   } catch (err) {
     logger.error({ err }, "Failed to get Connect status");
-    res.status(500).json({ error: "Failed to get connect status" });
+    res.status(500).json({ error: "Failed to get connect status", message: String(err) });
   }
 });
 
@@ -358,7 +368,7 @@ router.get("/stripe/connect/dashboard-link/:email", async (req, res) => {
     res.json({ url: link.url });
   } catch (err) {
     logger.error({ err }, "Failed to create dashboard link");
-    res.status(500).json({ error: "Failed to get dashboard link" });
+    res.status(500).json({ error: "Failed to get dashboard link", message: String(err) });
   }
 });
 
@@ -398,8 +408,9 @@ router.post("/stripe/apply-credits", async (req, res) => {
     res.json({ success: true, creditsAdded: totalCredits, balance });
   } catch (err) {
     logger.error({ err }, "Failed to apply credits");
-    res.status(500).json({ error: "Failed to apply credits" });
+    res.status(500).json({ error: "Failed to apply credits", message: String(err) });
   }
 });
 
 export default router;
+
