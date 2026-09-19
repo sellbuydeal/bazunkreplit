@@ -36,7 +36,7 @@ export default function IntroSplash() {
       }}
     >
       <video
-        src="/attached_assets/bazunkintro2.mp4"
+        src="/attached_assets/bazunkintro2.gif"
         autoPlay
         muted
         playsInline
