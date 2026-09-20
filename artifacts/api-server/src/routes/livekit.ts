@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { AccessToken } from "livekit-server-sdk";
 import { logger } from "../lib/logger.js";
+import { storage } from "../storage.js";
 
 const router = Router();
 
@@ -42,6 +43,17 @@ router.get("/livekit/token", async (req, res) => {
       canSubscribe: true,
     });
     const token = await at.toJwt();
+
+    // identity is the broadcaster's email (see LiveKitBroadcaster/LiveKitViewer
+    // callers). A publish-capable token means this user is going live —
+    // complete the "Go Live!" milestone. Fire-and-forget: never block or
+    // fail the stream over a milestone-tracking issue.
+    if (canPublish === "true") {
+      storage.completeMilestone(identity, "first-live").catch((err) => {
+        logger.error({ err, identity }, "Failed to record first-live milestone");
+      });
+    }
+
     res.json({ token, wsUrl: cfg.wsUrl });
   } catch (err) {
     logger.error({ err }, "Failed to generate LiveKit token");
@@ -50,3 +62,4 @@ router.get("/livekit/token", async (req, res) => {
 });
 
 export default router;
+
