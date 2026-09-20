@@ -1000,7 +1000,7 @@ export function QuickSellPage() {
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1.5 block">Shipping Price</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">{currency.split(" ")[0]}</span>
                   <input
                     type="number"
                     min="0"
@@ -1016,7 +1016,7 @@ export function QuickSellPage() {
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1.5 block">Handling Charge (Optional)</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">$</span>
+                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">{currency.split(" ")[0]}</span>
                   <input
                     type="number"
                     min="0"
