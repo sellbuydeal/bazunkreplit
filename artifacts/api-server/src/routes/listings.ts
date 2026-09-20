@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, listingsTable, listingPromotionsTable } from "@workspace/db";
 import { eq, desc, and, gt, sql, inArray } from "drizzle-orm";
 import { toGbp } from "../fxRates.js";
+import { storage } from "../storage.js";
 
 const router = Router();
 
@@ -246,6 +247,14 @@ router.post("/listings", async (req, res) => {
       .returning();
 
     console.log("Listing successfully created:", listing.id);
+
+    // First listing ever posted by this seller completes the "First
+    // Listing" milestone. Safe to call on every post — completeMilestone()
+    // never un-completes it.
+    storage.completeMilestone(sellerEmail, "first-listing").catch((err) => {
+      console.error("Failed to record first-listing milestone:", err);
+    });
+
     res.status(201).json({ ...listing, promotions: [] });
 
   } catch (err) {
