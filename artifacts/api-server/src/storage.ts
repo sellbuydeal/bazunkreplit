@@ -14,7 +14,11 @@ export class Storage {
       .values({ id: email, email, name: name ?? null, credits: "0.50" })
       .onConflictDoNothing()
       .returning();
-    if (inserted) return inserted;
+    if (inserted) {
+      // Genuinely new user — mark the "Welcome to Bazunk!" milestone complete.
+      await this.completeMilestone(email, "welcome-bonus").catch(() => {});
+      return inserted;
+    }
 
     // Existing user — just refresh name if supplied
     const [updated] = await db
@@ -77,6 +81,24 @@ export class Storage {
       .insert(creditTransactionsTable)
       .values({ id: sessionId, email, creditsAdded: creditsAdded.toString() })
       .onConflictDoNothing();
+  }
+
+  /**
+   * Marks a milestone as completed (progress = 1, completed = true) for a
+   * user. Safe to call repeatedly — it never un-completes a milestone or
+   * resets progress once it's done. "claimed" (whether the user has
+   * collected the credit reward) is left untouched here; that's only ever
+   * set by the existing /api/user/milestones/:id/claim route.
+   */
+  async completeMilestone(email: string, milestoneId: string) {
+    await db.execute(sql`
+      INSERT INTO user_milestones (email, milestone_id, progress, completed, claimed, updated_at)
+      VALUES (${email}, ${milestoneId}, 1, TRUE, FALSE, NOW())
+      ON CONFLICT (email, milestone_id) DO UPDATE
+        SET progress = GREATEST(user_milestones.progress, 1),
+            completed = TRUE,
+            updated_at = NOW()
+    `);
   }
 }
 
