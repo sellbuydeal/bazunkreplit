@@ -52,7 +52,7 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
     const ids = lines.map((l) => l.id);
     const rows = ids.length
       ? (await db.execute(sql`
-          SELECT id, title, image, price, price_gbp, seller_email FROM listings WHERE id = ANY(${ids}::int[])
+          SELECT id, title, image, price, price_gbp, seller_email FROM listings WHERE id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})
         `)).rows as Array<Record<string, unknown>>
       : [];
     const byId = new Map(rows.map((r) => [Number(r.id), r]));
