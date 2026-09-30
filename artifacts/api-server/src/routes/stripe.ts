@@ -4,6 +4,7 @@ import { getUncachableStripeClient, getStripePublishableKey } from "../stripeCli
 import { convertAmount, smallestUnit } from "../fxRates.js";
 import { logger } from "../lib/logger.js";
 import { sendCreditsConfirmation, sendOrderConfirmation } from "../email.js";
+import { fulfillCartSession } from "../lib/fulfillment.js";
 
 const router = Router();
 
@@ -144,7 +145,7 @@ router.post("/stripe/checkout-cart", async (req, res) => {
     const body = req.body as Record<string, unknown>;
     const email = body.email as string;
     const name = body.name as string | undefined;
-    const items = body.items as Array<{ title: string; price: number; quantity: number; currency?: string; priceGbp?: number }>;
+    const items = body.items as Array<{ id?: number; title: string; price: number; quantity: number; currency?: string; priceGbp?: number }>;
     const total = parseFloat(body.total as string);
     const creditsApplied = parseFloat((body.creditsApplied as string) ?? "0") || 0;
     const deliveryGbp = parseFloat((body.deliveryGbp as string) ?? "0") || 0;
@@ -222,6 +223,12 @@ router.post("/stripe/checkout-cart", async (req, res) => {
       metadata: {
         email,
         type: "cart",
+        // "listingId:qty,..." — fulfilment looks up seller/price from the listings table
+        items: items
+          .filter((i) => Number.isInteger(i.id))
+          .map((i) => `${i.id}:${i.quantity}`)
+          .join(",")
+          .slice(0, 500),
         creditsApplied: creditsApplied.toFixed(2),
         chargeCurrency,
       },
@@ -247,31 +254,9 @@ router.post("/stripe/confirm-cart-payment", async (req, res) => {
     if (!email) { res.status(400).json({ error: "email required" }); return; }
 
     if (sessionId) {
-      const alreadyApplied = await storage.hasCreditTransaction(`cart-${sessionId}`);
-      if (alreadyApplied) {
-        res.json({ success: true, alreadyApplied: true }); return;
-      }
-
-      const stripe = await getUncachableStripeClient();
-      const session = await stripe.checkout.sessions.retrieve(sessionId);
-      if (session.payment_status !== "paid") {
-        res.status(400).json({ error: "Payment not completed" }); return;
-      }
-      if (session.client_reference_id !== email) {
-        res.status(403).json({ error: "Email mismatch" }); return;
-      }
-
-      const sessionCredits = parseFloat(session.metadata?.creditsApplied ?? "0") || 0;
-      await storage.recordCreditTransaction(`cart-${sessionId}`, email, 0);
-      if (sessionCredits > 0) {
-        await storage.addCredits(email, -sessionCredits);
-      }
-      // Send order confirmation (fire-and-forget)
-      const cartItems = body.items as Array<{ title: string; price: number; quantity: number }> | undefined;
-      if (cartItems?.length) {
-        const paidTotal = parseFloat(body.total as string ?? "0") || 0;
-        void sendOrderConfirmation({ email, name: body.name as string | undefined, items: cartItems, total: paidTotal });
-      }
+      const result = await fulfillCartSession(sessionId, email);
+      if (result.status === "not_paid") { res.status(400).json({ error: "Payment not completed" }); return; }
+      if (result.status === "email_mismatch") { res.status(403).json({ error: "Email mismatch" }); return; }
     } else if (freeOrder) {
       if (creditsApplied > 0) {
         await storage.addCredits(email, -creditsApplied);

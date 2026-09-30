@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/adminAuth.js";
 import { randomUUID } from "crypto";
+import { storage } from "../storage.js";
 
 const router = Router();
 
@@ -91,6 +92,9 @@ router.post("/flash-sales", async (req, res) => {
       ${op}, ${sp}, ${discountPercent}, ${startsAt}, ${endsAt}, ${status}, ${resolvedType}, NOW(), NOW()
     )
   `);
+  storage.completeMilestone(sellerEmail, "first-flash-sale").catch((err) => {
+    console.error("Failed to record first-flash-sale milestone:", err);
+  });
   res.status(201).json({ id });
 });
 

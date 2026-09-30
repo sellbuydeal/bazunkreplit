@@ -80,7 +80,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error("🚨 UNCAUGHT EXPRESS ERROR:", err.stack || err);
   res.status(500).json({
     error: err.message || "Internal Server Error",
-    stack: process.env.NODE_NODE_ENV === "development" ? err.stack : undefined,
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
   });
 });
 

@@ -115,6 +115,13 @@ async function runAppMigrations() {
     )
   `, "orders");
 
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_session_id TEXT`, "orders.stripe_session_id");
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS line_no INTEGER`, "orders.line_no");
+  await run(
+    sql`CREATE UNIQUE INDEX IF NOT EXISTS orders_session_line_uniq ON orders (stripe_session_id, line_no)`,
+    "orders_session_line_uniq",
+  );
+
   await run(sql`
     CREATE TABLE IF NOT EXISTS returns (
       id TEXT PRIMARY KEY,

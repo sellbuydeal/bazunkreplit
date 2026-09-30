@@ -3,6 +3,7 @@ import { db, listingsTable, listingPromotionsTable } from "@workspace/db";
 import { eq, desc, and, gt, sql, inArray } from "drizzle-orm";
 import { toGbp } from "../fxRates.js";
 import { storage } from "../storage.js";
+import { refreshSellerMilestones } from "../lib/milestones.js";
 
 const router = Router();
 
@@ -254,6 +255,9 @@ router.post("/listings", async (req, res) => {
     storage.completeMilestone(sellerEmail, "first-listing").catch((err) => {
       console.error("Failed to record first-listing milestone:", err);
     });
+
+    // Active Lister (5/month) and Inventory Master (20/month)
+    void refreshSellerMilestones(sellerEmail);
 
     res.status(201).json({ ...listing, promotions: [] });
 

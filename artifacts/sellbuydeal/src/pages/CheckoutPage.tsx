@@ -142,6 +142,7 @@ export function CheckoutPage() {
           email: user.email,
           name: user.name,
           items: items.map((i) => ({
+            id: i.product.id,
             title: i.product.title,
             price: i.product.price,
             quantity: i.quantity,
