@@ -66,6 +66,7 @@ export function CheckoutPage() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [guestEmail, setGuestEmail] = useState("");
 
   const userCredits = user?.balance ?? 0;
   const appliedPromo = promoCode ? PROMO_CODES[promoCode] : null;
@@ -88,7 +89,7 @@ export function CheckoutPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");
-    if (!sessionId || !user?.email) return;
+    if (!sessionId) return;
 
     setConfirming(true);
     // Clean the URL without reloading
@@ -97,7 +98,7 @@ export function CheckoutPage() {
     fetch("/api/stripe/confirm-cart-payment", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId, email: user.email }),
+      body: JSON.stringify({ sessionId }),
     })
       .then((r) => r.json())
       .then((data: { success?: boolean; error?: string }) => {
@@ -111,7 +112,12 @@ export function CheckoutPage() {
       })
       .catch(() => setCheckoutError("Could not verify payment. Please contact support."))
       .finally(() => setConfirming(false));
-  }, [user?.email]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh the credit balance once the order is placed and the signed-in user has loaded
+  useEffect(() => {
+    if (placed && user?.email) refreshBalance();
+  }, [placed, user?.email]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyPromo() {
     setPromoError("");
@@ -126,8 +132,9 @@ export function CheckoutPage() {
   }
 
   async function handleContinueToPayment() {
-    if (!user?.email) {
-      setCheckoutError("Please sign in to continue.");
+    const email = user?.email ?? guestEmail.trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setCheckoutError("Please enter a valid email address to continue.");
       return;
     }
     setCheckoutError(null);
@@ -139,8 +146,8 @@ export function CheckoutPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: user.email,
-          name: user.name,
+          email,
+          name: user?.name,
           items: items.map((i) => ({
             id: i.product.id,
             title: i.product.title,
@@ -390,6 +397,20 @@ export function CheckoutPage() {
                     </>
                   )}
                 </div>
+
+                {!user && (
+                  <div className="mt-4">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">Email for your receipt</label>
+                    <input
+                      type="email"
+                      value={guestEmail}
+                      onChange={(e) => setGuestEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8]"
+                      data-testid="input-guest-email"
+                    />
+                  </div>
+                )}
 
                 <button
                   onClick={handleContinueToPayment}

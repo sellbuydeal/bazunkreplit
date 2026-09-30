@@ -2,16 +2,26 @@
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import { logger } from "./lib/logger.js";
 
-const FROM = "Bazunk <onboarding@resend.dev>";
+const FROM = process.env.EMAIL_FROM ?? "Bazunk <onboarding@resend.dev>";
+const SITE = process.env.PUBLIC_BASE_URL ?? "https://bazunk-web.onrender.com";
 
 async function send(to: string, subject: string, html: string): Promise<void> {
   try {
-    const connectors = new ReplitConnectors();
-    const res = await connectors.proxy("resend", "/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM, to: [to], subject, html }),
-    });
+    const payload = JSON.stringify({ from: FROM, to: [to], subject, html });
+    const res = process.env.RESEND_API_KEY
+      ? await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          },
+          body: payload,
+        })
+      : await new ReplitConnectors().proxy("resend", "/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+        });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       logger.warn({ to, subject, status: res.status, body: text }, "Resend non-OK response");
@@ -62,7 +72,7 @@ export async function sendNewBidNotification(opts: {
     <p><strong>${bidderName}</strong> just placed a bid of <span class="highlight">£${bidAmount.toFixed(2)}</span> on your auction:</p>
     <p><strong>${auctionTitle}</strong></p>
     <p>Total bids so far: ${currentBidCount}</p>
-    <p><a class="btn" href="https://bazunk.replit.app/auctions/${auctionId}">View Auction</a></p>
+    <p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>
     <p>Good luck with your sale!</p>
   `);
   await send(sellerEmail, `New bid on "${auctionTitle}"`, html);
@@ -83,7 +93,7 @@ export async function sendOutbidNotification(opts: {
     <p>Someone has placed a higher bid of <span class="highlight">£${newBidAmount.toFixed(2)}</span> on:</p>
     <p><strong>${auctionTitle}</strong></p>
     <p>You can still win — the minimum next bid is <strong>£${minNextBid.toFixed(2)}</strong>.</p>
-    <p><a class="btn" href="https://bazunk.replit.app/auctions/${auctionId}">Bid Again</a></p>
+    <p><a class="btn" href="${SITE}/auctions/${auctionId}">Bid Again</a></p>
   `);
   await send(email, `You've been outbid on "${auctionTitle}"`, html);
 }
@@ -102,7 +112,7 @@ export async function sendAuctionWonNotification(opts: {
     <p>Congratulations ${winnerName},</p>
     <p>You won <strong>${auctionTitle}</strong> with a bid of <span class="highlight">£${winningBid.toFixed(2)}</span>.</p>
     <p>The seller <strong>${sellerName}</strong> will be in touch to arrange delivery or collection.</p>
-    <p><a class="btn" href="https://bazunk.replit.app/auctions/${auctionId}">View Auction</a></p>
+    <p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>
   `);
   await send(winnerEmail, `You won "${auctionTitle}"!`, html);
 }
@@ -123,7 +133,7 @@ export async function sendAuctionEndedSellerNotification(opts: {
     <p>Your auction <strong>${auctionTitle}</strong> has ended with a winning bid of <span class="highlight">£${winningBid.toFixed(2)}</span>.</p>
     <p>Winner: <strong>${winnerName}</strong> (${winnerEmail})</p>
     <p>Please arrange delivery or collection with the winner.</p>
-    <p><a class="btn" href="https://bazunk.replit.app/auctions/${auctionId}">View Auction</a></p>
+    <p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>
   `);
   await send(sellerEmail, `Your auction "${auctionTitle}" has ended`, html);
 }
@@ -141,7 +151,7 @@ export async function sendCreditsConfirmation(opts: {
     <p><span class="highlight">£${creditsAdded.toFixed(2)}</span> in credits have been added to your Bazunk account.</p>
     <p>Your new balance is <strong>£${newBalance.toFixed(2)}</strong>.</p>
     <p>Use your credits to buy listings or boost your auctions on Bazunk.</p>
-    <p><a class="btn" href="https://bazunk.replit.app/dashboard">Go to Dashboard</a></p>
+    <p><a class="btn" href="${SITE}/dashboard">Go to Dashboard</a></p>
   `);
   await send(email, "Your Bazunk credits have been added", html);
 }
@@ -170,7 +180,7 @@ export async function sendOrderConfirmation(opts: {
       <tfoot><tr><td colspan="2" style="padding:8px 0;font-weight:700">Total</td><td style="padding:8px 0;font-weight:700;text-align:right">£${total.toFixed(2)}</td></tr></tfoot>
     </table>
     <p>The seller will be in touch to arrange delivery or collection.</p>
-    <p><a class="btn" href="https://bazunk.replit.app/dashboard">View My Orders</a></p>
+    <p><a class="btn" href="${SITE}/dashboard">View My Orders</a></p>
   `);
   await send(email, "Your Bazunk order is confirmed", html);
 }

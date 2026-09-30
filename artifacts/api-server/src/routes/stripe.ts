@@ -251,7 +251,7 @@ router.post("/stripe/confirm-cart-payment", async (req, res) => {
     const creditsApplied = parseFloat((body.creditsApplied as string) ?? "0") || 0;
     const freeOrder = body.freeOrder === true;
 
-    if (!email) { res.status(400).json({ error: "email required" }); return; }
+    if (!email && !sessionId) { res.status(400).json({ error: "email required" }); return; }
 
     if (sessionId) {
       const result = await fulfillCartSession(sessionId, email);
