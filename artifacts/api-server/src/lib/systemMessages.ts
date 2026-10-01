@@ -14,17 +14,24 @@ export async function sendSystemMessage(email: string, msg: SystemMessage): Prom
   try {
     const category = msg.category ?? "Notification";
     const kind = msg.kind ?? null;
-    const created = await db.execute(sql`
-      INSERT INTO support_tickets (email, subject, category, status, kind)
-      VALUES (${email}, ${msg.subject}, ${category}, 'closed', ${kind})
-      ON CONFLICT (email, kind) WHERE kind IS NOT NULL DO NOTHING
-      RETURNING id
-    `);
-    const id = (created.rows[0] as { id?: number } | undefined)?.id;
-    if (!id) return; // a one-time notice that was already sent
+    if (kind) {
+      // Heal: a one-time notice that exists with no message in it would block the real one forever.
+      await db.execute(sql`
+        DELETE FROM support_tickets t
+        WHERE t.email = ${email} AND t.kind = ${kind}
+          AND NOT EXISTS (SELECT 1 FROM support_ticket_messages m WHERE m.ticket_id = t.id)
+      `);
+    }
+    // One statement: the notice and its message are created together or not at all.
     await db.execute(sql`
+      WITH t AS (
+        INSERT INTO support_tickets (email, subject, category, status, kind)
+        VALUES (${email}, ${msg.subject}, ${category}, 'closed', ${kind})
+        ON CONFLICT (email, kind) WHERE kind IS NOT NULL DO NOTHING
+        RETURNING id
+      )
       INSERT INTO support_ticket_messages (ticket_id, author, author_type, body, read_by_user)
-      VALUES (${id}, 'Bazunk', 'admin', ${msg.body}, FALSE)
+      SELECT id, 'Bazunk'::text, 'admin'::text, ${msg.body}::text, FALSE FROM t
     `);
   } catch (err) {
     logger.error({ err, email }, "Failed to send system message");

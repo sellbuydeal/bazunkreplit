@@ -128,7 +128,9 @@ router.get("/support/inbox", async (req, res) => {
 
     const tickets = await db.execute(
       sql`SELECT id, subject, category, status FROM support_tickets
-          WHERE email = ${email} ORDER BY updated_at DESC, id DESC`
+          WHERE email = ${email}
+            AND EXISTS (SELECT 1 FROM support_ticket_messages m WHERE m.ticket_id = support_tickets.id)
+          ORDER BY updated_at DESC, id DESC`
     ).then(r => r.rows as any[]);
 
     const messages = await db.execute(

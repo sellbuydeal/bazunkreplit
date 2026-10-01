@@ -231,7 +231,7 @@ function SupportThreadRow({
 }: {
   ticket: SupportTicket; active: boolean; onClick: () => void;
 }) {
-  const last = ticket.messages[ticket.messages.length - 1];
+  const last = ticket.messages[ticket.messages.length - 1] ?? { timestamp: new Date().toISOString() };
   return (
     <button
       onClick={onClick}
@@ -535,7 +535,13 @@ export function MessageCenterOverlay({ open, onClose }: { open: boolean; onClose
     }
   }, [user?.email]);
 
-  useEffect(() => { if (open) void loadInbox(); }, [open, loadInbox]);
+  useEffect(() => {
+    if (!open) return;
+    void loadInbox();
+    const retry = setTimeout(() => { void loadInbox(); }, 2500);
+    const poll = setInterval(() => { void loadInbox(); }, 20000);
+    return () => { clearTimeout(retry); clearInterval(poll); };
+  }, [open, loadInbox]);
 
   const memberUnread = conversations.reduce((s, c) => s + c.unread, 0);
   const bazunkUnread = tickets.reduce((s, t) => s + t.unread, 0);
