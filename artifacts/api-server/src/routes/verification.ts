@@ -49,9 +49,12 @@ router.post("/verification/session", async (req, res) => {
     return;
   }
 
-  const host = `https://${process.env.REPLIT_DOMAINS?.split(",")[0]}`;
-  const redirectUrl = `${host}/dashboard?section=verification&verified=1`;
-  const callbackUrl = `${host}/api/verification/webhook`;
+  // PUBLIC_BASE_URL = the frontend (where the user returns to)
+  // PUBLIC_API_URL  = this API service (where Didit sends the webhook)
+  const siteUrl = (process.env.PUBLIC_BASE_URL ?? "https://bazunk-web.onrender.com").replace(/\/$/, "");
+  const apiUrl = (process.env.PUBLIC_API_URL ?? siteUrl).replace(/\/$/, "");
+  const redirectUrl = `${siteUrl}/dashboard?section=verification&verified=1`;
+  const callbackUrl = `${apiUrl}/api/verification/webhook`;
 
   try {
     const session = await createVerificationSession({

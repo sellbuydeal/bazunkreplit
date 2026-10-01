@@ -27,7 +27,7 @@ router.get("/setup/status", async (_req, res) => {
     stripe: {
       ok: false,
       label: "Stripe Payments",
-      hint: "Connect Stripe via the Replit Stripe integration.",
+      hint: "Set STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY and STRIPE_WEBHOOK_SECRET.",
     },
   };
 
