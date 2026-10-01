@@ -5,6 +5,7 @@ import { db, classifiedAdsTable } from "@workspace/db";
 import { createAdminToken, requireAdmin } from "../middlewares/adminAuth.js";
 import { getUncachableStripeClient } from "../stripeClient.js";
 import { logger } from "../lib/logger.js";
+import { syncMilestonesFor } from "../lib/milestones.js";
 import { DEMO_PRODUCTS } from "../demoSeedData.js";
 import { fetchAmazonDetails, buildAmazonDescription } from "../lib/amazon.js";
 import { fetchEbayDetails, buildEbayDescription } from "../lib/ebay.js";
@@ -316,6 +317,7 @@ router.get("/user/milestones", async (req, res) => {
   try {
     const email = req.query.email as string;
     if (!email) { res.status(400).json({ error: "email required" }); return; }
+    await syncMilestonesFor(email);
     const rows = await db.execute(
       sql`SELECT milestone_id, progress, completed, claimed FROM user_milestones WHERE email = ${email}`
     ).then(r => r.rows as any[]);

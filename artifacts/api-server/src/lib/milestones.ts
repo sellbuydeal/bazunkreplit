@@ -54,3 +54,33 @@ export async function refreshSellerMilestones(email: string): Promise<void> {
     logger.error({ err, email }, "Failed to refresh seller milestones");
   }
 }
+
+/**
+ * Brings a user's milestones up to date from data that already exists, so
+ * listings/sales/accounts created BEFORE the triggers were added still count.
+ * Called every time the Rewards page loads. Safe to call repeatedly.
+ */
+export async function syncMilestonesFor(email: string): Promise<void> {
+  if (!email) return;
+  await refreshSellerMilestones(email);
+  const oneTime: Array<[string, ReturnType<typeof sql>]> = [
+    ["welcome-bonus", sql`SELECT 1 FROM users WHERE email = ${email}`],
+    ["first-listing", sql`SELECT 1 FROM listings WHERE seller_email = ${email}`],
+    ["first-flash-sale", sql`SELECT 1 FROM flash_sales WHERE seller_email = ${email}`],
+  ];
+  for (const [id, exists] of oneTime) {
+    try {
+      await db.execute(sql`
+        INSERT INTO user_milestones (email, milestone_id, progress, completed, claimed, updated_at)
+        SELECT ${email}::text, ${id}::text, 1, TRUE, FALSE, NOW()
+        WHERE EXISTS (${exists})
+        ON CONFLICT (email, milestone_id) DO UPDATE SET
+          progress = GREATEST(user_milestones.progress, 1),
+          completed = TRUE,
+          updated_at = NOW()
+      `);
+    } catch (err) {
+      logger.error({ err, email, id }, "Failed to sync one-time milestone");
+    }
+  }
+}
