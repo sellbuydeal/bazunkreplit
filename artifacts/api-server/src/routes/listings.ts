@@ -4,6 +4,7 @@ import { eq, desc, and, gt, sql, inArray } from "drizzle-orm";
 import { toGbp } from "../fxRates.js";
 import { storage } from "../storage.js";
 import { refreshSellerMilestones } from "../lib/milestones.js";
+import { sendSystemMessage } from "../lib/systemMessages.js";
 
 const router = Router();
 
@@ -258,6 +259,13 @@ router.post("/listings", async (req, res) => {
 
     // Active Lister (5/month) and Inventory Master (20/month)
     void refreshSellerMilestones(sellerEmail);
+    void sendSystemMessage(sellerEmail, {
+      category: "Listings",
+      subject: "Your listing is live",
+      body:
+        `Your item "${(listing as { title?: string }).title ?? "your item"}" has been listed on Bazunk.\n\n` +
+        "Tip: you can promote it with credits to reach more buyers.",
+    });
 
     res.status(201).json({ ...listing, promotions: [] });
 

@@ -12,6 +12,7 @@ import { MOCK_CONVERSATIONS, type Conversation, type Message } from "@/data/mess
 import { useOffers, type Offer, type OfferStatus } from "@/context/OfferContext";
 import { useCart } from "@/context/CartContext";
 import { ALL_PRODUCTS } from "@/data/products";
+import { useAuth } from "@/context/AuthContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -38,69 +39,6 @@ type FolderKey =
   | "from-bazunk" | "unread-bazunk"
   | "sent" | "deleted" | "archive"
   | "offers";
-
-// ── Mock support tickets ───────────────────────────────────────────────────────
-
-const MOCK_TICKETS: SupportTicket[] = [
-  {
-    id: 101,
-    type: "support",
-    subject: "Welcome to Bazunk!",
-    status: "closed",
-    category: "General",
-    unread: 0,
-    messages: [
-      {
-        id: 1,
-        senderId: "bazunk",
-        text: "Welcome to Bazunk — the UK's peer-to-peer marketplace! 🎉\n\nYour account is all set up. You can start browsing listings, make offers, or list your first item today.\n\nIf you ever need help, just reply here and our team will get back to you within 24 hours.",
-        timestamp: new Date(Date.now() - 7 * 86400000).toISOString(),
-        read: true,
-      },
-    ],
-  },
-  {
-    id: 102,
-    type: "support",
-    subject: "Identity verification approved",
-    status: "closed",
-    category: "Account",
-    unread: 0,
-    messages: [
-      {
-        id: 1,
-        senderId: "bazunk",
-        text: "Great news! Your identity has been successfully verified. ✅\n\nYou can now list items for sale on Bazunk. Your seller badge will appear on your profile and listings.",
-        timestamp: new Date(Date.now() - 3 * 86400000).toISOString(),
-        read: true,
-      },
-    ],
-  },
-  {
-    id: 103,
-    type: "support",
-    subject: "Refund request — order #BZK-20260628",
-    status: "open",
-    category: "Refunds",
-    unread: 1,
-    messages: [
-      {
-        id: 1,
-        senderId: "me",
-        text: "Hi, I'd like to request a refund for my recent order. The item arrived damaged.",
-        timestamp: new Date(Date.now() - 2 * 86400000).toISOString(),
-        read: true,
-      },
-      {
-        id: 2,
-        senderId: "bazunk",
-        text: "Hi there, thanks for getting in touch. We're sorry to hear about the damaged item.\n\nWe've opened a case (Case #CAS-4421) and our team is reviewing it now. You'll receive an update within 2 business days.\n\nCould you please upload photos of the damage? Reply to this message with the images attached.",
-        timestamp: new Date(Date.now() - 86400000).toISOString(),
-        read: false,
-      },
-    ],
-  },
-];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -557,7 +495,7 @@ function OfferDetail({ offer, onRespond, onRespondToCounter }: {
 export function MessageCenterOverlay({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [folder, setFolder] = useState<FolderKey>("inbox");
   const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
-  const [tickets, setTickets] = useState<SupportTicket[]>(MOCK_TICKETS);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [activeSupportId, setActiveSupportId] = useState<number | null>(null);
   const [activeOfferId, setActiveOfferId] = useState<string | null>(null);
@@ -570,6 +508,34 @@ export function MessageCenterOverlay({ open, onClose }: { open: boolean; onClose
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { offers, respondToOffer, respondToCounter, pendingCount } = useOffers();
+  const { user } = useAuth();
+
+  // Start empty for every account; never show another user's messages.
+  useEffect(() => { setTickets([]); }, [user?.email]);
+
+  const loadInbox = useCallback(async () => {
+    if (!user?.email) return;
+    try {
+      const res = await fetch(`/api/support/inbox?email=${encodeURIComponent(user.email)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setTickets((data.tickets ?? []).map((t: any) => ({
+        id: t.id,
+        type: "support" as const,
+        subject: t.subject,
+        status: t.status,
+        category: t.category,
+        unread: t.unread,
+        messages: (t.messages ?? []).map((m: any) => ({
+          id: m.id, senderId: m.sender, text: m.text, timestamp: m.timestamp, read: m.read,
+        })),
+      })));
+    } catch {
+      /* keep what we have */
+    }
+  }, [user?.email]);
+
+  useEffect(() => { if (open) void loadInbox(); }, [open, loadInbox]);
 
   const memberUnread = conversations.reduce((s, c) => s + c.unread, 0);
   const bazunkUnread = tickets.reduce((s, t) => s + t.unread, 0);
@@ -639,6 +605,13 @@ export function MessageCenterOverlay({ open, onClose }: { open: boolean; onClose
     setTickets(prev => prev.map(t => t.id === id ? {
       ...t, unread: 0, messages: t.messages.map(m => ({ ...m, read: true }))
     } : t));
+    if (user?.email) {
+      void fetch(`/api/support/tickets/${id}/read`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email }),
+      }).catch(() => {});
+    }
   }
 
   function openOffer(id: string) {
@@ -661,20 +634,23 @@ export function MessageCenterOverlay({ open, onClose }: { open: boolean; onClose
     }, 1800);
   }
 
-  function sendSupportReply() {
-    if (!supportInput.trim() || !activeSupportId) return;
+  async function sendSupportReply() {
+    if (!supportInput.trim() || !activeSupportId || !user?.email) return;
     const text = supportInput.trim();
+    const ticketId = activeSupportId;
     setSupportInput("");
     const newMsg: SupportMessage = { id: Date.now(), senderId: "me", text, timestamp: new Date().toISOString(), read: true };
-    setTickets(prev => prev.map(t => t.id === activeSupportId ? { ...t, messages: [...t.messages, newMsg] } : t));
-    setTimeout(() => {
-      const ack: SupportMessage = {
-        id: Date.now() + 1, senderId: "bazunk",
-        text: "Thanks for your reply! Our support team has received your message and will respond within 24 hours. Your case reference is #CAS-4421.",
-        timestamp: new Date().toISOString(), read: false,
-      };
-      setTickets(prev => prev.map(t => t.id === activeSupportId ? { ...t, messages: [...t.messages, ack] } : t));
-    }, 2000);
+    setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, messages: [...t.messages, newMsg] } : t));
+    try {
+      await fetch(`/api/support/tickets/${ticketId}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: user.email, body: text }),
+      });
+    } catch {
+      /* the reload below shows what was really saved */
+    }
+    void loadInbox();
   }
 
   function toggleSelect(e: React.MouseEvent, id: number) {

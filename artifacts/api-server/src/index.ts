@@ -123,6 +123,45 @@ async function runAppMigrations() {
   );
 
   await run(sql`
+    CREATE TABLE IF NOT EXISTS support_tickets (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'general',
+      status TEXT NOT NULL DEFAULT 'open',
+      priority TEXT NOT NULL DEFAULT 'normal',
+      kind TEXT,
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    )
+  `, "support_tickets");
+  await run(sql`ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS kind TEXT`, "support_tickets.kind");
+  await run(sql`CREATE INDEX IF NOT EXISTS support_tickets_email_idx ON support_tickets (email)`, "support_tickets_email_idx");
+  await run(
+    sql`CREATE UNIQUE INDEX IF NOT EXISTS support_tickets_email_kind_uniq ON support_tickets (email, kind) WHERE kind IS NOT NULL`,
+    "support_tickets_email_kind_uniq",
+  );
+  await run(sql`
+    CREATE TABLE IF NOT EXISTS support_ticket_messages (
+      id SERIAL PRIMARY KEY,
+      ticket_id INTEGER NOT NULL,
+      author TEXT NOT NULL,
+      author_type TEXT NOT NULL,
+      body TEXT NOT NULL,
+      read_by_user BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    )
+  `, "support_ticket_messages");
+  await run(
+    sql`ALTER TABLE support_ticket_messages ADD COLUMN IF NOT EXISTS read_by_user BOOLEAN NOT NULL DEFAULT FALSE`,
+    "support_ticket_messages.read_by_user",
+  );
+  await run(
+    sql`CREATE INDEX IF NOT EXISTS support_ticket_messages_ticket_idx ON support_ticket_messages (ticket_id)`,
+    "support_ticket_messages_ticket_idx",
+  );
+
+  await run(sql`
     CREATE TABLE IF NOT EXISTS returns (
       id TEXT PRIMARY KEY,
       order_id TEXT NOT NULL,

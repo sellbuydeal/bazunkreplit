@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { requireAdmin } from "../middlewares/adminAuth.js";
 import { logger } from "../lib/logger.js";
+import { sendWelcomeMessage } from "../lib/systemMessages.js";
 
 const router = Router();
 
@@ -112,6 +113,73 @@ router.post("/support/tickets/:id/reply", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "Failed to reply to ticket");
     res.status(500).json({ error: "Failed to reply" });
+  }
+});
+
+// ── User-facing: the whole inbox (tickets + notices, with messages) ──────
+
+router.get("/support/inbox", async (req, res) => {
+  try {
+    const email = req.query.email as string;
+    if (!email) { res.status(400).json({ error: "email required" }); return; }
+
+    // Every account gets exactly one welcome notice (no-op if it already exists).
+    await sendWelcomeMessage(email);
+
+    const tickets = await db.execute(
+      sql`SELECT id, subject, category, status FROM support_tickets
+          WHERE email = ${email} ORDER BY updated_at DESC, id DESC`
+    ).then(r => r.rows as any[]);
+
+    const messages = await db.execute(
+      sql`SELECT m.id, m.ticket_id, m.author_type, m.body, m.read_by_user, m.created_at
+          FROM support_ticket_messages m
+          JOIN support_tickets t ON t.id = m.ticket_id
+          WHERE t.email = ${email}
+          ORDER BY m.created_at ASC, m.id ASC`
+    ).then(r => r.rows as any[]);
+
+    res.json({
+      tickets: tickets.map((t) => {
+        const own = messages.filter((m) => m.ticket_id === t.id);
+        return {
+          id: t.id,
+          subject: t.subject,
+          category: t.category,
+          status: t.status,
+          unread: own.filter((m) => m.author_type !== "user" && !m.read_by_user).length,
+          messages: own.map((m) => ({
+            id: m.id,
+            sender: m.author_type === "user" ? "me" : "bazunk",
+            text: m.body,
+            timestamp: m.created_at,
+            read: m.author_type === "user" || Boolean(m.read_by_user),
+          })),
+        };
+      }),
+    });
+  } catch (err) {
+    logger.error({ err }, "Failed to load inbox");
+    res.status(500).json({ error: "Failed to load inbox" });
+  }
+});
+
+// ── User-facing: mark a ticket's messages as read ────────────────────────
+
+router.post("/support/tickets/:id/read", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { email } = req.body;
+    if (!email || !Number.isInteger(id)) { res.status(400).json({ error: "email and ticket id required" }); return; }
+    await db.execute(
+      sql`UPDATE support_ticket_messages SET read_by_user = TRUE
+          WHERE ticket_id = ${id}
+            AND EXISTS (SELECT 1 FROM support_tickets WHERE id = ${id} AND email = ${email})`
+    );
+    res.json({ success: true });
+  } catch (err) {
+    logger.error({ err }, "Failed to mark ticket read");
+    res.status(500).json({ error: "Failed to mark read" });
   }
 });
 

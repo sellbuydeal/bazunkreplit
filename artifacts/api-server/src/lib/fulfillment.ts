@@ -5,6 +5,7 @@ import { getUncachableStripeClient } from "../stripeClient.js";
 import { storage } from "../storage.js";
 import { sendOrderConfirmation } from "../email.js";
 import { refreshSellerMilestones } from "./milestones.js";
+import { sendSystemMessage } from "./systemMessages.js";
 import { logger } from "./logger.js";
 
 export type FulfillResult = {
@@ -59,6 +60,7 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
 
     let lineNo = 0;
     const sellers = new Set<string>();
+    const sellerItems = new Map<string, string[]>();
     const emailItems: Array<{ title: string; price: number; quantity: number }> = [];
 
     for (const l of lines) {
@@ -80,7 +82,10 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
           ON CONFLICT (stripe_session_id, line_no) DO NOTHING
         `);
       }
-      if (seller) sellers.add(seller);
+      if (seller) {
+        sellers.add(seller);
+        sellerItems.set(seller, [...(sellerItems.get(seller) ?? []), `${row.title as string}${l.qty > 1 ? ` x${l.qty}` : ""}`]);
+      }
       emailItems.push({ title: row.title as string, price, quantity: l.qty });
     }
 
@@ -89,6 +94,19 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
 
     for (const seller of sellers) {
       void refreshSellerMilestones(seller);
+      void sendSystemMessage(seller, {
+        category: "Sales",
+        subject: "You made a sale",
+        body: `Great news! Someone just bought:\n\n${(sellerItems.get(seller) ?? []).join("\n")}\n\nOpen your Sales page to see the order details.`,
+      });
+    }
+
+    if (emailItems.length) {
+      void sendSystemMessage(buyerEmail, {
+        category: "Orders",
+        subject: "Order confirmed",
+        body: `Thanks for your purchase! Your order has been placed:\n\n${emailItems.map((i) => i.title + (i.quantity > 1 ? ` x${i.quantity}` : "")).join("\n")}\n\nYou can follow it from your Orders page.`,
+      });
     }
 
     if (emailItems.length) {

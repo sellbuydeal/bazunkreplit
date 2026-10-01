@@ -3,6 +3,7 @@ import { db, listingPromotionsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { storage } from "../storage.js";
 import { logger } from "../lib/logger.js";
+import { sendSystemMessage } from "../lib/systemMessages.js";
 import { requireAdmin } from "../middlewares/adminAuth.js";
 
 const router = Router();
@@ -54,6 +55,14 @@ router.post("/promotions/apply", async (req, res) => {
     });
 
     logger.info({ email, type, listingId, cost: config.cost, newBalance }, "Promotion applied");
+    void sendSystemMessage(email, {
+      category: "Promotions",
+      subject: `${config.label} activated`,
+      body:
+        `Your ${config.label} promotion is now active on listing #${listingId} until ` +
+        `${expiresAt.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.\n\n` +
+        `You spent ${Math.round(config.cost * 100)} credits. Your new balance is ${Math.round(Number(newBalance) * 100)} credits.`,
+    });
     res.json({ success: true, type, label: config.label, creditsSpent: config.cost, newBalance, expiresAt });
   } catch (err) {
     logger.error({ err }, "Failed to apply promotion");

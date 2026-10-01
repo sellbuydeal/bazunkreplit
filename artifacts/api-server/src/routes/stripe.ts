@@ -5,6 +5,7 @@ import { convertAmount, smallestUnit } from "../fxRates.js";
 import { logger } from "../lib/logger.js";
 import { sendCreditsConfirmation, sendOrderConfirmation } from "../email.js";
 import { fulfillCartSession } from "../lib/fulfillment.js";
+import { sendSystemMessage } from "../lib/systemMessages.js";
 
 const router = Router();
 
@@ -389,6 +390,13 @@ router.post("/stripe/apply-credits", async (req, res) => {
     const balance = await storage.addCredits(email, totalCredits);
 
     void sendCreditsConfirmation({ email, creditsAdded: totalCredits, newBalance: balance });
+    void sendSystemMessage(email, {
+      category: "Credits",
+      subject: "Credits added to your account",
+      body:
+        `We've added ${Math.round(totalCredits * 100)} credits (\u00A3${totalCredits.toFixed(2)}) to your account.\n\n` +
+        `Your new balance is ${Math.round(Number(balance) * 100)} credits.`,
+    });
 
     res.json({ success: true, creditsAdded: totalCredits, balance });
   } catch (err) {
