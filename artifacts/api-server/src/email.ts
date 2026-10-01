@@ -1,5 +1,4 @@
-// Email via Resend — uses @replit/connectors-sdk proxy (no API key needed)
-import { ReplitConnectors } from "@replit/connectors-sdk";
+// Email via Resend. Set RESEND_API_KEY (and optionally EMAIL_FROM) in the environment.
 import { logger } from "./lib/logger.js";
 
 const FROM = process.env.EMAIL_FROM ?? "Bazunk <onboarding@resend.dev>";
@@ -7,21 +6,18 @@ const SITE = process.env.PUBLIC_BASE_URL ?? "https://bazunk-web.onrender.com";
 
 async function send(to: string, subject: string, html: string): Promise<void> {
   try {
-    const payload = JSON.stringify({ from: FROM, to: [to], subject, html });
-    const res = process.env.RESEND_API_KEY
-      ? await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-          },
-          body: payload,
-        })
-      : await new ReplitConnectors().proxy("resend", "/emails", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: payload,
-        });
+    if (!process.env.RESEND_API_KEY) {
+      logger.warn({ to, subject }, "RESEND_API_KEY not set — email skipped");
+      return;
+    }
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({ from: FROM, to: [to], subject, html }),
+    });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       logger.warn({ to, subject, status: res.status, body: text }, "Resend non-OK response");

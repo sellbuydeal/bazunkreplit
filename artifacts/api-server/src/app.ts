@@ -2,12 +2,6 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import cors from "cors";
 import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
-import { publishableKeyFromHost } from "@clerk/shared/keys";
-import {
-  CLERK_PROXY_PATH,
-  clerkProxyMiddleware,
-  getClerkProxyHost,
-} from "./middlewares/clerkProxyMiddleware.js";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { WebhookHandlers } from "./webhookHandlers.js";
@@ -15,8 +9,8 @@ import { handleDiditWebhook } from "./routes/verification.js";
 
 const app: Express = express();
 
-// Clerk proxy — must come before body parsers (streams raw bytes)
-app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+// Render terminates TLS in front of us — trust it so req.protocol / IPs are right
+app.set("trust proxy", 1);
 
 // Didit KYC webhook — must come before express.json() so body stays as a Buffer
 app.post(
@@ -60,18 +54,24 @@ app.use(
   }),
 );
 
-app.use(cors({ credentials: true, origin: true }));
+// Restrict browsers to your frontend(s). CORS_ORIGINS = comma-separated list.
+// If unset, any origin is allowed (fine while testing, tighten for production).
+const allowedOrigins = (process.env.CORS_ORIGINS ?? "")
+  .split(",").map((o) => o.trim().replace(/\/$/, "")).filter(Boolean);
+app.use(
+  cors({
+    credentials: true,
+    origin: allowedOrigins.length ? allowedOrigins : true,
+  }),
+);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-app.use(
-  clerkMiddleware((req) => ({
-    publishableKey: publishableKeyFromHost(
-      getClerkProxyHost(req) ?? "",
-      process.env.CLERK_PUBLISHABLE_KEY,
-    ),
-  })),
-);
+// No route reads Clerk auth server-side, and clerkMiddleware throws on EVERY
+// request when CLERK_SECRET_KEY is missing — so only mount it when configured.
+if (process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY) {
+  app.use(clerkMiddleware());
+}
 
 app.use("/api", router);
 

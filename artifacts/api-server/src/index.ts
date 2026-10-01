@@ -1,5 +1,3 @@
-import { runMigrations } from "stripe-replit-sync";
-import { getStripeSync } from "./stripeClient.js";
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
 import { db } from "@workspace/db";
@@ -17,27 +15,6 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-async function initStripe() {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    logger.warn("DATABASE_URL not set — skipping Stripe initialization");
-    return;
-  }
-  try {
-    logger.info("Initializing Stripe schema…");
-    await runMigrations({ databaseUrl });
-    logger.info("Stripe schema ready");
-
-    const stripeSync = await getStripeSync();
-
-    stripeSync.syncBackfill()
-      .then(() => logger.info("Stripe backfill complete"))
-      .catch((err: unknown) => logger.error({ err }, "Stripe backfill error"));
-  } catch (err) {
-    logger.error({ err }, "Stripe initialization failed");
-  }
-}
-
 async function runAppMigrations() {
   // Runs each migration statement independently so one missing/failing
   // statement (e.g. a table that references another table that doesn't
@@ -50,6 +27,104 @@ async function runAppMigrations() {
       logger.error({ err, label }, "Migration statement failed");
     }
   };
+
+  // ── Base tables (mirror lib/db/src/schema + site_settings) ───────────────
+  // These used to be created by `drizzle-kit push` on Replit. Creating them
+  // here means a brand-new Render Postgres works with no manual step.
+  await run(sql`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      name TEXT,
+      stripe_customer_id TEXT,
+      stripe_account_id TEXT,
+      credits NUMERIC(10,2) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT NOW(),
+      verification_status TEXT NOT NULL DEFAULT 'unverified',
+      verification_date TIMESTAMP WITH TIME ZONE,
+      didit_verification_id TEXT
+    )
+  `, "users");
+
+  await run(sql`
+    CREATE TABLE IF NOT EXISTS credit_transactions (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      credits_added NUMERIC(10,2) NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `, "credit_transactions");
+
+  await run(sql`
+    CREATE TABLE IF NOT EXISTS listings (
+      id SERIAL PRIMARY KEY,
+      public_id TEXT UNIQUE,
+      title TEXT NOT NULL,
+      price NUMERIC(10,2) NOT NULL,
+      category TEXT NOT NULL,
+      subcategory TEXT,
+      description TEXT NOT NULL,
+      condition TEXT NOT NULL DEFAULT 'good',
+      image TEXT,
+      views INTEGER NOT NULL DEFAULT 0,
+      watchers INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      seller_email TEXT NOT NULL,
+      seller_name TEXT,
+      seller_username TEXT,
+      tags TEXT,
+      extra_categories TEXT,
+      specifications TEXT,
+      currency TEXT NOT NULL DEFAULT 'GBP',
+      price_gbp NUMERIC(10,2),
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    )
+  `, "listings");
+
+  await run(sql`
+    CREATE TABLE IF NOT EXISTS listing_promotions (
+      id SERIAL PRIMARY KEY,
+      listing_id INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    )
+  `, "listing_promotions");
+
+  await run(sql`
+    CREATE TABLE IF NOT EXISTS classified_ads (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      category TEXT NOT NULL,
+      subcategory TEXT,
+      type TEXT NOT NULL DEFAULT 'offer',
+      price NUMERIC(10,2),
+      price_label TEXT,
+      negotiable BOOLEAN NOT NULL DEFAULT FALSE,
+      condition TEXT,
+      location TEXT NOT NULL,
+      contact_name TEXT NOT NULL,
+      contact_email TEXT,
+      contact_phone TEXT,
+      urgency TEXT,
+      photos TEXT,
+      external_link TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      expires_at TIMESTAMP WITH TIME ZONE,
+      posted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    )
+  `, "classified_ads");
+
+  await run(sql`
+    CREATE TABLE IF NOT EXISTS site_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `, "site_settings");
 
   await run(sql`
     CREATE TABLE IF NOT EXISTS user_milestones (
@@ -426,6 +501,5 @@ app.listen(port, (err?: Error) => {
 runAppMigrations()
   .then(() => {
     startSyncJob();
-    return initStripe();
   })
   .catch((err: unknown) => logger.error({ err }, "Startup initialization error"));
