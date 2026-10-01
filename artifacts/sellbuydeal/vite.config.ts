@@ -2,47 +2,13 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-const rawPort = process.env.PORT;
-const port = rawPort ? Number(rawPort) : 3000;
-
+const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 const basePath = process.env.BASE_PATH ?? "/";
-const isDev = process.env.NODE_ENV !== "production";
-
-const noCachePlugin = {
-  name: "no-cache-headers",
-  configureServer(server: import("vite").ViteDevServer) {
-    server.middlewares.use((_req, res, next) => {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-      next();
-    });
-  },
-};
 
 export default defineConfig({
   base: basePath,
-  plugins: [
-    noCachePlugin,
-    react(),
-    tailwindcss({ optimize: false }),
-    isDev && runtimeErrorOverlay(),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer({
-              root: path.resolve(import.meta.dirname, ".."),
-            }),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
-  ].filter(Boolean),
+  plugins: [react(), tailwindcss({ optimize: false })],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
@@ -57,16 +23,10 @@ export default defineConfig({
   },
   server: {
     port,
-    strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
-    fs: {
-      strict: true,
-    },
+    // Local dev: forward /api to the API server (run it on :8080)
+    proxy: { "/api": process.env.DEV_API_URL ?? "http://localhost:8080" },
   },
-  preview: {
-    port,
-    host: "0.0.0.0",
-    allowedHosts: true,
-  },
+  preview: { port, host: "0.0.0.0", allowedHosts: true },
 });
