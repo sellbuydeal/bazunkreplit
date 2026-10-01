@@ -8,7 +8,7 @@ const router = Router();
 
 const VALID_STATUSES = ["pending", "confirmed", "preparing", "shipped", "out_for_delivery", "delivered", "cancelled"];
 
-router.post("/orders", async (req, res) => {
+router.post("/orders", requireAdmin, async (req, res) => {
   const { buyerEmail, sellerEmail, itemTitle, itemImage, price, address, notes } = req.body as Record<string, string>;
   if (!buyerEmail || !itemTitle || !price) {
     res.status(400).json({ error: "buyerEmail, itemTitle, and price are required" });

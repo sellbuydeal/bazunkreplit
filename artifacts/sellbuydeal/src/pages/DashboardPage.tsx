@@ -3816,6 +3816,17 @@ function DisputesSection() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [form, setForm] = useState({ itemTitle: "", orderId: "", reason: "item_not_received", description: "" });
   const [formError, setFormError] = useState("");
+  const [eligible, setEligible] = useState<Array<{ id: string; item_title: string; created_at: string; days_left: number }>>([]);
+
+  async function loadEligible() {
+    if (!user?.email) return;
+    try {
+      const res = await fetch(`/api/disputes/eligible-orders?email=${encodeURIComponent(user.email)}`);
+      if (res.ok) setEligible(await res.json());
+    } catch {
+      /* keep the list as it is */
+    }
+  }
 
   async function load() {
     if (!user?.email) return;
@@ -3828,10 +3839,10 @@ function DisputesSection() {
     }
   }
 
-  useEffect(() => { load(); }, [user?.email]);
+  useEffect(() => { load(); loadEligible(); }, [user?.email]);
 
   async function submit() {
-    if (!form.itemTitle.trim()) { setFormError("Please enter the item name."); return; }
+    if (!form.orderId) { setFormError("Please choose the order you are disputing."); return; }
     if (!form.description.trim()) { setFormError("Please describe the issue."); return; }
     setFormError("");
     setSubmitting(true);
@@ -3841,8 +3852,7 @@ function DisputesSection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           buyerEmail: user?.email,
-          orderId: form.orderId.trim() || undefined,
-          itemTitle: form.itemTitle.trim(),
+          orderId: form.orderId,
           reason: form.reason,
           description: form.description.trim(),
         }),
@@ -3852,8 +3862,10 @@ function DisputesSection() {
         setShowForm(false);
         setForm({ itemTitle: "", orderId: "", reason: "item_not_received", description: "" });
         await load();
+        await loadEligible();
       } else {
-        setFormError("Something went wrong. Please try again.");
+        const data = await res.json().catch(() => ({} as { error?: string }));
+        setFormError(data?.error ?? "Something went wrong. Please try again.");
       }
     } finally {
       setSubmitting(false);
@@ -3869,7 +3881,7 @@ function DisputesSection() {
         </div>
         {!showForm && (
           <button
-            onClick={() => { setShowForm(true); setSubmitted(false); }}
+            onClick={() => { setShowForm(true); setSubmitted(false); void loadEligible(); }}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#4A5CE8] text-white text-sm font-bold hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" /> Open Dispute
@@ -3902,22 +3914,25 @@ function DisputesSection() {
 
           <div className="space-y-3">
             <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Item Name *</label>
-              <input
-                value={form.itemTitle}
-                onChange={(e) => setForm((f) => ({ ...f, itemTitle: e.target.value }))}
-                placeholder="e.g. MacBook Pro 14 inch"
-                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8]"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Order ID <span className="text-gray-300 font-normal">(optional)</span></label>
-              <input
-                value={form.orderId}
-                onChange={(e) => setForm((f) => ({ ...f, orderId: e.target.value }))}
-                placeholder="e.g. ORD-12345"
-                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8]"
-              />
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Order *</label>
+              {eligible.length === 0 ? (
+                <p className="text-sm text-gray-500 bg-white border border-gray-200 rounded-xl px-3 py-2.5">
+                  You have no orders from the last 30 days that can be disputed.
+                </p>
+              ) : (
+                <select
+                  value={form.orderId}
+                  onChange={(e) => setForm((f) => ({ ...f, orderId: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] bg-white"
+                >
+                  <option value="">Choose the order you are disputing...</option>
+                  {eligible.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.item_title} - {o.id} - {new Date(o.created_at).toLocaleDateString("en-GB")} ({o.days_left} days left)
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Reason *</label>
@@ -3944,7 +3959,7 @@ function DisputesSection() {
             <div className="flex gap-2 pt-1">
               <button
                 onClick={submit}
-                disabled={submitting}
+                disabled={submitting || eligible.length === 0}
                 className="flex-1 py-3 rounded-xl bg-[#4A5CE8] text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {submitting ? "Submitting…" : "Submit Dispute"}
