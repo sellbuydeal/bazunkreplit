@@ -52,7 +52,6 @@ import { LiveStreamProvider } from "@/context/LiveStreamContext";
 import { AdminProvider } from "@/context/AdminContext";
 import { SiteSettingsProvider } from "@/context/SiteSettingsContext";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
-   import IntroSplash from "@/components/IntroSplash";
 import IntroSplash from "@/components/IntroSplash";
 import { UserCurrencySync } from "@/components/UserCurrencySync";
 import { AdminLoginPage } from "@/pages/admin/AdminLoginPage";
