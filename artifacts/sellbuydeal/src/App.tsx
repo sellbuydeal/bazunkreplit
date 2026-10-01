@@ -1,7 +1,6 @@
 import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { useEffect, useRef } from "react";
 import { ClerkProvider, SignIn, SignUp, useClerk } from "@clerk/react";
-import { publishableKeyFromHost } from "@clerk/react/internal";
 import { shadcn } from "@clerk/themes";
 
 function ScrollToTop() {
@@ -53,6 +52,7 @@ import { LiveStreamProvider } from "@/context/LiveStreamContext";
 import { AdminProvider } from "@/context/AdminContext";
 import { SiteSettingsProvider } from "@/context/SiteSettingsContext";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
+import IntroSplash from "@/components/IntroSplash";
 import { UserCurrencySync } from "@/components/UserCurrencySync";
 import { AdminLoginPage } from "@/pages/admin/AdminLoginPage";
 import { AdminDashboardPage } from "@/pages/admin/AdminDashboardPage";
@@ -90,14 +90,13 @@ import CashbackPage from "@/pages/CashbackPage";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
-// REQUIRED — copy verbatim
-const clerkPubKey = publishableKeyFromHost(
-  window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
-);
+// Use the publishable key straight from the environment. (The Replit-era
+// publishableKeyFromHost() helper derived a key from the page hostname, which
+// produces an invalid key on *.onrender.com and breaks sign-in.)
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
-// REQUIRED — empty in dev (intentional), auto-set in prod
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+// Only set if you front Clerk with your own proxy. Leave unset on Render.
+const clerkProxyUrl = (import.meta.env.VITE_CLERK_PROXY_URL as string | undefined) || undefined;
 
 if (!clerkPubKey) {
   throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
@@ -210,6 +209,7 @@ function SignUpPage() {
 function Home() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <IntroSplash />
       <AnnouncementBanner />
       <Navbar />
       <PerksStrip />
