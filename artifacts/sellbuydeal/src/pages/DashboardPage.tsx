@@ -209,10 +209,9 @@ function BuyerProtectionDashSection() {
         <p className="text-gray-500 text-sm mt-1">Every purchase on Bazunk is fully covered.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
           { icon: Clock,    color: "bg-emerald-500", label: "48h Dispute Resolution",    desc: "Fast resolution by our UK team" },
-          { icon: Shield,   color: "bg-[#4A5CE8]",   label: "Escrow-Protected Payments", desc: "Money held safely until you're happy" },
           { icon: RotateCcw,color: "bg-amber-500",   label: "30-Day Returns",            desc: "Change your mind? No problem" },
         ].map(({ icon: Icon, color, label, desc }) => (
           <div key={label} className="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col gap-3 shadow-sm">

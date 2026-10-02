@@ -175,7 +175,7 @@ const SELLER_STEPS = [
 
 const BUYER_STEPS = [
   { n: 1, icon: Star,         title: "Choose locker delivery", desc: "At checkout, select 'Locker Delivery' and pick your nearest InPost / Evri / Royal Mail point." },
-  { n: 2, icon: ShieldCheck,  title: "Pay securely",           desc: "Payment is held in escrow until your parcel arrives." },
+  { n: 2, icon: ShieldCheck,  title: "Pay securely",           desc: "Pay securely at checkout." },
   { n: 3, icon: Clock,        title: "Track in real time",     desc: "Follow your parcel from drop-off to your locker via the Bazunk tracking page." },
   { n: 4, icon: QrCode,       title: "Collect with QR",        desc: "Open the locker door by scanning the QR code in your Bazunk notification." },
 ];
@@ -192,7 +192,6 @@ const FAQS = [
   { q: "Who pays for the shipping label?", a: "Labels are prepaid by the buyer at checkout and included in the total. Sellers never have to pay out of pocket for postage." },
   { q: "What sizes can I send?", a: "Each carrier supports Small, Medium, and Large parcels. Very heavy or oversized items (over 20 kg) may need home collection instead." },
   { q: "How do returns work if the buyer uses a locker?", a: "We generate a prepaid return label. The buyer drops it at any compatible point; once scanned as received, we release the refund automatically." },
-  { q: "Is the payment held until delivery?", a: "Yes — all Bazunk locker shipments use escrow. Funds are only released once the carrier marks the parcel as delivered." },
   { q: "Can I use any locker, or only specific ones?", a: "You can use any drop-off point in the carrier's network — not just the one shown on the listing. We'll always suggest the nearest one but it's your choice." },
 ];
 
@@ -372,9 +371,8 @@ export function LockerShippingPage() {
         {/* Why locker shipping */}
         <section className="bg-gradient-to-br from-[#4A5CE8]/5 to-[#F26B21]/5 rounded-3xl p-8 border border-gray-100">
           <h2 className="text-2xl font-black text-gray-900 mb-6 text-center">Why Locker Shipping?</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { icon: ShieldCheck,  color: "bg-[#4A5CE8]",  title: "Escrow protection", desc: "Funds held until delivery confirmed." },
               { icon: Clock,        color: "bg-[#F26B21]",  title: "No missed deliveries", desc: "Collect on your schedule, not the courier's." },
               { icon: MapPin,       color: "bg-emerald-500", title: "20,000+ locations", desc: "Always one nearby — shops, garages, stations." },
               { icon: Zap,          color: "bg-purple-500",  title: "Instant labels",   desc: "QR code in seconds after a sale completes." },

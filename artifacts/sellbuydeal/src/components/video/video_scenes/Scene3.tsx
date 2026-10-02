@@ -106,7 +106,6 @@ export function Scene3() {
           animate={phase >= 4 ? { opacity: 1, y: 0 } : {}}>
           {[
             ['🏆', '3 active bidders'],
-            ['🛡️', 'Escrow-protected bids'],
             ['🔔', 'Auto-bid & outbid alerts'],
           ].map(([icon, text]) => (
             <div key={text} className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-3 border border-white/10">

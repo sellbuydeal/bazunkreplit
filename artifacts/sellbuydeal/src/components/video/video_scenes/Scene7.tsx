@@ -65,7 +65,7 @@ export function Scene7() {
             100% Buyer<br /><span className="text-emerald-400">Protection</span>
           </h2>
           <p className="text-white/60 mt-3" style={{ fontSize: 'clamp(10px, 1.5vw, 18px)' }}>
-            Money-back guarantee on every order. 30-day dispute window. Escrow on all transactions.
+            Money-back guarantee on every order. 30-day dispute window.
           </p>
         </motion.div>
 
@@ -74,7 +74,6 @@ export function Scene7() {
           animate={phase >= 2 ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5 }}>
           {[
-            ['🔒', 'Escrow-protected payments'],
             ['↩️', '30-day returns on all orders'],
             ['⚡', 'Disputes resolved in 48h'],
           ].map(([icon, text]) => (

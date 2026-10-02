@@ -74,7 +74,7 @@ export function Scene5() {
           Drop Off. Collect. <span className="text-emerald-600">Done.</span>
         </h2>
         <p className="text-gray-500 font-semibold mt-2" style={{ fontSize: 'clamp(10px, 1.5vw, 18px)' }}>
-          20,000+ UK locations · No printer needed · Escrow-protected
+          20,000+ UK locations · No printer needed
         </p>
       </motion.div>
 

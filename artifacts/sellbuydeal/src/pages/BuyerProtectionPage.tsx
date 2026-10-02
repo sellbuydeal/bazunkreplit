@@ -1,4 +1,4 @@
-import { Shield, Clock, RotateCcw, Lock, AlertCircle, Phone, ArrowLeft } from 'lucide-react';
+import { Shield, Clock, RotateCcw, AlertCircle, Phone, ArrowLeft } from 'lucide-react';
 import { Link } from 'wouter';
 
 const GUARANTEES = [
@@ -20,16 +20,10 @@ const GUARANTEES = [
     desc: 'Change your mind? Return any eligible item within 30 days for a full refund.',
     color: 'bg-purple-500',
   },
-  {
-    icon: Lock,
-    title: 'Escrow Protection',
-    desc: 'Your payment is held securely and only released to the seller once you confirm delivery.',
-    color: 'bg-[#F26B21]',
-  },
 ];
 
 const HOW_IT_WORKS = [
-  { step: '1', title: 'Pay Securely', desc: 'All payments go through our escrow system — never direct to the seller.' },
+  { step: '1', title: 'Pay Securely', desc: 'Pay securely through Bazunk at checkout.' },
   { step: '2', title: 'Item Arrives', desc: 'You have 48 hours after delivery to confirm everything is as expected.' },
   { step: '3', title: 'Issue? Open a Dispute', desc: 'File a claim from your dashboard. Our team resolves disputes within 48 hours.' },
   { step: '4', title: 'Fast Resolution', desc: 'Receive your refund directly back to your original payment method.' },
@@ -70,10 +64,6 @@ export default function BuyerProtectionPage() {
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-5 py-3">
               <Clock className="w-4 h-4 text-emerald-400" />
               <span className="text-sm font-semibold">48h dispute resolution</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-5 py-3">
-              <Lock className="w-4 h-4 text-[#F26B21]" />
-              <span className="text-sm font-semibold">Escrow-protected payments</span>
             </div>
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-5 py-3">
               <RotateCcw className="w-4 h-4 text-[#4A5CE8]" />
@@ -141,7 +131,6 @@ export default function BuyerProtectionPage() {
             </thead>
             <tbody>
               {[
-                ['Escrow on all transactions', true, false, false],
                 ['30-day returns guarantee', true, true, true],
                 ['48h dispute resolution', true, false, false],
                 ['Locker return QR codes', true, false, false],
