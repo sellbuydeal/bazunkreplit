@@ -99,6 +99,8 @@ const FEE_CATEGORIES: { name: string; slug: string; defaultRate: string }[] = [
   { name: "Arts, Crafts & Sewing", slug: "arts-crafts-sewing", defaultRate: "5" },
   { name: "Appliances", slug: "appliances", defaultRate: "5" },
   { name: "Eco-Friendly", slug: "eco-friendly", defaultRate: "5" },
+  { name: "Digital", slug: "digital", defaultRate: "5" },
+  { name: "Adult", slug: "adult", defaultRate: "5" },
 ];
 
 const AD_SLOTS = [

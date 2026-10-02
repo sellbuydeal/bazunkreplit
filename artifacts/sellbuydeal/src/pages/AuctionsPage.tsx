@@ -39,7 +39,7 @@ function Countdown({ endTime }: { endTime: string }) {
   return <span className="font-mono font-bold text-sm text-red-600 animate-pulse">{t.mins}m {t.secs}s</span>;
 }
 
-const CATEGORIES = ["All", "Electronics", "Fashion", "Gaming", "Books", "Collectibles", "Home", "Sports", "Other"];
+const CATEGORIES = ["All", "Electronics", "Fashion", "Gaming", "Books", "Collectibles", "Home", "Sports", "Digital", "Adult", "Other"];
 const SORT_OPTIONS = [
   { value: "ending", label: "Ending Soon" },
   { value: "newest", label: "Newest First" },

@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { SellerListingPicker, type SellerListing } from "@/components/SellerListingPicker";
 
-const CATEGORIES = ["Electronics", "Fashion", "Gaming", "Books", "Collectibles", "Home", "Sports", "Other"];
+const CATEGORIES = ["Electronics", "Fashion", "Gaming", "Books", "Collectibles", "Home", "Sports", "Digital", "Adult", "Other"];
 
 type SaleType = "standard" | "lightning" | "happy_hour" | "weekend_mega" | "category_event";
 

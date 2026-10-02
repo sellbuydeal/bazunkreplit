@@ -28,7 +28,7 @@ import { SellerListingPicker, type SellerListing } from "@/components/SellerList
 
 const CATEGORIES = [
   "Electronics", "Fashion", "Gaming", "Books",
-  "Collectibles", "Home", "Sports", "Art", "Music", "Toys", "Other",
+  "Collectibles", "Home", "Sports", "Art", "Music", "Toys", "Digital", "Adult", "Other",
 ];
 
 const CONDITIONS = [

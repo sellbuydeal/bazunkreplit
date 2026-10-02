@@ -25,6 +25,8 @@ const FEE_CATEGORIES = [
   { name: "Arts, Crafts & Sewing", slug: "arts-crafts-sewing", defaultRate: "10" },
   { name: "Appliances", slug: "appliances", defaultRate: "8" },
   { name: "Eco-Friendly", slug: "eco-friendly", defaultRate: "8" },
+  { name: "Digital", slug: "digital", defaultRate: "10" },
+  { name: "Adult", slug: "adult", defaultRate: "10" },
 ];
 
 type PayTab = "credits" | "fees";

@@ -481,9 +481,19 @@ async function runAppMigrations() {
       ('fee_rate_health-household',      '5', NOW()),
       ('fee_rate_arts-crafts-sewing',    '5', NOW()),
       ('fee_rate_appliances',            '5', NOW()),
-      ('fee_rate_eco-friendly',          '5', NOW())
+      ('fee_rate_eco-friendly',          '5', NOW()),
+      ('fee_rate_digital',               '5', NOW()),
+      ('fee_rate_adult',                 '5', NOW())
     ON CONFLICT (key) DO NOTHING
   `, "site_settings.seed");
+
+  // Make the Digital and Adult categories available in the admin product category list
+  await run(sql`
+    INSERT INTO product_categories (id, name, slug, description) VALUES
+      ('cat-digital', 'Digital', 'digital', 'Software, ebooks, design assets, courses and other digital goods'),
+      ('cat-adult',   'Adult',   'adult',   'Adult (18+) products')
+    ON CONFLICT DO NOTHING
+  `, "product_categories.seed_digital_adult");
 
   logger.info("App migrations complete");
 }
