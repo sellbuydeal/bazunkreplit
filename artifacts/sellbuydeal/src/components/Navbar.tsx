@@ -15,6 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { useCurrency, CURRENCIES, type CurrencyCode } from "@/context/CurrencyContext";
 import { MessageCenterOverlay } from "./MessageCenterOverlay";
+import { ThemeToggle } from "./ThemeToggle";
 
 const ALL_PRODUCTS: { id: number; title: string; price: number; condition: string; views: number; image: string; category: string }[] = [];
 
@@ -400,6 +401,9 @@ export function Navbar() {
               )}
             </div>
 
+            {/* Dark mode toggle */}
+            <ThemeToggle className="hidden md:flex w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 items-center justify-center transition-colors flex-shrink-0" />
+
             {/* Currency selector */}
             <div ref={currencyRef} className="relative hidden md:block flex-shrink-0">
               <button
@@ -634,7 +638,7 @@ export function Navbar() {
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <Link href="/" onClick={() => setMobileOpen(false)} className="flex items-center">
-                   <img src="/bazunk-logo.png" alt="Bazunk" className="h-10 -my-1 w-auto object-contain" />
+                   <img src="/bazunk-logo-header.png" alt="Bazunk" className="h-9 w-auto object-contain" />
                 </Link>
                 <button
                   onClick={() => setMobileOpen(false)}
@@ -693,6 +697,10 @@ export function Navbar() {
 
               {/* Nav links */}
               <nav className="flex-1 overflow-y-auto py-2">
+                <ThemeToggle
+                  withLabel
+                  className="w-full flex items-center gap-3 px-5 py-3.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                />
                 {/* Rewards link (logged in) */}
                 {user && (
                   <button

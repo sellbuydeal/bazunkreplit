@@ -338,3 +338,307 @@
     inset: -1px;
   }
 }
+/* ════════════════════════════════════════════════════════════════════════
+   DARK MODE
+   The site's pages use Tailwind's fixed palette (bg-white, text-gray-700,
+   bg-orange-50 …) rather than theme tokens, so instead of editing every file
+   we remap the palette itself while the `.dark` class is on <html>.
+   The class is toggled by next-themes (see ThemeToggle + main.tsx).
+   Light mode is untouched: none of this applies without `.dark`.
+   ════════════════════════════════════════════════════════════════════════ */
+.dark {
+  color-scheme: dark;
+
+  /* Neutral ramp: light → dark backgrounds, dark → light text */
+  --dk-page: 222 47% 11%;   /* matches --background */
+  --dk-card: 222 47% 14%;   /* matches --card */
+
+  --color-gray-50: hsl(222 40% 12%);
+  --color-gray-100: hsl(222 30% 17%);
+  --color-gray-200: hsl(222 25% 22%);
+  --color-gray-300: hsl(222 20% 31%);
+  --color-gray-500: hsl(220 13% 62%);
+  --color-gray-600: hsl(220 14% 72%);
+  --color-gray-700: hsl(220 15% 80%);
+  --color-gray-800: hsl(220 20% 88%);
+  --color-gray-900: hsl(220 25% 94%);
+  --color-slate-50: hsl(222 40% 12%);
+  --color-slate-100: hsl(222 30% 17%);
+  --color-slate-200: hsl(222 25% 22%);
+  --color-slate-300: hsl(222 20% 31%);
+  --color-slate-500: hsl(220 13% 62%);
+  --color-slate-600: hsl(220 14% 72%);
+  --color-slate-700: hsl(220 15% 80%);
+  --color-slate-800: hsl(220 20% 88%);
+  --color-slate-900: hsl(220 25% 94%);
+  --color-zinc-50: hsl(222 40% 12%);
+  --color-zinc-100: hsl(222 30% 17%);
+  --color-zinc-200: hsl(222 25% 22%);
+  --color-zinc-300: hsl(222 20% 31%);
+  --color-zinc-500: hsl(220 13% 62%);
+  --color-zinc-600: hsl(220 14% 72%);
+  --color-zinc-700: hsl(220 15% 80%);
+  --color-zinc-800: hsl(220 20% 88%);
+  --color-zinc-900: hsl(220 25% 94%);
+  --color-neutral-50: hsl(222 40% 12%);
+  --color-neutral-100: hsl(222 30% 17%);
+  --color-neutral-200: hsl(222 25% 22%);
+  --color-neutral-300: hsl(222 20% 31%);
+  --color-neutral-500: hsl(220 13% 62%);
+  --color-neutral-600: hsl(220 14% 72%);
+  --color-neutral-700: hsl(220 15% 80%);
+  --color-neutral-800: hsl(220 20% 88%);
+  --color-neutral-900: hsl(220 25% 94%);
+  --color-stone-50: hsl(222 40% 12%);
+  --color-stone-100: hsl(222 30% 17%);
+  --color-stone-200: hsl(222 25% 22%);
+  --color-stone-300: hsl(222 20% 31%);
+  --color-stone-500: hsl(220 13% 62%);
+  --color-stone-600: hsl(220 14% 72%);
+  --color-stone-700: hsl(220 15% 80%);
+  --color-stone-800: hsl(220 20% 88%);
+  --color-stone-900: hsl(220 25% 94%);
+
+  --color-red-50: color-mix(in srgb, #ef4444 9%, hsl(222 47% 14%));
+  --color-red-100: color-mix(in srgb, #ef4444 15%, hsl(222 47% 14%));
+  --color-red-200: color-mix(in srgb, #ef4444 24%, hsl(222 47% 14%));
+  --color-red-300: color-mix(in srgb, #ef4444 38%, hsl(222 47% 14%));
+  --color-red-700: color-mix(in srgb, #ef4444 62%, #ffffff);
+  --color-red-800: color-mix(in srgb, #ef4444 48%, #ffffff);
+  --color-red-900: color-mix(in srgb, #ef4444 38%, #ffffff);
+  --color-orange-50: color-mix(in srgb, #f97316 9%, hsl(222 47% 14%));
+  --color-orange-100: color-mix(in srgb, #f97316 15%, hsl(222 47% 14%));
+  --color-orange-200: color-mix(in srgb, #f97316 24%, hsl(222 47% 14%));
+  --color-orange-300: color-mix(in srgb, #f97316 38%, hsl(222 47% 14%));
+  --color-orange-700: color-mix(in srgb, #f97316 62%, #ffffff);
+  --color-orange-800: color-mix(in srgb, #f97316 48%, #ffffff);
+  --color-orange-900: color-mix(in srgb, #f97316 38%, #ffffff);
+  --color-amber-50: color-mix(in srgb, #f59e0b 9%, hsl(222 47% 14%));
+  --color-amber-100: color-mix(in srgb, #f59e0b 15%, hsl(222 47% 14%));
+  --color-amber-200: color-mix(in srgb, #f59e0b 24%, hsl(222 47% 14%));
+  --color-amber-300: color-mix(in srgb, #f59e0b 38%, hsl(222 47% 14%));
+  --color-amber-700: color-mix(in srgb, #f59e0b 62%, #ffffff);
+  --color-amber-800: color-mix(in srgb, #f59e0b 48%, #ffffff);
+  --color-amber-900: color-mix(in srgb, #f59e0b 38%, #ffffff);
+  --color-yellow-50: color-mix(in srgb, #eab308 9%, hsl(222 47% 14%));
+  --color-yellow-100: color-mix(in srgb, #eab308 15%, hsl(222 47% 14%));
+  --color-yellow-200: color-mix(in srgb, #eab308 24%, hsl(222 47% 14%));
+  --color-yellow-300: color-mix(in srgb, #eab308 38%, hsl(222 47% 14%));
+  --color-yellow-700: color-mix(in srgb, #eab308 62%, #ffffff);
+  --color-yellow-800: color-mix(in srgb, #eab308 48%, #ffffff);
+  --color-yellow-900: color-mix(in srgb, #eab308 38%, #ffffff);
+  --color-lime-50: color-mix(in srgb, #84cc16 9%, hsl(222 47% 14%));
+  --color-lime-100: color-mix(in srgb, #84cc16 15%, hsl(222 47% 14%));
+  --color-lime-200: color-mix(in srgb, #84cc16 24%, hsl(222 47% 14%));
+  --color-lime-300: color-mix(in srgb, #84cc16 38%, hsl(222 47% 14%));
+  --color-lime-700: color-mix(in srgb, #84cc16 62%, #ffffff);
+  --color-lime-800: color-mix(in srgb, #84cc16 48%, #ffffff);
+  --color-lime-900: color-mix(in srgb, #84cc16 38%, #ffffff);
+  --color-green-50: color-mix(in srgb, #22c55e 9%, hsl(222 47% 14%));
+  --color-green-100: color-mix(in srgb, #22c55e 15%, hsl(222 47% 14%));
+  --color-green-200: color-mix(in srgb, #22c55e 24%, hsl(222 47% 14%));
+  --color-green-300: color-mix(in srgb, #22c55e 38%, hsl(222 47% 14%));
+  --color-green-700: color-mix(in srgb, #22c55e 62%, #ffffff);
+  --color-green-800: color-mix(in srgb, #22c55e 48%, #ffffff);
+  --color-green-900: color-mix(in srgb, #22c55e 38%, #ffffff);
+  --color-emerald-50: color-mix(in srgb, #10b981 9%, hsl(222 47% 14%));
+  --color-emerald-100: color-mix(in srgb, #10b981 15%, hsl(222 47% 14%));
+  --color-emerald-200: color-mix(in srgb, #10b981 24%, hsl(222 47% 14%));
+  --color-emerald-300: color-mix(in srgb, #10b981 38%, hsl(222 47% 14%));
+  --color-emerald-700: color-mix(in srgb, #10b981 62%, #ffffff);
+  --color-emerald-800: color-mix(in srgb, #10b981 48%, #ffffff);
+  --color-emerald-900: color-mix(in srgb, #10b981 38%, #ffffff);
+  --color-teal-50: color-mix(in srgb, #14b8a6 9%, hsl(222 47% 14%));
+  --color-teal-100: color-mix(in srgb, #14b8a6 15%, hsl(222 47% 14%));
+  --color-teal-200: color-mix(in srgb, #14b8a6 24%, hsl(222 47% 14%));
+  --color-teal-300: color-mix(in srgb, #14b8a6 38%, hsl(222 47% 14%));
+  --color-teal-700: color-mix(in srgb, #14b8a6 62%, #ffffff);
+  --color-teal-800: color-mix(in srgb, #14b8a6 48%, #ffffff);
+  --color-teal-900: color-mix(in srgb, #14b8a6 38%, #ffffff);
+  --color-cyan-50: color-mix(in srgb, #06b6d4 9%, hsl(222 47% 14%));
+  --color-cyan-100: color-mix(in srgb, #06b6d4 15%, hsl(222 47% 14%));
+  --color-cyan-200: color-mix(in srgb, #06b6d4 24%, hsl(222 47% 14%));
+  --color-cyan-300: color-mix(in srgb, #06b6d4 38%, hsl(222 47% 14%));
+  --color-cyan-700: color-mix(in srgb, #06b6d4 62%, #ffffff);
+  --color-cyan-800: color-mix(in srgb, #06b6d4 48%, #ffffff);
+  --color-cyan-900: color-mix(in srgb, #06b6d4 38%, #ffffff);
+  --color-sky-50: color-mix(in srgb, #0ea5e9 9%, hsl(222 47% 14%));
+  --color-sky-100: color-mix(in srgb, #0ea5e9 15%, hsl(222 47% 14%));
+  --color-sky-200: color-mix(in srgb, #0ea5e9 24%, hsl(222 47% 14%));
+  --color-sky-300: color-mix(in srgb, #0ea5e9 38%, hsl(222 47% 14%));
+  --color-sky-700: color-mix(in srgb, #0ea5e9 62%, #ffffff);
+  --color-sky-800: color-mix(in srgb, #0ea5e9 48%, #ffffff);
+  --color-sky-900: color-mix(in srgb, #0ea5e9 38%, #ffffff);
+  --color-blue-50: color-mix(in srgb, #3b82f6 9%, hsl(222 47% 14%));
+  --color-blue-100: color-mix(in srgb, #3b82f6 15%, hsl(222 47% 14%));
+  --color-blue-200: color-mix(in srgb, #3b82f6 24%, hsl(222 47% 14%));
+  --color-blue-300: color-mix(in srgb, #3b82f6 38%, hsl(222 47% 14%));
+  --color-blue-700: color-mix(in srgb, #3b82f6 62%, #ffffff);
+  --color-blue-800: color-mix(in srgb, #3b82f6 48%, #ffffff);
+  --color-blue-900: color-mix(in srgb, #3b82f6 38%, #ffffff);
+  --color-indigo-50: color-mix(in srgb, #6366f1 9%, hsl(222 47% 14%));
+  --color-indigo-100: color-mix(in srgb, #6366f1 15%, hsl(222 47% 14%));
+  --color-indigo-200: color-mix(in srgb, #6366f1 24%, hsl(222 47% 14%));
+  --color-indigo-300: color-mix(in srgb, #6366f1 38%, hsl(222 47% 14%));
+  --color-indigo-700: color-mix(in srgb, #6366f1 62%, #ffffff);
+  --color-indigo-800: color-mix(in srgb, #6366f1 48%, #ffffff);
+  --color-indigo-900: color-mix(in srgb, #6366f1 38%, #ffffff);
+  --color-violet-50: color-mix(in srgb, #8b5cf6 9%, hsl(222 47% 14%));
+  --color-violet-100: color-mix(in srgb, #8b5cf6 15%, hsl(222 47% 14%));
+  --color-violet-200: color-mix(in srgb, #8b5cf6 24%, hsl(222 47% 14%));
+  --color-violet-300: color-mix(in srgb, #8b5cf6 38%, hsl(222 47% 14%));
+  --color-violet-700: color-mix(in srgb, #8b5cf6 62%, #ffffff);
+  --color-violet-800: color-mix(in srgb, #8b5cf6 48%, #ffffff);
+  --color-violet-900: color-mix(in srgb, #8b5cf6 38%, #ffffff);
+  --color-purple-50: color-mix(in srgb, #a855f7 9%, hsl(222 47% 14%));
+  --color-purple-100: color-mix(in srgb, #a855f7 15%, hsl(222 47% 14%));
+  --color-purple-200: color-mix(in srgb, #a855f7 24%, hsl(222 47% 14%));
+  --color-purple-300: color-mix(in srgb, #a855f7 38%, hsl(222 47% 14%));
+  --color-purple-700: color-mix(in srgb, #a855f7 62%, #ffffff);
+  --color-purple-800: color-mix(in srgb, #a855f7 48%, #ffffff);
+  --color-purple-900: color-mix(in srgb, #a855f7 38%, #ffffff);
+  --color-fuchsia-50: color-mix(in srgb, #d946ef 9%, hsl(222 47% 14%));
+  --color-fuchsia-100: color-mix(in srgb, #d946ef 15%, hsl(222 47% 14%));
+  --color-fuchsia-200: color-mix(in srgb, #d946ef 24%, hsl(222 47% 14%));
+  --color-fuchsia-300: color-mix(in srgb, #d946ef 38%, hsl(222 47% 14%));
+  --color-fuchsia-700: color-mix(in srgb, #d946ef 62%, #ffffff);
+  --color-fuchsia-800: color-mix(in srgb, #d946ef 48%, #ffffff);
+  --color-fuchsia-900: color-mix(in srgb, #d946ef 38%, #ffffff);
+  --color-pink-50: color-mix(in srgb, #ec4899 9%, hsl(222 47% 14%));
+  --color-pink-100: color-mix(in srgb, #ec4899 15%, hsl(222 47% 14%));
+  --color-pink-200: color-mix(in srgb, #ec4899 24%, hsl(222 47% 14%));
+  --color-pink-300: color-mix(in srgb, #ec4899 38%, hsl(222 47% 14%));
+  --color-pink-700: color-mix(in srgb, #ec4899 62%, #ffffff);
+  --color-pink-800: color-mix(in srgb, #ec4899 48%, #ffffff);
+  --color-pink-900: color-mix(in srgb, #ec4899 38%, #ffffff);
+  --color-rose-50: color-mix(in srgb, #f43f5e 9%, hsl(222 47% 14%));
+  --color-rose-100: color-mix(in srgb, #f43f5e 15%, hsl(222 47% 14%));
+  --color-rose-200: color-mix(in srgb, #f43f5e 24%, hsl(222 47% 14%));
+  --color-rose-300: color-mix(in srgb, #f43f5e 38%, hsl(222 47% 14%));
+  --color-rose-700: color-mix(in srgb, #f43f5e 62%, #ffffff);
+  --color-rose-800: color-mix(in srgb, #f43f5e 48%, #ffffff);
+  --color-rose-900: color-mix(in srgb, #f43f5e 38%, #ffffff);
+}
+
+/* Class-level overrides live in the utilities layer with :where() so they keep
+   the same specificity as normal utilities — hover:/focus: states still win. */
+@layer utilities {
+  /* White surfaces become the dark card colour (translucent white glass on dark
+     heroes — bg-white/5, /10, /20 — is deliberately left alone). */
+  :where(.dark) .bg-white,
+  :where(.dark) .hover\:bg-white:hover { background-color: hsl(var(--dk-card)); }
+  :where(.dark) .to-white   { --tw-gradient-to: hsl(var(--dk-card)); }
+  :where(.dark) .from-white { --tw-gradient-from: hsl(var(--dk-card)); }
+  :where(.dark) .bg-white\/95 { background-color: hsl(var(--dk-card) / .95); }
+  :where(.dark) .bg-white\/90 { background-color: hsl(var(--dk-card) / .90); }
+  :where(.dark) .bg-white\/60 { background-color: hsl(var(--dk-card) / .60); }
+  :where(.dark) .bg-white\/50 { background-color: hsl(var(--dk-card) / .50); }
+  :where(.dark) .border-white  { border-color: hsl(var(--dk-card)); }
+  :where(.dark) .ring-white    { --tw-ring-color: hsl(var(--dk-card)); }
+
+  /* Dark surfaces that already existed in the light design stay dark
+     (their shade numbers are otherwise flipped to light for text). */
+  :where(.dark) .bg-gray-950 { background-color: #070a14; }
+  :where(.dark) .bg-gray-900 { background-color: #0b0f1d; }
+  :where(.dark) .bg-gray-800 { background-color: #151a2c; }
+  :where(.dark) .bg-gray-700 { background-color: #232a42; }
+  :where(.dark) .bg-gray-900\/70 { background-color: rgb(11 15 29 / .7); }
+  :where(.dark) .hover\:bg-gray-900:hover { background-color: #0b0f1d; }
+  :where(.dark) .hover\:bg-gray-800:hover { background-color: #151a2c; }
+  :where(.dark) .hover\:bg-gray-800\/50:hover { background-color: rgb(21 26 44 / .5); }
+  :where(.dark) .hover\:bg-gray-700:hover { background-color: #232a42; }
+  :where(.dark) .border-gray-900 { border-color: #0b0f1d; }
+  :where(.dark) .border-gray-800 { border-color: #1b2136; }
+  :where(.dark) .border-gray-700 { border-color: #2a3150; }
+  :where(.dark) .hover\:border-gray-600:hover { border-color: #3a4366; }
+
+  /* Plain black/near-black text and the brand blue need lifting on dark. */
+  :where(.dark) .text-black,
+  :where(.dark) .text-\[\#1A1D2E\] { color: hsl(220 25% 94%); }
+  :where(.dark) .text-\[\#4A5CE8\],
+  :where(.dark) .text-\[\#3B4FD8\],
+  :where(.dark) .hover\:text-\[\#4A5CE8\]:hover { color: #8c99f7; }
+
+  /* Form controls and scrollbars */
+  :where(.dark) input::placeholder,
+  :where(.dark) textarea::placeholder { color: hsl(220 13% 50%); }
+  :where(.dark) ::-webkit-scrollbar-thumb { background: hsl(222 20% 28%); border-radius: 8px; }
+  :where(.dark) ::-webkit-scrollbar-track { background: hsl(222 47% 11%); }
+  /* Coloured text (text-red-600 …) is lightened one step so it reads on dark. */
+  :where(.dark) .text-red-600,
+  :where(.dark) .text-red-500,
+  :where(.dark) .hover\:text-red-600:hover,
+  :where(.dark) .hover\:text-red-700:hover { color: #f87171; }
+  :where(.dark) .text-orange-600,
+  :where(.dark) .text-orange-500,
+  :where(.dark) .hover\:text-orange-600:hover,
+  :where(.dark) .hover\:text-orange-700:hover { color: #fb923c; }
+  :where(.dark) .text-amber-600,
+  :where(.dark) .text-amber-500,
+  :where(.dark) .hover\:text-amber-600:hover,
+  :where(.dark) .hover\:text-amber-700:hover { color: #fbbf24; }
+  :where(.dark) .text-yellow-600,
+  :where(.dark) .text-yellow-500,
+  :where(.dark) .hover\:text-yellow-600:hover,
+  :where(.dark) .hover\:text-yellow-700:hover { color: #facc15; }
+  :where(.dark) .text-lime-600,
+  :where(.dark) .text-lime-500,
+  :where(.dark) .hover\:text-lime-600:hover,
+  :where(.dark) .hover\:text-lime-700:hover { color: #a3e635; }
+  :where(.dark) .text-green-600,
+  :where(.dark) .text-green-500,
+  :where(.dark) .hover\:text-green-600:hover,
+  :where(.dark) .hover\:text-green-700:hover { color: #4ade80; }
+  :where(.dark) .text-emerald-600,
+  :where(.dark) .text-emerald-500,
+  :where(.dark) .hover\:text-emerald-600:hover,
+  :where(.dark) .hover\:text-emerald-700:hover { color: #34d399; }
+  :where(.dark) .text-teal-600,
+  :where(.dark) .text-teal-500,
+  :where(.dark) .hover\:text-teal-600:hover,
+  :where(.dark) .hover\:text-teal-700:hover { color: #2dd4bf; }
+  :where(.dark) .text-cyan-600,
+  :where(.dark) .text-cyan-500,
+  :where(.dark) .hover\:text-cyan-600:hover,
+  :where(.dark) .hover\:text-cyan-700:hover { color: #22d3ee; }
+  :where(.dark) .text-sky-600,
+  :where(.dark) .text-sky-500,
+  :where(.dark) .hover\:text-sky-600:hover,
+  :where(.dark) .hover\:text-sky-700:hover { color: #38bdf8; }
+  :where(.dark) .text-blue-600,
+  :where(.dark) .text-blue-500,
+  :where(.dark) .hover\:text-blue-600:hover,
+  :where(.dark) .hover\:text-blue-700:hover { color: #60a5fa; }
+  :where(.dark) .text-indigo-600,
+  :where(.dark) .text-indigo-500,
+  :where(.dark) .hover\:text-indigo-600:hover,
+  :where(.dark) .hover\:text-indigo-700:hover { color: #818cf8; }
+  :where(.dark) .text-violet-600,
+  :where(.dark) .text-violet-500,
+  :where(.dark) .hover\:text-violet-600:hover,
+  :where(.dark) .hover\:text-violet-700:hover { color: #a78bfa; }
+  :where(.dark) .text-purple-600,
+  :where(.dark) .text-purple-500,
+  :where(.dark) .hover\:text-purple-600:hover,
+  :where(.dark) .hover\:text-purple-700:hover { color: #c084fc; }
+  :where(.dark) .text-fuchsia-600,
+  :where(.dark) .text-fuchsia-500,
+  :where(.dark) .hover\:text-fuchsia-600:hover,
+  :where(.dark) .hover\:text-fuchsia-700:hover { color: #e879f9; }
+  :where(.dark) .text-pink-600,
+  :where(.dark) .text-pink-500,
+  :where(.dark) .hover\:text-pink-600:hover,
+  :where(.dark) .hover\:text-pink-700:hover { color: #f472b6; }
+  :where(.dark) .text-rose-600,
+  :where(.dark) .text-rose-500,
+  :where(.dark) .hover\:text-rose-600:hover,
+  :where(.dark) .hover\:text-rose-700:hover { color: #fb7185; }
+
+}
+
+/* Soft cross-fade when switching (skipped for people who prefer less motion) */
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-switching, html.theme-switching *, html.theme-switching *::before, html.theme-switching *::after {
+    transition: background-color .25s ease, border-color .25s ease, color .25s ease !important;
+  }
+}

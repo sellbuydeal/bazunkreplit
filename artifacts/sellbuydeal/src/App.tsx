@@ -12,6 +12,7 @@ function ScrollToTop() {
 }
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 
@@ -342,6 +343,7 @@ function InnerApp() {
 
 function App() {
   return (
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="bazunk-theme" disableTransitionOnChange={false}>
     <TooltipProvider>
       <CurrencyProvider>
         <SiteSettingsProvider>
@@ -353,6 +355,7 @@ function App() {
         </SiteSettingsProvider>
       </CurrencyProvider>
     </TooltipProvider>
+    </ThemeProvider>
   );
 }
 
