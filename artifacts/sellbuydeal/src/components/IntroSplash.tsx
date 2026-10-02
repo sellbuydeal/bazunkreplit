@@ -1,40 +1,32 @@
 import { useState, useEffect, useRef } from "react";
 
 const GIF_SRC = `${import.meta.env.BASE_URL}bazunkintro2.gif`;
-const GIF_DURATION_MS = 5400; // bazunkintro2.gif runs ~5.3s — change if you swap the GIF
+const SHOW_MS = 5000; // intro closes after 5 seconds (GIF loops, so don't go longer)
 const FADE_MS = 500;
-const SEEN_KEY = "bazunk_intro_seen";
 
 export default function IntroSplash() {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true); // plays on EVERY homepage load
   const [fading, setFading] = useState(false);
   const closing = useRef(false);
-
-  // Decide once, on first load of the session, whether to show the intro
-  useEffect(() => {
-    try {
-      if (!sessionStorage.getItem(SEEN_KEY)) setVisible(true);
-    } catch {
-      setVisible(true);
-    }
-  }, []);
+  const timers = useRef<number[]>([]);
 
   const close = () => {
     if (closing.current) return;
     closing.current = true;
-    try {
-      sessionStorage.setItem(SEEN_KEY, "true");
-    } catch {}
     setFading(true);
-    setTimeout(() => setVisible(false), FADE_MS);
+    timers.current.push(window.setTimeout(() => setVisible(false), FADE_MS));
   };
 
-  // Safety net: close even if the GIF fails to load
+  // Start the 5s countdown once the GIF has actually loaded and begun playing
+  const startCountdown = () => {
+    timers.current.push(window.setTimeout(close, SHOW_MS));
+  };
+
+  // Safety net: close even if the GIF is slow or fails to load
   useEffect(() => {
-    if (!visible) return;
-    const t = setTimeout(close, GIF_DURATION_MS + 3000);
-    return () => clearTimeout(t);
-  }, [visible]);
+    timers.current.push(window.setTimeout(close, SHOW_MS + 4000));
+    return () => timers.current.forEach(clearTimeout);
+  }, []);
 
   if (!visible) return null;
 
@@ -56,8 +48,7 @@ export default function IntroSplash() {
       <img
         src={GIF_SRC}
         alt="Bazunk"
-        // start the countdown only once the GIF has actually loaded and begun
-        onLoad={() => setTimeout(close, GIF_DURATION_MS)}
+        onLoad={startCountdown}
         onError={close}
         style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
       />
