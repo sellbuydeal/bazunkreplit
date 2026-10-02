@@ -193,7 +193,7 @@ export function Navbar() {
 
           {/* Logo */}
           <Link href="/" className="flex items-center flex-shrink-0" data-testid="link-logo">
-              <img src="/bazunk-logo.png" alt="Bazunk" className="h-24 -my-2 w-auto object-contain" />
+              <img src="/bazunk-logo.png" alt="Bazunk" className="h-28 -my-2 w-auto object-contain" />
           </Link>
 
           {/* Desktop nav */}
