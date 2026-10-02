@@ -71,12 +71,12 @@ const SELL_OPTIONS: Array<{
 ];
 
 const MORE_NAV = [
-  { href: "/auctions",          label: "Auctions",         icon: Gavel },
-  { href: "/flash-sales",       label: "Flash Sales",      icon: Flame },
-  { href: "/classifieds",       label: "Classifieds",      icon: Newspaper },
-  { href: "/buyer-protection",  label: "Buyer Protection", icon: ShieldCheck },
-  { href: "/support",           label: "Support",          icon: HelpCircle },
-  { href: "/dashboard",         label: "Importers",        icon: ArrowDownToLine },
+  { href: "/auctions",          label: "Auctions",         icon: Gavel,           color: "text-amber-600",   bg: "bg-amber-50" },
+  { href: "/flash-sales",       label: "Flash Sales",      icon: Flame,           color: "text-red-500",     bg: "bg-red-50" },
+  { href: "/classifieds",       label: "Classifieds",      icon: Newspaper,       color: "text-purple-600",  bg: "bg-purple-50" },
+  { href: "/buyer-protection",  label: "Buyer Protection", icon: ShieldCheck,     color: "text-emerald-600", bg: "bg-emerald-50" },
+  { href: "/support",           label: "Support",          icon: HelpCircle,      color: "text-sky-600",     bg: "bg-sky-50" },
+  { href: "/dashboard",         label: "Importers",        icon: ArrowDownToLine, color: "text-[#4A5CE8]",   bg: "bg-blue-50" },
 ];
 
 const MOBILE_NAV_LINKS = [
@@ -180,7 +180,6 @@ export function Navbar() {
   const initial = user?.name?.charAt(0).toUpperCase() ?? "U";
 
   const primaryLinks = [
-    { href: "/",           label: "Home" },
     { href: "/browse",     label: "Browse" },
     { href: "/categories", label: "Categories" },
     { href: "/live",       label: "Live", live: true },
@@ -188,16 +187,16 @@ export function Navbar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 w-full bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 h-20 flex items-center justify-between gap-3">
+      <nav className="sticky top-0 z-50 w-full bg-white shadow-sm">
+        <div className="container mx-auto px-4 h-20 md:h-24 flex items-center justify-between gap-3">
 
           {/* Logo */}
           <Link href="/" className="flex items-center flex-shrink-0" data-testid="link-logo">
-              <img src="/bazunk-logo.png" alt="Bazunk" className="h-28 -my-2 w-auto object-contain" />
+              <img src="/bazunk-logo-header.png" alt="Bazunk" className="h-11 md:h-12 xl:h-14 w-auto object-contain" />
           </Link>
 
           {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-0.5 text-sm font-medium">
+          <div className="hidden xl:flex items-center gap-1 text-sm font-medium flex-shrink-0">
 
             {/* Primary links */}
             {primaryLinks.map(({ href, label, live }) => {
@@ -206,10 +205,12 @@ export function Navbar() {
                 <Link
                   key={href}
                   href={href}
-                  className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                    active
-                      ? "text-[#F26B21] font-semibold bg-orange-50"
-                      : "text-gray-500 hover:text-[#F26B21] hover:bg-gray-50"
+                  className={`px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                    live
+                      ? `text-red-600 font-semibold ${active ? "bg-red-100" : "bg-red-50 hover:bg-red-100"}`
+                      : active
+                        ? "text-[#4A5CE8] font-semibold bg-[#4A5CE8]/10"
+                        : "text-gray-600 hover:text-[#4A5CE8] hover:bg-[#4A5CE8]/5"
                   }`}
                 >
                   {live && (
@@ -227,10 +228,10 @@ export function Navbar() {
             <div ref={rewardsRef} className="relative">
               <button
                 onClick={handleRewardsClick}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap text-amber-600 font-semibold hover:bg-amber-50"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap text-amber-700 font-semibold bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-200 hover:to-orange-200"
                 data-testid="link-rewards"
               >
-                <Trophy className="w-3.5 h-3.5" />
+                <Trophy className="w-3.5 h-3.5 text-amber-500" />
                 Rewards
               </button>
               <AnimatePresence>
@@ -276,8 +277,8 @@ export function Navbar() {
             <div ref={moreRef} className="relative">
               <button
                 onClick={() => setMoreOpen((v) => !v)}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
-                  moreOpen ? "text-[#F26B21] bg-orange-50" : "text-gray-500 hover:text-[#F26B21] hover:bg-gray-50"
+                className={`flex items-center gap-1 px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap ${
+                  moreOpen ? "text-[#4A5CE8] bg-[#4A5CE8]/10" : "text-gray-600 hover:text-[#4A5CE8] hover:bg-[#4A5CE8]/5"
                 }`}
                 data-testid="button-more-nav"
               >
@@ -291,22 +292,24 @@ export function Navbar() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 6, scale: 0.97 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute left-0 top-[calc(100%+8px)] w-48 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 py-1.5"
+                    className="absolute left-0 top-[calc(100%+8px)] w-60 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 py-1.5"
                   >
-                    {MORE_NAV.map(({ href, label, icon: Icon }) => {
+                    {MORE_NAV.map(({ href, label, icon: Icon, color, bg }) => {
                       const active = location === href;
                       return (
                         <Link
                           key={href}
                           href={href}
                           onClick={() => setMoreOpen(false)}
-                          className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                          className={`flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
                             active
-                              ? "text-[#F26B21] font-semibold bg-orange-50"
-                              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                              ? "text-[#4A5CE8] font-semibold bg-[#4A5CE8]/5"
+                              : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                           }`}
                         >
-                          <Icon className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          <span className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center flex-shrink-0`}>
+                            <Icon className={`w-4 h-4 ${color}`} />
+                          </span>
                           {label}
                         </Link>
                       );
@@ -319,10 +322,10 @@ export function Navbar() {
           </div>
 
           {/* Right section */}
-          <div className="flex items-center gap-2 flex-1 md:flex-none justify-end">
+          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
 
             {/* Desktop search */}
-            <div ref={searchRef} className="relative w-full max-w-[220px] hidden sm:block">
+            <div ref={searchRef} className="relative flex-1 min-w-[120px] max-w-[240px] hidden lg:block">
               <form onSubmit={handleSubmit}>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <Input
@@ -398,7 +401,7 @@ export function Navbar() {
             </div>
 
             {/* Currency selector */}
-            <div ref={currencyRef} className="relative hidden sm:block">
+            <div ref={currencyRef} className="relative hidden md:block flex-shrink-0">
               <button
                 onClick={() => setCurrencyOpen(!currencyOpen)}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:border-[#4A5CE8] hover:text-[#4A5CE8] transition-colors bg-white"
@@ -432,13 +435,13 @@ export function Navbar() {
             {/* Logged OUT actions */}
             {!user && (
               <>
-                <Link href="/sell" className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#F26B21]/40 text-[#F26B21] text-sm font-semibold hover:bg-[#F26B21]/5 transition-colors" data-testid="link-sell-info">
+                <Link href="/sell" className="hidden 2xl:flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#F26B21]/40 text-[#F26B21] text-sm font-semibold hover:bg-[#F26B21]/5 transition-colors whitespace-nowrap" data-testid="link-sell-info">
                   <Tag className="w-3.5 h-3.5" /> Start Selling
                 </Link>
-                <Link href="/sign-in" className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-700 hover:border-[#4A5CE8] hover:text-[#4A5CE8] transition-colors" data-testid="link-sign-in">
+                <Link href="/sign-in" className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#4A5CE8]/30 text-sm font-semibold text-[#4A5CE8] hover:bg-[#4A5CE8]/5 hover:border-[#4A5CE8] transition-colors whitespace-nowrap" data-testid="link-sign-in">
                   Sign In
                 </Link>
-                <Link href="/sign-up" className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#F26B21] text-white text-sm font-semibold hover:bg-[#D97706] transition-colors shadow-sm" data-testid="link-register">
+                <Link href="/sign-up" className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#F26B21] text-white text-sm font-semibold hover:bg-[#D97706] transition-colors shadow-sm whitespace-nowrap" data-testid="link-register">
                   Join Free
                 </Link>
               </>
@@ -595,7 +598,7 @@ export function Navbar() {
             {/* Mobile hamburger */}
             <button
               onClick={() => setMobileOpen(true)}
-              className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors flex-shrink-0"
+              className="xl:hidden flex items-center justify-center w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors flex-shrink-0"
               aria-label="Open menu"
               data-testid="button-mobile-menu"
             >
@@ -603,6 +606,8 @@ export function Navbar() {
             </button>
           </div>
         </div>
+        {/* Brand colour accent */}
+        <div className="h-[3px] w-full bg-gradient-to-r from-[#1E6FE8] via-[#4A5CE8] to-[#F5B301]" />
       </nav>
 
       {/* Mobile menu drawer */}
@@ -615,7 +620,7 @@ export function Navbar() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/50 z-50 md:hidden"
+              className="fixed inset-0 bg-black/50 z-50 xl:hidden"
               onClick={() => setMobileOpen(false)}
             />
             <motion.div
@@ -624,7 +629,7 @@ export function Navbar() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 220 }}
-              className="fixed top-0 right-0 bottom-0 w-72 bg-white z-50 flex flex-col md:hidden shadow-2xl"
+              className="fixed top-0 right-0 bottom-0 w-72 bg-white z-50 flex flex-col xl:hidden shadow-2xl"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
