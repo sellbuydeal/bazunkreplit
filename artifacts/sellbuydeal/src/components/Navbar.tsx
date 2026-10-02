@@ -193,7 +193,7 @@ export function Navbar() {
 
           {/* Logo */}
           <Link href="/" className="flex items-center flex-shrink-0" data-testid="link-logo">
-            <img src="/bazunk-logo.png" alt="Bazunk" className="h-20 w-auto object-contain" />
+              <img src="/bazunk-logo.png" alt="Bazunk" className="h-24 -my-2 w-auto object-contain" />
           </Link>
 
           {/* Desktop nav */}
@@ -629,7 +629,7 @@ export function Navbar() {
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <Link href="/" onClick={() => setMobileOpen(false)} className="flex items-center">
-                  <img src="/bazunk-logo.png" alt="Bazunk" className="h-8 w-auto object-contain" />
+                   <img src="/bazunk-logo.png" alt="Bazunk" className="h-10 -my-1 w-auto object-contain" />
                 </Link>
                 <button
                   onClick={() => setMobileOpen(false)}
