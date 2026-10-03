@@ -1005,9 +1005,9 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
   const products: SelectedEbay[] = req.body.products ?? [];
   const site        = (req.body.site as string ?? "uk") === "us" ? "us" : "uk";
   const currency: "GBP" | "USD" = site === "uk" ? "GBP" : "USD";
-  const markupPct   = Math.max(0, parseFloat(String(req.body.markup ?? 35)) || 35);
-  const shippingAmt = Math.max(0, parseFloat(String(req.body.shipping ?? 0)) || 0);
-  const minProfit = Math.max(0, parseFloat(String(req.body.minProfit ?? 5)) || 5);
+  const markupPct   = Math.max(0, parseFloat(String(req.body.markup   ?? 35))   || 35);
+  const shippingAmt = Math.max(0, parseFloat(String(req.body.shipping ?? 3.99)) || 3.99);
+  const minProfit = Math.max(0, parseFloat(String(req.body.minProfit ?? 0)) || 0);
   const category    = (req.body.category    as string) || "other";
   const subcategory = (req.body.subcategory as string) || null;
   const sellerEmail = "cczslater@gmail.com";
@@ -1015,10 +1015,14 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
   if (!products.length) { res.status(400).json({ error: "products array required" }); return; }
 
   const sellerRow = await db.execute(
-    sql`SELECT name FROM users WHERE email = ${sellerEmail} LIMIT 1`
-  ).then(r => r.rows[0] as { name: string | null } | undefined);
+    sql`SELECT id, name FROM users WHERE LOWER(email) = LOWER(${sellerEmail}) LIMIT 1`
+  ).then(r => r.rows[0] as { id: string; name: string | null } | undefined);
+  if (!sellerRow) {
+    res.status(400).json({ error: "Create/sign in to cczslater@gmail.com once before importing to Bazunk Official Store." });
+    return;
+  }
+  await db.execute(sql`UPDATE users SET name = 'Bazunk Official Store', verification_status = 'verified', verification_date = COALESCE(verification_date, NOW()) WHERE id = ${sellerRow.id}`);
   const SELLER_NAME = "Bazunk Official Store";
-  await db.execute(sql`INSERT INTO users (id,email,name,verification_status,created_at) VALUES ('bazunk-official-store',${sellerEmail},${SELLER_NAME},'verified',NOW()) ON CONFLICT (email) DO UPDATE SET name=${SELLER_NAME}, verification_status='verified'`);
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   let inserted = 0;
 
@@ -1038,13 +1042,17 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
       source, item_id: p.item_id, ebay_url: p.ebay_url,
       ebay_price: p.price, ebay_currency: currency, ebay_site: site,
       shipping: shippingAmt, markup_pct: markupPct, min_profit: minProfit, official_store: true,
-      official_store_name: "Bazunk Official Store", source_last_checked: new Date().toISOString(),
     });
 
     const sym = p.currency === "GBP" ? "£" : "$";
     const descParts: string[] = [p.title, ""];
     if (p.condition) descParts.push(`Condition: ${p.condition}`);
     if (p.categories?.length) descParts.push(`Category: ${p.categories.join(" › ")}`);
+    const sellerLine = [
+      p.seller_username ? `Sold by: ${p.seller_username}` : null,
+      p.seller_feedback ? `(${p.seller_feedback}% positive feedback)` : null,
+    ].filter(Boolean).join(" ");
+    if (sellerLine) descParts.push(sellerLine);
     if (p.shipping_label) {
       const shipType = p.shipping_type === "FIXED" ? "Standard" : p.shipping_type === "FREE" ? "Free" : p.shipping_type ?? "";
       descParts.push(`Shipping: ${p.shipping_label}${shipType && shipType !== "Free" ? ` (${shipType})` : ""}`);
@@ -1054,6 +1062,9 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
       descParts.push(`Listing type: ${p.buying_options.map(o => o.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase())).join(", ")}`);
     }
     descParts.push("");
+    if (p.original_price) descParts.push(`Original eBay retail price: ${sym}${p.original_price}${p.discount_pct ? ` (${p.discount_pct})` : ""}`);
+    descParts.push(`eBay price: ${sym}${p.price.toFixed(2)}`);
+    descParts.push(`View original listing: ${p.ebay_url}`);
     while (descParts.length && descParts[descParts.length - 1] === "") descParts.pop();
     const description = descParts.join("\n");
     const image       = p.image ?? null;
@@ -1070,11 +1081,10 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
         ${image}, ${sellerEmail}, ${SELLER_NAME}, ${specs}, 'active', NOW(), NOW()
       )
     `);
-    await db.execute(sql`UPDATE listings SET seller_username = 'Bazunk Official Store' WHERE public_id = ${publicId}`);
     inserted++;
   }
 
-  logger.info({ inserted, site, markupPct, shippingAmt, minProfit }, "eBay Official Store import complete");
+  logger.info({ inserted, site, markupPct, shippingAmt }, "eBay admin import complete");
   res.json({ imported: inserted, message: `Imported ${inserted} product${inserted !== 1 ? "s" : ""}` });
 });
 
@@ -1101,8 +1111,8 @@ router.post("/admin/sync-ebay-prices", async (req, res) => {
         const itemId    = specs.item_id as string;
         const site      = (specs.ebay_site as string ?? "uk") === "us" ? "us" : "uk";
         const markupPct = parseFloat(String(specs.markup_pct ?? 35)) || 35;
-        const shipping  = parseFloat(String(specs.shipping ?? 0)) || 0;
-        const minProfit = parseFloat(String(specs.min_profit ?? 5)) || 5;
+        const shipping  = parseFloat(String(specs.shipping   ?? 3.99)) || 3.99;
+        const minProfit = parseFloat(String(specs.min_profit ?? 0)) || 0;
         const oldPrice  = parseFloat(String(specs.ebay_price ?? 0));
         if (!itemId) return;
 
@@ -1125,12 +1135,7 @@ router.post("/admin/sync-ebay-prices", async (req, res) => {
 
         const landedCost = newEbayPrice + shipping;
         const newBazunkPrice = Math.round(Math.max(landedCost * (1 + markupPct / 100), landedCost + minProfit) * 100) / 100;
-        const changeRatio = oldPrice > 0 ? newEbayPrice / oldPrice : 1;
-        if (changeRatio > 2.5 || changeRatio < 0.4) {
-          const pausedSpecs = JSON.stringify({ ...specs, source_price_anomaly: true, source_last_checked: new Date().toISOString(), proposed_source_price: newEbayPrice });
-          await db.execute(sql`UPDATE listings SET status='paused', specifications=${pausedSpecs}, updated_at=NOW() WHERE id=${row.id}`); errors++; return;
-        }
-        const newSpecs = JSON.stringify({ ...specs, ebay_price: newEbayPrice, source_price_anomaly: false, source_last_checked: new Date().toISOString() });
+        const newSpecs       = JSON.stringify({ ...specs, ebay_price: newEbayPrice });
         await db.execute(sql`
           UPDATE listings SET price = ${newBazunkPrice}, price_gbp = ${newBazunkPrice},
             specifications = ${newSpecs}, updated_at = NOW() WHERE id = ${row.id}
@@ -1181,8 +1186,7 @@ router.post("/admin/sync-ebay-details", async (req, res) => {
 router.patch("/admin/bulk-markup-ebay", async (req, res) => {
   try {
     const markupPct = Math.max(0, parseFloat(String(req.body.markup  ?? 35))  || 35);
-    const shipping  = Math.max(0, parseFloat(String(req.body.shipping ?? 0)) || 0);
-    const minProfit = Math.max(0, parseFloat(String(req.body.minProfit ?? 5)) || 5);
+    const shipping  = Math.max(0, parseFloat(String(req.body.shipping ?? 3.99)) || 3.99);
 
     const rows = await db.execute(sql`
       SELECT id, specifications FROM listings
@@ -1195,9 +1199,8 @@ router.patch("/admin/bulk-markup-ebay", async (req, res) => {
         const specs    = JSON.parse(row.specifications) as Record<string, unknown>;
         const ebayPrice = parseFloat(String(specs.ebay_price ?? 0));
         if (!ebayPrice) continue;
-        const landedCost = ebayPrice + shipping;
-        const newPrice = Math.round(Math.max(landedCost * (1 + markupPct / 100), landedCost + minProfit) * 100) / 100;
-        const newSpecs = JSON.stringify({ ...specs, shipping, markup_pct: markupPct, min_profit: minProfit });
+        const newPrice  = Math.round((ebayPrice * (1 + markupPct / 100) + shipping) * 100) / 100;
+        const newSpecs  = JSON.stringify({ ...specs, shipping, markup_pct: markupPct });
         await db.execute(sql`
           UPDATE listings SET price = ${newPrice}, price_gbp = ${newPrice},
             specifications = ${newSpecs}, updated_at = NOW() WHERE id = ${row.id}

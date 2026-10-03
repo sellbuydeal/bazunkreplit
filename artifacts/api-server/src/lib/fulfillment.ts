@@ -62,6 +62,7 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
     let lineNo = 0;
     const sellers = new Set<string>();
     const sellerItems = new Map<string, string[]>();
+    const sellerEmailItems = new Map<string, Array<{ title: string; price: number; quantity: number }>>();
     const emailItems: Array<{ title: string; price: number; quantity: number }> = [];
 
     for (const l of lines) {
@@ -86,6 +87,7 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
       if (seller) {
         sellers.add(seller);
         sellerItems.set(seller, [...(sellerItems.get(seller) ?? []), `${row.title as string}${l.qty > 1 ? ` x${l.qty}` : ""}`]);
+        sellerEmailItems.set(seller, [...(sellerEmailItems.get(seller) ?? []), { title: row.title as string, price, quantity: l.qty }]);
       }
       emailItems.push({ title: row.title as string, price, quantity: l.qty });
     }
@@ -94,7 +96,6 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
     if (creditsApplied > 0) await storage.addCredits(buyerEmail, -creditsApplied);
 
     for (const seller of sellers) {
-      void sendSellerSaleNotification({ email: seller, items: sellerItems.get(seller) ?? [] });
       void refreshSellerMilestones(seller);
       void sendSystemMessage(seller, {
         category: "Sales",
@@ -119,6 +120,7 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
         items: emailItems,
         total: (session.amount_total ?? 0) / 100,
       });
+      for (const [email, items] of sellerEmailItems) void sendSellerSaleNotification({ email, items, buyerEmail });
     }
 
     return { status: "fulfilled", orders: lineNo };
