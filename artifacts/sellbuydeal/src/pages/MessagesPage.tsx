@@ -17,17 +17,18 @@ import { useOffers, type Offer, type OfferStatus } from "@/context/OfferContext"
 import { useCart } from "@/context/CartContext";
 import { ALL_PRODUCTS } from "@/data/products";
 
-function normaliseTimestamp(value: unknown): string | null {
-  if (typeof value === "string" && value.trim()) return value;
-  if (value instanceof Date) return value.toISOString();
-  return null;
+function safeTimestamp(message?: Partial<Message> | null): string | null {
+  if (!message) return null;
+  const value = (message as any).timestamp ?? (message as any).createdAt ?? (message as any).created_at;
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function timeAgo(timestamp: unknown): string {
-  const safe = normaliseTimestamp(timestamp);
-  if (!safe) return "";
+function timeAgo(timestamp?: string | null): string {
+  if (!timestamp) return "";
   const now = new Date();
-  const then = new Date(safe);
+  const then = new Date(timestamp);
   if (Number.isNaN(then.getTime())) return "";
   const diff = Math.floor((now.getTime() - then.getTime()) / 1000);
   if (diff < 60) return "just now";
@@ -36,10 +37,9 @@ function timeAgo(timestamp: unknown): string {
   return then.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-function formatTime(timestamp: unknown): string {
-  const safe = normaliseTimestamp(timestamp);
-  if (!safe) return "";
-  const date = new Date(safe);
+function formatTime(timestamp?: string | null): string {
+  if (!timestamp) return "";
+  const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
@@ -60,7 +60,8 @@ function Avatar({ initials, size = "md" }: { initials: string; size?: "sm" | "md
 }
 
 function ConversationRow({ convo, active, onClick }: { convo: Conversation; active: boolean; onClick: () => void }) {
-  const last = convo.messages[convo.messages.length - 1] ?? null;
+  const last = convo.messages?.[convo.messages.length - 1];
+  const lastTimestamp = safeTimestamp(last);
   return (
     <button
       onClick={onClick}
@@ -79,11 +80,11 @@ function ConversationRow({ convo, active, onClick }: { convo: Conversation; acti
           <p className={`text-sm ${convo.unread > 0 ? "font-bold text-gray-900" : "font-semibold text-gray-700"}`}>
             {convo.with.name}
           </p>
-          <span className="text-[10px] text-gray-400 flex-shrink-0 ml-1">{last ? timeAgo(last.timestamp) : ""}</span>
+          <span className="text-[10px] text-gray-400 flex-shrink-0 ml-1">{lastTimestamp ? timeAgo(lastTimestamp) : ""}</span>
         </div>
         <p className="text-[11px] text-[#F26B21] font-medium truncate mb-0.5">{convo.listingTitle}</p>
         <p className={`text-xs truncate ${convo.unread > 0 ? "text-gray-700 font-medium" : "text-gray-400"}`}>
-          {last ? <>{last.senderId === "me" ? "You: " : ""}{last.text}</> : "No messages yet — start the conversation"}
+          {last ? `${last.senderId === "me" ? "You: " : ""}${last.text}` : "No messages yet — start the conversation"}
         </p>
       </div>
     </button>
@@ -107,7 +108,7 @@ function MessageBubble({ msg }: { msg: Message }) {
           {msg.text}
         </div>
         <div className="flex items-center gap-1 mt-1 px-1">
-          <span className="text-[10px] text-gray-400">{formatTime(msg.timestamp)}</span>
+          <span className="text-[10px] text-gray-400">{formatTime(safeTimestamp(msg))}</span>
           {isMe && (
             <span className="text-[10px] text-gray-400">
               {msg.read ? <CheckCheck className="w-3 h-3 text-[#4A5CE8]" /> : <Check className="w-3 h-3" />}
@@ -555,7 +556,7 @@ export function MessagesPage() {
     const r = await fetch(`/api/messages/conversations/${id}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!r.ok) return;
     const data = await r.json();
-    setConversations(prev => prev.map(c => c.id === id ? { ...c, messages: Array.isArray(data.messages) ? data.messages.map((m: any) => ({ ...m, timestamp: m.timestamp ?? m.createdAt ?? m.created_at ?? null })) : [], unread: 0 } : c));
+    setConversations(prev => prev.map(c => c.id === id ? { ...c, messages: data.messages || [], unread: 0 } : c));
   }
 
   async function sendMessage() {
@@ -566,7 +567,7 @@ export function MessagesPage() {
       const r = await fetch(`/api/messages/conversations/${activeId}/messages`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ text }) });
       const msg = await r.json();
       if (!r.ok) { setInputText(text); return; }
-      setConversations(prev => prev.map(c => c.id === activeId ? { ...c, messages: [...c.messages, { ...msg, timestamp: msg.timestamp ?? msg.createdAt ?? msg.created_at ?? new Date().toISOString() }] } : c));
+      setConversations(prev => prev.map(c => c.id === activeId ? { ...c, messages: [...c.messages, msg] } : c));
     } catch { setInputText(text); }
   }
 
@@ -578,7 +579,7 @@ export function MessagesPage() {
         const token=await session.getToken();
         const r=await fetch("/api/messages/conversations",{headers:{Authorization:`Bearer ${token}`}});
         if(!r.ok) return; const rows=await r.json();
-        const mapped: Conversation[] = rows.map((x:any)=>({...x,messages:[{id:-x.id,senderId:"them",text:x.lastText,timestamp:x.lastAt ?? x.updatedAt ?? x.updated_at ?? null,read:x.unread===0}]}));
+        const mapped: Conversation[] = rows.map((x:any)=>({...x,messages:[{id:-x.id,senderId:"them",text:x.lastText,timestamp:x.lastAt,read:x.unread===0}]}));
         if(cancelled) return; setConversations(mapped);
         const wanted=Number(new URLSearchParams(window.location.search).get("conversation"));
         const first=(wanted && mapped.some(c=>c.id===wanted))?wanted:(mapped[0]?.id ?? null);
@@ -756,13 +757,21 @@ export function MessagesPage() {
                     {/* Messages */}
                     <div className="flex-1 flex flex-col min-h-0">
                       <div className="flex-1 overflow-y-auto px-4 py-5 space-y-2">
-                        <div className="flex items-center gap-3 py-2">
-                          <div className="flex-1 h-px bg-gray-100" />
-                          <span className="text-[10px] text-gray-400 font-medium">
-                            {new Date(activeConvo.messages[0].timestamp).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
-                          </span>
-                          <div className="flex-1 h-px bg-gray-100" />
-                        </div>
+                        {activeConvo.messages.length > 0 && safeTimestamp(activeConvo.messages[0]) ? (
+                          <div className="flex items-center gap-3 py-2">
+                            <div className="flex-1 h-px bg-gray-100" />
+                            <span className="text-[10px] text-gray-400 font-medium">
+                              {new Date(safeTimestamp(activeConvo.messages[0])!).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}
+                            </span>
+                            <div className="flex-1 h-px bg-gray-100" />
+                          </div>
+                        ) : (
+                          <div className="h-full min-h-[220px] flex flex-col items-center justify-center text-center px-6">
+                            <MessageSquare className="w-10 h-10 text-[#4A5CE8]/50 mb-3" />
+                            <p className="text-sm font-semibold text-gray-700">Start the conversation</p>
+                            <p className="text-xs text-gray-400 mt-1">Ask the seller a question about this listing.</p>
+                          </div>
+                        )}
                         <AnimatePresence initial={false}>
                           {activeConvo.messages.map((msg) => (
                             <MessageBubble key={msg.id} msg={msg} />
