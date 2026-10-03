@@ -24,42 +24,47 @@ async function authenticatedEmail(req: Request): Promise<string | null> {
 // ── Reputation ───────────────────────────────────────────────────────────────
 
 async function sellerReputation(email: string) {
-  const rev = (await db.execute(sql`
-    SELECT COUNT(*)::int AS total,
-           COUNT(*) FILTER (WHERE rating >= 4)::int AS positive,
-           COUNT(*) FILTER (WHERE rating = 3)::int AS neutral,
-           COUNT(*) FILTER (WHERE rating <= 2)::int AS negative,
-           COALESCE(ROUND(AVG(rating)::numeric, 2), 0)::float AS average
-    FROM reviews WHERE role = 'buyer_to_seller' AND LOWER(reviewee_email) = LOWER(${email})
-  `)).rows[0] as { total: number; positive: number; neutral: number; negative: number; average: number };
-
-  const sales = (await db.execute(sql`
-    SELECT COUNT(*)::int AS n FROM orders
-    WHERE LOWER(seller_email) = LOWER(${email}) AND status IN ${SENT}
-  `)).rows[0] as { n: number };
-
-  const repeat = (await db.execute(sql`
-    SELECT COUNT(*)::int AS n FROM (
-      SELECT LOWER(buyer_email) AS b FROM orders
+  // These aggregates are independent. Running them concurrently cuts the seller-card
+  // latency from five sequential database round trips to roughly one round trip window.
+  const [revResult, salesResult, repeatResult, dispResult, sellerResult] = await Promise.all([
+    db.execute(sql`
+      SELECT COUNT(*)::int AS total,
+             COUNT(*) FILTER (WHERE rating >= 4)::int AS positive,
+             COUNT(*) FILTER (WHERE rating = 3)::int AS neutral,
+             COUNT(*) FILTER (WHERE rating <= 2)::int AS negative,
+             COALESCE(ROUND(AVG(rating)::numeric, 2), 0)::float AS average
+      FROM reviews WHERE role = 'buyer_to_seller' AND LOWER(reviewee_email) = LOWER(${email})
+    `),
+    db.execute(sql`
+      SELECT COUNT(*)::int AS n FROM orders
       WHERE LOWER(seller_email) = LOWER(${email}) AND status IN ${SENT}
-      GROUP BY LOWER(buyer_email) HAVING COUNT(*) >= 2
-    ) x
-  `)).rows[0] as { n: number };
+    `),
+    db.execute(sql`
+      SELECT COUNT(*)::int AS n FROM (
+        SELECT LOWER(buyer_email) AS b FROM orders
+        WHERE LOWER(seller_email) = LOWER(${email}) AND status IN ${SENT}
+        GROUP BY LOWER(buyer_email) HAVING COUNT(*) >= 2
+      ) x
+    `),
+    db.execute(sql`
+      SELECT COUNT(*)::int AS n,
+             PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (shipped_at - created_at)) / 3600.0)::float AS median_hours
+      FROM orders
+      WHERE LOWER(seller_email) = LOWER(${email}) AND shipped_at IS NOT NULL
+        AND shipped_at >= created_at AND created_at > NOW() - INTERVAL '90 days'
+    `),
+    db.execute(sql`
+      SELECT u.name, u.created_at, u.verification_status,
+             (SELECT l.seller_username FROM listings l WHERE LOWER(l.seller_email) = LOWER(${email}) AND l.seller_username IS NOT NULL ORDER BY l.created_at DESC LIMIT 1) AS username
+      FROM users u WHERE LOWER(u.email) = LOWER(${email}) LIMIT 1
+    `),
+  ]);
 
-  // Median hours from order to dispatch, over the last 90 days (orders the seller has sent)
-  const disp = (await db.execute(sql`
-    SELECT COUNT(*)::int AS n,
-           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (shipped_at - created_at)) / 3600.0)::float AS median_hours
-    FROM orders
-    WHERE LOWER(seller_email) = LOWER(${email}) AND shipped_at IS NOT NULL
-      AND shipped_at >= created_at AND created_at > NOW() - INTERVAL '90 days'
-  `)).rows[0] as { n: number; median_hours: number | null };
-
-  const seller = (await db.execute(sql`
-    SELECT u.name, u.created_at, u.verification_status,
-           (SELECT l.seller_username FROM listings l WHERE LOWER(l.seller_email) = LOWER(${email}) AND l.seller_username IS NOT NULL ORDER BY l.created_at DESC LIMIT 1) AS username
-    FROM users u WHERE LOWER(u.email) = LOWER(${email}) LIMIT 1
-  `)).rows[0] as { name?: string | null; created_at?: string; verification_status?: string; username?: string | null } | undefined;
+  const rev = revResult.rows[0] as { total: number; positive: number; neutral: number; negative: number; average: number };
+  const sales = salesResult.rows[0] as { n: number };
+  const repeat = repeatResult.rows[0] as { n: number };
+  const disp = dispResult.rows[0] as { n: number; median_hours: number | null };
+  const seller = sellerResult.rows[0] as { name?: string | null; created_at?: string; verification_status?: string; username?: string | null } | undefined;
 
   const enoughReviews = rev.total >= MIN_REVIEWS_FOR_PERCENT;
   return {
@@ -69,7 +74,6 @@ async function sellerReputation(email: string) {
     repeatBuyers: repeat.n,
     dispatchMedianHours: disp.n >= MIN_ORDERS_FOR_DISPATCH && disp.median_hours !== null ? Math.round(disp.median_hours * 10) / 10 : null,
     dispatchSampleSize: disp.n,
-    // Buyer ↔ seller messaging isn't built yet, so there is nothing to measure here.
     replyMedianHours: null as number | null,
     memberSince: seller?.created_at ?? null,
     profile: {

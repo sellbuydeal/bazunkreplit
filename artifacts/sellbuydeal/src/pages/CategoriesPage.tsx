@@ -11,9 +11,10 @@ import * as LucideIcons from "lucide-react";
 
 type LucideIconName = keyof typeof LucideIcons;
 
-interface ApiListing {
+interface CategoryCount {
   category: string;
   subcategory: string | null;
+  count: number;
 }
 
 function CategoryIcon({ name }: { name: string }) {
@@ -24,12 +25,12 @@ function CategoryIcon({ name }: { name: string }) {
 export function CategoriesPage() {
   const [openSlug, setOpenSlug] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [listings, setListings] = useState<ApiListing[]>([]);
+  const [counts, setCounts] = useState<CategoryCount[]>([]);
 
   useEffect(() => {
-    fetch("/api/listings?limit=500")
+    fetch("/api/listings/category-counts")
       .then((r) => r.json())
-      .then((data: ApiListing[]) => setListings(Array.isArray(data) ? data : []))
+      .then((data: CategoryCount[]) => setCounts(Array.isArray(data) ? data : []))
       .catch(() => {});
   }, []);
 
@@ -44,10 +45,10 @@ export function CategoriesPage() {
     : CATEGORIES;
 
   function catCount(slug: string) {
-    return listings.filter((l) => l.category === slug).length;
+    return counts.filter((l) => l.category === slug).reduce((sum, l) => sum + Number(l.count || 0), 0);
   }
   function subCount(catSlug: string, subSlug: string) {
-    return listings.filter((l) => l.category === catSlug && l.subcategory === subSlug).length;
+    return counts.find((l) => l.category === catSlug && l.subcategory === subSlug)?.count ?? 0;
   }
 
   return (

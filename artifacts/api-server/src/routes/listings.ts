@@ -13,7 +13,7 @@ function makePublicId(id: number): string {
   return `BZL-${id}`;
 }
 
-async function attachPromotions(rows: (typeof listingsTable.$inferSelect)[]): Promise<(typeof listingsTable.$inferSelect & { promotions: string[] })[]> {
+async function attachPromotions<T extends { id: number }>(rows: T[]): Promise<(T & { promotions: string[] })[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const now = new Date();
@@ -67,8 +67,29 @@ router.get("/listings", async (req, res) => {
     const parsedLimit = isNaN(parseInt(limit)) ? 40 : parseInt(limit);
     const parsedOffset = isNaN(parseInt(offset)) ? 0 : parseInt(offset);
 
+    // Browse/list views only need card fields. Avoid sending large description, tags,
+    // specifications and other detail-only columns for every listing.
     const rows = await db
-      .select()
+      .select({
+        id: listingsTable.id,
+        publicId: listingsTable.publicId,
+        title: listingsTable.title,
+        price: listingsTable.price,
+        category: listingsTable.category,
+        subcategory: listingsTable.subcategory,
+        condition: listingsTable.condition,
+        image: listingsTable.image,
+        views: listingsTable.views,
+        watchers: listingsTable.watchers,
+        status: listingsTable.status,
+        sellerEmail: listingsTable.sellerEmail,
+        sellerName: listingsTable.sellerName,
+        sellerUsername: listingsTable.sellerUsername,
+        extraCategories: listingsTable.extraCategories,
+        currency: listingsTable.currency,
+        priceGbp: listingsTable.priceGbp,
+        createdAt: listingsTable.createdAt,
+      })
       .from(listingsTable)
       .where(
         sellerEmail
@@ -88,6 +109,22 @@ router.get("/listings", async (req, res) => {
     res.json(withPromos);
   } catch (err) {
     console.error("Error fetching listings:", err);
+    res.status(500).json({ error: "internal_server_error", message: String(err) });
+  }
+});
+
+router.get("/listings/category-counts", async (_req, res) => {
+  try {
+    res.setHeader("Cache-Control", "public, max-age=120");
+    const rows = await db.execute(sql`
+      SELECT category, subcategory, COUNT(*)::int AS count
+      FROM listings
+      WHERE status = 'active'
+      GROUP BY category, subcategory
+    `);
+    res.json(rows.rows);
+  } catch (err) {
+    console.error("Error fetching category counts:", err);
     res.status(500).json({ error: "internal_server_error", message: String(err) });
   }
 });

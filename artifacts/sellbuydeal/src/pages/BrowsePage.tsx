@@ -236,13 +236,35 @@ export function BrowsePage() {
   const [minRating, setMinRating] = useState<number | null>(null);
   const [listedWithin, setListedWithin] = useState("any");
   const [apiListings, setApiListings] = useState<(typeof ALL_PRODUCTS[0] & { subcategory?: string; promotions: string[] })[]>([]);
+  const [hasMoreListings, setHasMoreListings] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const LISTING_BATCH = 60;
 
   useEffect(() => {
-    fetch("/api/listings?limit=500")
+    fetch(`/api/listings?limit=${LISTING_BATCH}&offset=0`)
       .then((r) => r.json())
-      .then((data: ApiListing[]) => setApiListings(Array.isArray(data) ? data.map(mapApiListing) : []))
+      .then((data: ApiListing[]) => {
+        const rows = Array.isArray(data) ? data : [];
+        setApiListings(rows.map(mapApiListing));
+        setHasMoreListings(rows.length === LISTING_BATCH);
+      })
       .catch(() => {});
   }, []);
+
+  async function loadMoreListings() {
+    if (loadingMore || !hasMoreListings) return;
+    setLoadingMore(true);
+    try {
+      const r = await fetch(`/api/listings?limit=${LISTING_BATCH}&offset=${apiListings.length}`);
+      const data: ApiListing[] = await r.json();
+      const rows = Array.isArray(data) ? data : [];
+      setApiListings((current) => [...current, ...rows.map(mapApiListing)]);
+      setHasMoreListings(rows.length === LISTING_BATCH);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   // Keep query in sync with URL
   useEffect(() => {
@@ -875,6 +897,17 @@ export function BrowsePage() {
                   <ProductCard product={product} view={view} promotions={'promotions' in product ? (product as Record<string,unknown>).promotions as string[] : []} />
                 </Link>
               ))}
+            </div>
+          )}
+          {hasMoreListings && (
+            <div className="flex justify-center mt-8">
+              <button
+                onClick={loadMoreListings}
+                disabled={loadingMore}
+                className="px-6 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:border-[#4A5CE8] hover:text-[#4A5CE8] disabled:opacity-50 transition-colors"
+              >
+                {loadingMore ? "Loading…" : "Load more listings"}
+              </button>
             </div>
           )}
         </main>

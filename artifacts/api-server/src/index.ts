@@ -508,6 +508,13 @@ async function runAppMigrations() {
   `, "reviews");
   await run(sql`CREATE INDEX IF NOT EXISTS reviews_reviewee_idx ON reviews (reviewee_email, role)`, "reviews_reviewee_idx");
   await run(sql`CREATE INDEX IF NOT EXISTS orders_seller_idx ON orders (seller_email)`, "orders_seller_idx");
+  // Performance indexes for public listing grids and case-insensitive reputation lookups.
+  await run(sql`CREATE INDEX IF NOT EXISTS listings_active_created_idx ON listings (status, created_at DESC)`, "listings_active_created_idx");
+  await run(sql`CREATE INDEX IF NOT EXISTS listings_active_category_idx ON listings (status, category, subcategory)`, "listings_active_category_idx");
+  await run(sql`CREATE INDEX IF NOT EXISTS reviews_reviewee_lower_role_idx ON reviews (LOWER(reviewee_email), role)`, "reviews_reviewee_lower_role_idx");
+  await run(sql`CREATE INDEX IF NOT EXISTS orders_seller_lower_status_idx ON orders (LOWER(seller_email), status)`, "orders_seller_lower_status_idx");
+  await run(sql`CREATE INDEX IF NOT EXISTS users_email_lower_idx ON users (LOWER(email))`, "users_email_lower_idx");
+  await run(sql`CREATE INDEX IF NOT EXISTS listings_seller_lower_created_idx ON listings (LOWER(seller_email), created_at DESC)`, "listings_seller_lower_created_idx");
 
   // ── Promotion tools: admin-editable prices, follows, scheduling, analytics, auction add-ons ──
   await run(sql`
