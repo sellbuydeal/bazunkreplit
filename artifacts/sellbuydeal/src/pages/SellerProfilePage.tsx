@@ -13,10 +13,11 @@ interface Reputation {
   repeatBuyers: number;
   dispatchMedianHours: number | null;
   dispatchSampleSize: number;
+  replyMedianHours: number | null;
   memberSince: string | null;
   profile: { name: string; username: string | null; verified: boolean };
 }
-interface ReviewRow { id: number; rating: number; comment: string | null; item_title: string | null; created_at: string; reviewer: string; verified_purchase?: boolean; seller_reply?: string | null; seller_replied_at?: string | null }
+interface ReviewRow { id: number; rating: number; comment: string | null; item_title: string | null; created_at: string; reviewer: string; verified_purchase?: boolean; seller_reply?: string | null; seller_replied_at?: string | null; item_as_described?: number | null; dispatch_rating?: number | null; packaging_rating?: number | null; edited_at?: string | null }
 interface ListingRow { id: number; publicId?: string | null; public_id?: string | null; title: string; price: string; image: string | null; condition: string }
 
 function Stars({ rating, size = "w-4 h-4" }: { rating: number; size?: string }) {
@@ -107,8 +108,9 @@ export function SellerProfilePage() {
               </div>
               {rep.positivePercent !== null && <div className="rounded-2xl bg-emerald-50 px-6 py-4 text-center"><div className="text-3xl font-black text-emerald-700">{rep.positivePercent}%</div><div className="text-xs font-bold text-emerald-700">positive</div></div>}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-7">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-7">
               {rep.dispatchMedianHours !== null && <div className="rounded-2xl bg-gray-50 p-4 flex gap-3"><Clock className="w-5 h-5 text-[#4A5CE8]" /><div><p className="font-bold text-sm text-gray-800">{dispatchLabel(rep.dispatchMedianHours)}</p><p className="text-xs text-gray-400">Based on recent dispatches</p></div></div>}
+              {rep.replyMedianHours !== null && <div className="rounded-2xl bg-gray-50 p-4 flex gap-3"><Clock className="w-5 h-5 text-emerald-500" /><div><p className="font-bold text-sm text-gray-800">{rep.replyMedianHours <= 1 ? "Usually replies within 1 hour" : rep.replyMedianHours <= 24 ? `Usually replies within ${Math.ceil(rep.replyMedianHours)} hours` : `Usually replies within ${Math.ceil(rep.replyMedianHours/24)} days`}</p><p className="text-xs text-gray-400">Based on buyer messages</p></div></div>}
               <div className="rounded-2xl bg-gray-50 p-4 flex gap-3"><Trophy className="w-5 h-5 text-amber-500" /><div><p className="font-bold text-sm text-gray-800">{rep.successfulSales.toLocaleString()} successful sales</p><p className="text-xs text-gray-400">Orders sent, not cancelled</p></div></div>
               <div className="rounded-2xl bg-gray-50 p-4 flex gap-3"><Repeat2 className="w-5 h-5 text-emerald-500" /><div><p className="font-bold text-sm text-gray-800">{rep.repeatBuyers.toLocaleString()} repeat buyers</p><p className="text-xs text-gray-400">Bought from this seller 2+ times</p></div></div>
             </div>
@@ -131,6 +133,8 @@ export function SellerProfilePage() {
             {reviews.length === 0 ? <p className="text-sm text-gray-400 py-6 text-center">No reviews have been left for this seller yet.</p> : <div className="divide-y divide-gray-100">{reviews.map(review => <article key={review.id} className="py-5 first:pt-0">
               <div className="flex justify-between gap-4"><div><div className="flex items-center gap-2 flex-wrap"><Stars rating={review.rating} />{review.verified_purchase && <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full"><ShieldCheck className="w-3 h-3" /> Verified purchase</span>}</div><p className="text-xs text-gray-400 mt-1">{review.reviewer} · {review.item_title ?? "Bazunk purchase"}</p></div><time className="text-xs text-gray-400 whitespace-nowrap">{new Date(review.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</time></div>
               {review.comment && <p className="text-sm text-gray-700 leading-relaxed mt-3">{review.comment}</p>}
+              {(review.item_as_described || review.dispatch_rating || review.packaging_rating) && <div className="flex flex-wrap gap-2 mt-3">{[["As described",review.item_as_described],["Dispatch",review.dispatch_rating],["Packaging",review.packaging_rating]].filter(([,v])=>v).map(([label,v])=><span key={String(label)} className="text-[11px] bg-gray-50 border border-gray-100 rounded-full px-2 py-1 text-gray-600">{label}: <b>{v}/5</b></span>)}</div>}
+              {review.edited_at && <p className="text-[10px] text-gray-400 mt-2">Edited</p>}
               {review.seller_reply && <div className="mt-3 ml-3 rounded-xl bg-gray-50 border-l-4 border-[#4A5CE8] p-3"><p className="text-[11px] font-black text-gray-700 mb-1">Seller response</p><p className="text-sm text-gray-700">{review.seller_reply}</p>{review.seller_replied_at && <p className="text-[10px] text-gray-400 mt-1">{new Date(review.seller_replied_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</p>}</div>}
               <div className="flex gap-3 mt-3">
                 {isSeller && !review.seller_reply && <button disabled={actionBusy === review.id} onClick={() => replyToReview(review)} className="text-xs font-bold text-[#4A5CE8] hover:underline disabled:opacity-50">{actionBusy === review.id ? "Saving…" : "Reply publicly"}</button>}

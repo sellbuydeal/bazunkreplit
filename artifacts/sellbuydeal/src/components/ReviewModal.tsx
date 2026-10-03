@@ -14,6 +14,9 @@ export function ReviewModal({
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState("");
+  const [itemAsDescribed, setItemAsDescribed] = useState(0);
+  const [dispatchRating, setDispatchRating] = useState(0);
+  const [packagingRating, setPackagingRating] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
@@ -27,7 +30,7 @@ export function ReviewModal({
       const r = await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ orderId, rating, comment }),
+        body: JSON.stringify({ orderId, rating, comment, itemAsDescribed, dispatchRating, packagingRating }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setError(d.error ?? "Couldn't save your review"); return; }
@@ -64,6 +67,10 @@ export function ReviewModal({
               </div>
               <p className="h-5 mt-1 text-sm font-semibold text-gray-600">{LABELS[shown]}</p>
             </div>
+            {role === "buyer" && <div className="grid gap-3 mb-4 rounded-xl bg-gray-50 p-3">
+              <p className="text-xs font-bold text-gray-700">Rate the transaction <span className="font-normal text-gray-400">(optional)</span></p>
+              {[["Item as described", itemAsDescribed, setItemAsDescribed], ["Dispatch speed", dispatchRating, setDispatchRating], ["Packaging", packagingRating, setPackagingRating]].map(([label,value,setter]: any) => <div key={label} className="flex items-center justify-between gap-3"><span className="text-xs text-gray-600">{label}</span><span className="flex">{[1,2,3,4,5].map(i=><button type="button" key={i} onClick={()=>setter(i)} aria-label={`${label} ${i} stars`}><Star className={`w-5 h-5 ${i<=value ? "fill-amber-400 text-amber-400":"text-gray-200"}`} /></button>)}</span></div>)}
+            </div>}
             <textarea
               value={comment} onChange={e => setComment(e.target.value)} rows={4} maxLength={1000}
               placeholder={role === "buyer" ? "How was the item, the packaging and the dispatch? (optional)" : "How was this buyer to deal with? (optional)"}
@@ -74,7 +81,7 @@ export function ReviewModal({
               className="w-full mt-4 py-2.5 rounded-xl bg-[#F26B21] text-white text-sm font-bold disabled:opacity-40 flex items-center justify-center gap-2">
               {busy && <Loader2 className="w-4 h-4 animate-spin" />} Submit review
             </button>
-            <p className="text-[11px] text-gray-400 text-center mt-2">Reviews are public and can't be edited once submitted.</p>
+            <p className="text-[11px] text-gray-400 text-center mt-2">Reviews are public. You can edit your own review for 30 days or delete it later.</p>
           </>
         )}
       </div>

@@ -524,6 +524,11 @@ async function runAppMigrations() {
   await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS seller_replied_at TIMESTAMP WITH TIME ZONE`, "reviews.seller_replied_at");
   await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS removed_at TIMESTAMP WITH TIME ZONE`, "reviews.removed_at");
   await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS removed_reason TEXT`, "reviews.removed_reason");
+  await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS item_as_described INTEGER`, "reviews.item_as_described");
+  await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS dispatch_rating INTEGER`, "reviews.dispatch_rating");
+  await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS packaging_rating INTEGER`, "reviews.packaging_rating");
+  await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS edited_at TIMESTAMP WITH TIME ZONE`, "reviews.edited_at");
+  await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS deleted_by_reviewer_at TIMESTAMP WITH TIME ZONE`, "reviews.deleted_by_reviewer_at");
   await run(sql`CREATE TABLE IF NOT EXISTS review_reports (
     id BIGSERIAL PRIMARY KEY,
     review_id BIGINT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,

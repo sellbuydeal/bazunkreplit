@@ -33,7 +33,7 @@ async function sellerReputation(email: string) {
              COUNT(*) FILTER (WHERE rating = 3)::int AS neutral,
              COUNT(*) FILTER (WHERE rating <= 2)::int AS negative,
              COALESCE(ROUND(AVG(rating)::numeric, 2), 0)::float AS average
-      FROM reviews WHERE role = 'buyer_to_seller' AND removed_at IS NULL AND LOWER(reviewee_email) = LOWER(${email})
+      FROM reviews WHERE role = 'buyer_to_seller' AND removed_at IS NULL AND deleted_by_reviewer_at IS NULL AND LOWER(reviewee_email) = LOWER(${email})
     `),
     db.execute(sql`
       SELECT COUNT(*)::int AS n FROM orders
@@ -74,7 +74,21 @@ async function sellerReputation(email: string) {
     repeatBuyers: repeat.n,
     dispatchMedianHours: disp.n >= MIN_ORDERS_FOR_DISPATCH && disp.median_hours !== null ? Math.round(disp.median_hours * 10) / 10 : null,
     dispatchSampleSize: disp.n,
-    replyMedianHours: null as number | null,
+    replyMedianHours: await (async () => {
+      const rr = await db.execute(sql`WITH first_buyer AS (
+        SELECT c.id, MIN(m.created_at) AS asked_at FROM marketplace_conversations c
+        JOIN marketplace_messages m ON m.conversation_id=c.id AND LOWER(m.sender_email)=LOWER(c.buyer_email)
+        WHERE LOWER(c.seller_email)=LOWER(${email}) GROUP BY c.id
+      ), first_reply AS (
+        SELECT f.id, f.asked_at, MIN(m.created_at) AS replied_at FROM first_buyer f
+        JOIN marketplace_messages m ON m.conversation_id=f.id AND m.created_at>f.asked_at
+        JOIN marketplace_conversations c ON c.id=f.id AND LOWER(m.sender_email)=LOWER(c.seller_email)
+        GROUP BY f.id,f.asked_at
+      ) SELECT COUNT(*)::int n, PERCENTILE_CONT(0.5) WITHIN GROUP
+        (ORDER BY EXTRACT(EPOCH FROM (replied_at-asked_at))/3600.0)::float median_hours FROM first_reply`);
+      const x=rr.rows[0] as {n:number;median_hours:number|null};
+      return x.n>=3 && x.median_hours!==null ? Math.round(x.median_hours*10)/10 : null;
+    })(),
     memberSince: seller?.created_at ?? null,
     profile: {
       name: seller?.name || email.split("@")[0],
@@ -103,7 +117,7 @@ router.get("/buyers/reputation", async (req, res) => {
   try {
     const rev = (await db.execute(sql`
       SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE rating >= 4)::int AS positive
-      FROM reviews WHERE role = 'seller_to_buyer' AND removed_at IS NULL AND LOWER(reviewee_email) = LOWER(${email})
+      FROM reviews WHERE role = 'seller_to_buyer' AND removed_at IS NULL AND deleted_by_reviewer_at IS NULL AND LOWER(reviewee_email) = LOWER(${email})
     `)).rows[0] as { total: number; positive: number };
     const orders = (await db.execute(sql`
       SELECT COUNT(*)::int AS n FROM orders WHERE LOWER(buyer_email) = LOWER(${email}) AND status <> 'cancelled'
@@ -128,9 +142,9 @@ router.get("/reviews/seller", async (req, res) => {
   if (!email) { res.status(400).json({ error: "email required" }); return; }
   try {
     const rows = await db.execute(sql`
-      SELECT r.id, r.rating, r.comment, r.item_title, r.created_at, r.seller_reply, r.seller_replied_at, TRUE AS verified_purchase, split_part(r.reviewer_email, '@', 1) AS reviewer
+      SELECT r.id, r.rating, r.comment, r.item_title, r.created_at, r.seller_reply, r.seller_replied_at, r.item_as_described, r.dispatch_rating, r.packaging_rating, r.edited_at, TRUE AS verified_purchase, split_part(r.reviewer_email, '@', 1) AS reviewer
       FROM reviews r
-      WHERE r.role = 'buyer_to_seller' AND r.removed_at IS NULL AND LOWER(r.reviewee_email) = LOWER(${email})
+      WHERE r.role = 'buyer_to_seller' AND r.removed_at IS NULL AND r.deleted_by_reviewer_at IS NULL AND LOWER(r.reviewee_email) = LOWER(${email})
       ORDER BY r.created_at DESC LIMIT ${limit} OFFSET ${offset}
     `);
     // Only the start of the buyer's email is shown, partly masked
@@ -148,7 +162,7 @@ router.get("/reviews/seller", async (req, res) => {
 // ── Writing reviews ──────────────────────────────────────────────────────────
 
 router.post("/reviews", async (req, res) => {
-  const { orderId, rating, comment } = req.body as { orderId?: string; rating?: number; comment?: string };
+  const { orderId, rating, comment, itemAsDescribed, dispatchRating, packagingRating } = req.body as { orderId?: string; rating?: number; comment?: string; itemAsDescribed?: number; dispatchRating?: number; packagingRating?: number };
   const stars = Math.round(Number(rating));
   if (!orderId) { res.status(400).json({ error: "orderId is required" }); return; }
   if (!(stars >= 1 && stars <= 5)) { res.status(400).json({ error: "Choose a rating from 1 to 5" }); return; }
@@ -175,8 +189,11 @@ router.post("/reviews", async (req, res) => {
     }
 
     const inserted = await db.execute(sql`
-      INSERT INTO reviews (order_id, role, reviewer_email, reviewee_email, rating, comment, item_title)
-      VALUES (${orderId}, ${role}, ${reviewerEmail}, ${reviewee}, ${stars}, ${text || null}, ${order.item_title})
+      INSERT INTO reviews (order_id, role, reviewer_email, reviewee_email, rating, comment, item_title, item_as_described, dispatch_rating, packaging_rating)
+      VALUES (${orderId}, ${role}, ${reviewerEmail}, ${reviewee}, ${stars}, ${text || null}, ${order.item_title},
+        ${role === "buyer_to_seller" && Number(itemAsDescribed)>=1 && Number(itemAsDescribed)<=5 ? Math.round(Number(itemAsDescribed)) : null},
+        ${role === "buyer_to_seller" && Number(dispatchRating)>=1 && Number(dispatchRating)<=5 ? Math.round(Number(dispatchRating)) : null},
+        ${role === "buyer_to_seller" && Number(packagingRating)>=1 && Number(packagingRating)<=5 ? Math.round(Number(packagingRating)) : null})
       ON CONFLICT (order_id, role) DO NOTHING RETURNING id
     `);
     if (!inserted.rows.length) { res.status(409).json({ error: "You've already reviewed this order" }); return; }
@@ -191,6 +208,29 @@ router.post("/reviews", async (req, res) => {
     logger.error({ err }, "Create review failed");
     res.status(500).json({ error: "Failed to save your review" });
   }
+});
+
+// Buyers/sellers may correct their own review for 30 days. The order/role cannot change.
+router.patch("/reviews/:id", async (req, res) => {
+  const id=Number(req.params.id); const stars=Math.round(Number(req.body?.rating));
+  if(!id || stars<1 || stars>5) { res.status(400).json({error:"Choose a rating from 1 to 5"}); return; }
+  const email=await authenticatedEmail(req); if(!email){res.status(401).json({error:"Please sign in"});return;}
+  const row=(await db.execute(sql`SELECT * FROM reviews WHERE id=${id} LIMIT 1`)).rows[0] as any;
+  if(!row || row.deleted_by_reviewer_at || row.removed_at){res.status(404).json({error:"Review not found"});return;}
+  if(String(row.reviewer_email).toLowerCase()!==email){res.status(403).json({error:"You can only edit your own review"});return;}
+  if(Date.now()-new Date(row.created_at).getTime()>30*86400000){res.status(400).json({error:"The 30-day editing window has ended"});return;}
+  const comment=typeof req.body?.comment==="string"?req.body.comment.trim().slice(0,1000):"";
+  const cat=(v:any)=>Number(v)>=1&&Number(v)<=5?Math.round(Number(v)):null;
+  await db.execute(sql`UPDATE reviews SET rating=${stars},comment=${comment||null},
+    item_as_described=${row.role==='buyer_to_seller'?cat(req.body?.itemAsDescribed):null},
+    dispatch_rating=${row.role==='buyer_to_seller'?cat(req.body?.dispatchRating):null},
+    packaging_rating=${row.role==='buyer_to_seller'?cat(req.body?.packagingRating):null},edited_at=NOW() WHERE id=${id}`);
+  res.json({ok:true});
+});
+router.delete("/reviews/:id/mine", async (req,res)=>{
+  const id=Number(req.params.id); const email=await authenticatedEmail(req); if(!email){res.status(401).json({error:"Please sign in"});return;}
+  const r=await db.execute(sql`UPDATE reviews SET deleted_by_reviewer_at=NOW() WHERE id=${id} AND LOWER(reviewer_email)=LOWER(${email}) AND deleted_by_reviewer_at IS NULL RETURNING id`);
+  if(!r.rows.length){res.status(404).json({error:"Review not found or not yours"});return;} res.json({ok:true});
 });
 
 // ── Review replies & reporting ───────────────────────────────────────────────
