@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { fetchAmazonDetails, buildAmazonDescription } from "../lib/amazon.js";
+import { rapidApiErrorMessage } from "../lib/rapidapi.js";
 
 const router = Router();
 
@@ -23,7 +24,11 @@ router.get("/user/search-amazon", async (req, res) => {
         "X-RapidAPI-Host": "real-time-amazon-data.p.rapidapi.com",
       },
     });
-    if (!resp.ok) { res.status(502).json({ error: "Amazon search unavailable" }); return; }
+    if (!resp.ok) {
+      logger.error(rapidApiErrorMessage("Amazon", resp.status));
+      res.status(502).json({ error: "Amazon search is temporarily unavailable — please try again later." });
+      return;
+    }
 
     const data = await resp.json() as Record<string, unknown>;
     const raw  = ((data?.data as Record<string, unknown>)?.products as Record<string, unknown>[]) ?? [];
@@ -145,7 +150,11 @@ router.get("/user/search-ebay", async (req, res) => {
       `https://real-time-ebay-data.p.rapidapi.com/ebay_search?q=${encodeURIComponent(q)}&marketplace_id=${marketplaceId}&offset=${offset}`,
       { headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": "real-time-ebay-data.p.rapidapi.com" } }
     );
-    if (!resp.ok) { res.status(502).json({ error: "eBay search unavailable" }); return; }
+    if (!resp.ok) {
+      logger.error(rapidApiErrorMessage("eBay", resp.status));
+      res.status(502).json({ error: "eBay search is temporarily unavailable — please try again later." });
+      return;
+    }
 
     const data     = await resp.json() as Record<string, unknown>;
     const raw      = (data?.itemSummaries as Record<string, unknown>[]) ?? [];

@@ -3,6 +3,7 @@ import { logger } from "./lib/logger.js";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { startSyncJob } from "./lib/syncJob.js";
+import { loadRapidApiKeyFromDb } from "./lib/rapidapi.js";
 
 const rawPort = process.env["PORT"];
 
@@ -509,6 +510,7 @@ app.listen(port, (err?: Error) => {
 });
 
 runAppMigrations()
+  .then(() => loadRapidApiKeyFromDb())
   .then(() => {
     startSyncJob();
   })

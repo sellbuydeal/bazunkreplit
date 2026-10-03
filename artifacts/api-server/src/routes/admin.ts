@@ -9,6 +9,14 @@ import { syncMilestonesFor } from "../lib/milestones.js";
 import { DEMO_PRODUCTS } from "../demoSeedData.js";
 import { fetchAmazonDetails, buildAmazonDescription } from "../lib/amazon.js";
 import { fetchEbayDetails, buildEbayDescription } from "../lib/ebay.js";
+import {
+  saveRapidApiKey, clearRapidApiKey, rapidApiKeyStatus, testRapidApi, rapidApiErrorMessage,
+} from "../lib/rapidapi.js";
+
+// Settings that must never be sent to the browser or edited through the generic settings route
+const PRIVATE_SETTING_KEYS = new Set(["admin_password_hash", "admin_email", "rapidapi_key"]);
+const isPrivateSetting = (k: string) =>
+  PRIVATE_SETTING_KEYS.has(k) || /(secret|password|api_?key|token)/i.test(k);
 
 const router = Router();
 
@@ -64,6 +72,7 @@ router.get("/settings/public", async (_req, res) => {
     const rows = await db.execute(sql`SELECT key, value FROM site_settings`);
     const settings: Record<string, string> = {};
     for (const row of rows.rows as any[]) {
+      if (isPrivateSetting(row.key)) continue;
       settings[row.key] = row.value;
     }
     res.setHeader("Cache-Control", "no-store");
@@ -226,6 +235,46 @@ router.patch("/admin/users/:email/ban", async (req, res) => {
   }
 });
 
+// RapidAPI key + connection test (used by Admin → Importers)
+
+router.get("/admin/rapidapi", (_req, res) => {
+  res.json(rapidApiKeyStatus());
+});
+
+router.put("/admin/rapidapi", async (req, res) => {
+  const key = String(req.body?.key ?? "").trim();
+  if (key.length < 20 || /\s/.test(key)) {
+    res.status(400).json({ error: "That doesn't look like a RapidAPI key — copy the X-RapidAPI-Key value from rapidapi.com." });
+    return;
+  }
+  try {
+    await saveRapidApiKey(key);
+    res.json({ ok: true, ...rapidApiKeyStatus() });
+  } catch (err) {
+    logger.error({ err }, "Failed to save RapidAPI key");
+    res.status(500).json({ error: "Failed to save the key" });
+  }
+});
+
+router.delete("/admin/rapidapi", async (_req, res) => {
+  try {
+    await clearRapidApiKey();
+    res.json({ ok: true, ...rapidApiKeyStatus() });
+  } catch (err) {
+    logger.error({ err }, "Failed to remove RapidAPI key");
+    res.status(500).json({ error: "Failed to remove the key" });
+  }
+});
+
+router.post("/admin/rapidapi/test", async (_req, res) => {
+  const status = rapidApiKeyStatus();
+  if (!status.configured) {
+    res.status(400).json({ error: "No RapidAPI key is set yet." });
+    return;
+  }
+  res.json({ ...status, results: await testRapidApi() });
+});
+
 // Site settings
 
 router.get("/admin/settings", async (_req, res) => {
@@ -233,7 +282,7 @@ router.get("/admin/settings", async (_req, res) => {
     const rows = await db.execute(sql`SELECT key, value FROM site_settings ORDER BY key`).then(r => r.rows as any[]);
     const settings: Record<string, string> = {};
     for (const row of rows) {
-      if (row.key !== "admin_password_hash") settings[row.key] = row.value;
+      if (row.key !== "admin_password_hash" && row.key !== "rapidapi_key") settings[row.key] = row.value;
     }
     // Include the current admin email but never the hash
     const creds = await getAdminCredentials();
@@ -249,7 +298,7 @@ router.get("/admin/settings", async (_req, res) => {
 router.put("/admin/settings", async (req, res) => {
   try {
     const updates = req.body as Record<string, string>;
-    const blocked = new Set(["admin_password_hash", "_admin_email"]);
+    const blocked = new Set(["admin_password_hash", "_admin_email", "rapidapi_key"]);
     for (const [key, value] of Object.entries(updates)) {
       if (blocked.has(key)) continue;
       await db.execute(
@@ -479,7 +528,7 @@ router.get("/admin/listings", async (req, res) => {
 // GET /api/admin/search-amazon — search Amazon UK and return raw results for admin to browse
 router.get("/admin/search-amazon", async (req, res) => {
   const apiKey = process.env.RAPIDAPI_KEY;
-  if (!apiKey) { res.status(503).json({ error: "RAPIDAPI_KEY not configured" }); return; }
+  if (!apiKey) { res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." }); return; }
 
   const query = (req.query.q as string ?? "").trim();
   const page  = Math.max(1, parseInt(req.query.page as string) || 1);
@@ -491,7 +540,7 @@ router.get("/admin/search-amazon", async (req, res) => {
       { headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": "real-time-amazon-data.p.rapidapi.com" } }
     );
     if (!resp.ok) {
-      res.status(502).json({ error: `Amazon API error ${resp.status}` });
+      res.status(502).json({ error: rapidApiErrorMessage("Amazon", resp.status) });
       return;
     }
     const data = await resp.json() as Record<string, unknown>;
@@ -521,7 +570,7 @@ router.get("/admin/search-amazon", async (req, res) => {
 // POST /api/admin/import-selected-amazon — import specific chosen ASINs
 router.post("/admin/import-selected-amazon", async (req, res) => {
   const apiKey = process.env.RAPIDAPI_KEY;
-  if (!apiKey) { res.status(503).json({ error: "RAPIDAPI_KEY not configured" }); return; }
+  if (!apiKey) { res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." }); return; }
 
   interface SelectedProduct {
     asin: string; title: string; price_gbp: number;
@@ -592,7 +641,7 @@ router.post("/admin/import-selected-amazon", async (req, res) => {
 // POST /api/admin/sync-amazon-prices — re-fetch current Amazon UK prices and re-price by markup rules
 router.post("/admin/sync-amazon-prices", async (req, res) => {
   const apiKey = process.env.RAPIDAPI_KEY;
-  if (!apiKey) { res.status(503).json({ error: "RAPIDAPI_KEY not configured" }); return; }
+  if (!apiKey) { res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." }); return; }
 
   const rows = await db.execute(sql`
     SELECT id, title, specifications FROM listings
@@ -657,7 +706,7 @@ router.post("/admin/sync-amazon-prices", async (req, res) => {
 // POST /api/admin/sync-amazon-details — re-fetch title, about-this-item bullets & description
 router.post("/admin/sync-amazon-details", async (req, res) => {
   const apiKey = process.env.RAPIDAPI_KEY;
-  if (!apiKey) { res.status(503).json({ error: "RAPIDAPI_KEY not configured" }); return; }
+  if (!apiKey) { res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." }); return; }
 
   const rows = await db.execute(sql`
     SELECT id, title, specifications FROM listings
@@ -769,7 +818,7 @@ router.delete("/admin/clear-amazon-imports", async (req, res) => {
 // GET /api/admin/search-ebay — search eBay UK or US
 router.get("/admin/search-ebay", async (req, res) => {
   const apiKey = process.env.RAPIDAPI_KEY;
-  if (!apiKey) { res.status(503).json({ error: "RAPIDAPI_KEY not configured" }); return; }
+  if (!apiKey) { res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." }); return; }
 
   const query = (req.query.q as string ?? "").trim();
   const site  = (req.query.site as string ?? "uk") === "us" ? "us" : "uk";
@@ -783,7 +832,7 @@ router.get("/admin/search-ebay", async (req, res) => {
       `https://real-time-ebay-data.p.rapidapi.com/ebay_search?q=${encodeURIComponent(query)}&marketplace_id=${marketplaceId}&offset=${offset}`,
       { headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": "real-time-ebay-data.p.rapidapi.com" } }
     );
-    if (!resp.ok) { res.status(502).json({ error: `eBay API error ${resp.status}` }); return; }
+    if (!resp.ok) { res.status(502).json({ error: rapidApiErrorMessage("eBay", resp.status) }); return; }
 
     const data = await resp.json() as Record<string, unknown>;
     const raw  = (data?.itemSummaries as Record<string, unknown>[]) ?? [];
@@ -845,7 +894,7 @@ router.get("/admin/search-ebay", async (req, res) => {
 // POST /api/admin/import-selected-ebay — import chosen eBay listings
 router.post("/admin/import-selected-ebay", async (req, res) => {
   const apiKey = process.env.RAPIDAPI_KEY;
-  if (!apiKey) { res.status(503).json({ error: "RAPIDAPI_KEY not configured" }); return; }
+  if (!apiKey) { res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." }); return; }
 
   interface SelectedEbay {
     item_id: string; title: string; price: number; currency: "GBP" | "USD";
@@ -938,7 +987,7 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
 // POST /api/admin/sync-ebay-prices — re-fetch current eBay prices and reprice
 router.post("/admin/sync-ebay-prices", async (req, res) => {
   const apiKey = process.env.RAPIDAPI_KEY;
-  if (!apiKey) { res.status(503).json({ error: "RAPIDAPI_KEY not configured" }); return; }
+  if (!apiKey) { res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." }); return; }
 
   const rows = await db.execute(sql`
     SELECT id, specifications FROM listings
@@ -997,7 +1046,7 @@ router.post("/admin/sync-ebay-prices", async (req, res) => {
 // POST /api/admin/sync-ebay-details — re-fetch eBay titles & descriptions
 router.post("/admin/sync-ebay-details", async (req, res) => {
   const apiKey = process.env.RAPIDAPI_KEY;
-  if (!apiKey) { res.status(503).json({ error: "RAPIDAPI_KEY not configured" }); return; }
+  if (!apiKey) { res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." }); return; }
 
   const rows = await db.execute(sql`
     SELECT id, title, specifications FROM listings

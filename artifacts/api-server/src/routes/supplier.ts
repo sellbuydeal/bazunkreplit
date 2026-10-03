@@ -194,7 +194,7 @@ router.post("/supplier/imports/:id/sync", async (req, res) => {
   if (isNaN(id)) { res.status(400).json({ error: "invalid id" }); return; }
 
   if (!process.env.RAPIDAPI_KEY) {
-    res.status(503).json({ error: "RAPIDAPI_KEY not configured" });
+    res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." });
     return;
   }
 
@@ -209,7 +209,7 @@ router.post("/supplier/imports/:id/sync", async (req, res) => {
 // Sync all imports
 router.post("/supplier/sync", async (req, res) => {
   if (!process.env.RAPIDAPI_KEY) {
-    res.status(503).json({ error: "RAPIDAPI_KEY not configured" });
+    res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." });
     return;
   }
 

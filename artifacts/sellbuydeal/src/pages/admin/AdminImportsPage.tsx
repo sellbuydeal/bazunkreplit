@@ -7,6 +7,7 @@ import {
   CheckSquare, Square, ArrowDownToLine, User, Globe, Plus, FileText,
 } from "lucide-react";
 import { AdminLayout } from "./AdminLayout";
+import { RapidApiPanel } from "./RapidApiPanel";
 import { useAdmin } from "@/context/AdminContext";
 import { CATEGORIES as SITE_CATEGORIES } from "@/data/categories";
 import { CLASSIFIED_CATEGORIES } from "@/data/classifieds";
@@ -592,6 +593,8 @@ export function AdminImportsPage() {
           <p className="text-sm text-gray-400 mt-0.5">Search Amazon UK or eBay, choose products, import with your markup</p>
         </div>
       </div>
+
+      <RapidApiPanel />
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit flex-wrap">

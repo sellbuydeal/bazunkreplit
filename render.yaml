@@ -40,6 +40,8 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      - key: RAPIDAPI_KEY          # importers (Amazon / eBay / AliExpress) — or paste it in Admin > Imports
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM
@@ -51,7 +53,6 @@ services:
       # Optional integrations (set only the ones you use):
       #   LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET
       #   DIDIT_CLIENT_ID, DIDIT_CLIENT_SECRET, DIDIT_WEBHOOK_SECRET, DIDIT_BASE_URL
-      #   RAPIDAPI_KEY (AliExpress/Amazon importers)
 
   # ── Frontend (static) ──────────────────────────────────────────────────────
   - type: web
