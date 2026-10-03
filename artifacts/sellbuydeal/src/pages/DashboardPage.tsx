@@ -971,7 +971,7 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
         </div>
         <div className="hidden lg:flex items-center gap-2">
           <Link href="/rewards" className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F26B21]/10 hover:bg-[#F26B21]/20 transition-colors text-[#F26B21] border border-[#F26B21]/20 text-sm font-semibold">
-            <Dices className="w-4 h-4" /> Rewards Arcade
+            <Gift className="w-4 h-4" /> Rewards Arcade
           </Link>
           <Link href="/promotions" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#7C3AED]/10 hover:bg-[#7C3AED]/20 transition-colors text-[#7C3AED] border border-[#7C3AED]/20 text-sm font-semibold">
             <Megaphone className="w-4 h-4" /> Promotions
@@ -1052,7 +1052,7 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-[#F26B21]/15 flex items-center justify-center">
-              <Dices className="w-6 h-6 text-[#F26B21]" />
+              <Gift className="w-6 h-6 text-[#F26B21]" />
             </div>
             <div>
               <p className="text-xs font-black uppercase tracking-wider text-[#F26B21]">Daily Rewards</p>
