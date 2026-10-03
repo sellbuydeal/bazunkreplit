@@ -41,7 +41,8 @@ const ICON_BG: Record<string, string> = {
   "spin-wheel":     "bg-purple-50",
   "daily-quiz":     "bg-blue-50",
   "scratch-card":   "bg-orange-50",
-  "word-scramble":  "bg-pink-50",
+  "mystery-box":    "bg-pink-50",
+  "lucky-number":   "bg-amber-50",
 };
 
 const ICON_COLOR: Record<string, string> = {
@@ -49,7 +50,8 @@ const ICON_COLOR: Record<string, string> = {
   "spin-wheel":     "text-purple-500",
   "daily-quiz":     "text-blue-500",
   "scratch-card":   "text-orange-500",
-  "word-scramble":  "text-pink-500",
+  "mystery-box":    "text-pink-500",
+  "lucky-number":   "text-amber-500",
 };
 
 // ── Spin Wheel ────────────────────────────────────────────────────────────────
@@ -254,6 +256,14 @@ function WordScrambleGame({ game, onPlay }: { game: Game; onPlay: (answer?: unkn
   );
 }
 
+function MysteryBoxGame({ onPlay }: { onPlay: (answer?: unknown) => Promise<void> }) {
+  return <div className="py-4 text-center"><p className="font-bold text-gray-900 mb-4">Pick one. You won't know the prize until it opens.</p><div className="grid grid-cols-3 gap-3">{[1,2,3].map(n => <button key={n} onClick={() => onPlay(n)} className="rounded-2xl border-2 border-pink-100 bg-pink-50 py-8 text-3xl hover:scale-105 transition-transform">🎁<span className="block text-xs mt-2 font-bold text-pink-700">Box {n}</span></button>)}</div></div>;
+}
+
+function LuckyNumberGame({ onPlay }: { onPlay: (answer?: unknown) => Promise<void> }) {
+  return <div className="py-4 text-center"><p className="font-bold text-gray-900 mb-1">Choose your lucky number</p><p className="text-sm text-gray-500 mb-5">Match 1–6 for the jackpot. Miss it and you still get a small prize.</p><div className="grid grid-cols-3 gap-3">{[1,2,3,4,5,6].map(n => <button key={n} onClick={() => onPlay(n)} className="rounded-xl border border-amber-200 bg-amber-50 py-4 text-xl font-black text-amber-700 hover:bg-amber-100">{n}</button>)}</div></div>;
+}
+
 // ── Game Modal ────────────────────────────────────────────────────────────────
 function GameModal({
   game, onClose, onResult,
@@ -382,7 +392,8 @@ function GameModal({
                 {game.id === "spin-wheel" && <SpinWheelGame game={game} onPlay={play} />}
                 {game.id === "daily-quiz" && <QuizGame game={game} onPlay={play} />}
                 {game.id === "scratch-card" && <ScratchCardGame onPlay={play} />}
-                {game.id === "word-scramble" && <WordScrambleGame game={game} onPlay={play} />}
+                {game.id === "mystery-box" && <MysteryBoxGame onPlay={play} />}
+                {game.id === "lucky-number" && <LuckyNumberGame onPlay={play} />}
               </motion.div>
             )}
           </AnimatePresence>

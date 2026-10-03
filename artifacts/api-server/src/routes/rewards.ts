@@ -209,14 +209,21 @@ router.post("/rewards/play", async (req, res) => {
       message = won ? `You scratched ${creditsEarned} credits!` : "Better luck next card!";
       break;
     }
-    case "word-scramble": {
-      const scramble = getTodayScramble();
-      const userAnswer = typeof answer === "string" ? answer.toUpperCase().trim() : "";
-      won = userAnswer === scramble.word;
-      creditsEarned = won ? creditsMax : 0;
-      message = won
-        ? `Correct! "${scramble.word}" it is! You earned ${creditsEarned} credits.`
-        : `Wrong! The word was "${scramble.word}". No credits this time.`;
+    case "mystery-box": {
+      const box = Math.max(1, Math.min(3, Number(answer) || 1));
+      const prizes = [creditsMin, Math.max(creditsMin, Math.round((creditsMin + creditsMax) / 2)), creditsMax];
+      const shuffled = prizes.sort(() => Math.random() - 0.5);
+      creditsEarned = shuffled[box - 1];
+      won = creditsEarned > 0;
+      message = `Box ${box} contained ${creditsEarned} credits!`;
+      break;
+    }
+    case "lucky-number": {
+      const pick = Math.max(1, Math.min(6, Number(answer) || 1));
+      const drawn = 1 + Math.floor(Math.random() * 6);
+      won = pick === drawn;
+      creditsEarned = won ? creditsMax : creditsMin;
+      message = won ? `Jackpot — ${drawn}! You matched and won ${creditsEarned} credits.` : `The lucky number was ${drawn}. You still get ${creditsEarned} credits.`;
       break;
     }
     default:

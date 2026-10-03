@@ -48,6 +48,8 @@ async function runAppMigrations() {
     )
   `, "users");
 
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`, "users.banned");
+
   await run(sql`
     CREATE TABLE IF NOT EXISTS credit_transactions (
       id TEXT PRIMARY KEY,
@@ -423,9 +425,11 @@ async function runAppMigrations() {
       ('spin-wheel',     'Spin the Wheel',   'Give the wheel a spin and land on a random credit prize.',                       '🎡', TRUE,  5, 50,  1),
       ('daily-quiz',     'Daily Quiz',       'Answer today''s marketplace question correctly to earn credits.',                '❓', TRUE, 15, 15,  1),
       ('scratch-card',   'Scratch Card',     'Scratch to reveal your prize — 70% chance of winning each card.',               '🎁', TRUE,  5, 30,  3),
-      ('word-scramble',  'Word Scramble',    'Unscramble the daily marketplace word to pocket the credits.',                   '🔤', TRUE, 20, 20,  1)
+      ('mystery-box',    'Mystery Box',      'Pick a mystery box and reveal a surprise credit prize.',                          '🎁', TRUE,  5, 40,  1),
+        ('lucky-number',   'Lucky Number',      'Choose a number from 1 to 6. Match the draw for a bigger prize.',                   '🎲', TRUE,  5, 50,  2)
     ON CONFLICT (id) DO NOTHING
   `, "reward_games.seed");
+  await run(sql`DELETE FROM reward_games WHERE id = 'word-scramble'`, "reward_games.remove_word_scramble");
 
   // ── Didit KYC verification ──────────────────────────────────────────────
   await run(sql`

@@ -114,6 +114,25 @@ const AD_SLOTS = [
   { key: "support_mid",    label: "Support — Mid Banner",        desc: "Leaderboard (728×90) between the hero and FAQ tabs" },
 ] as const;
 
+
+function SettingsField({ value, label, type = "text", placeholder, onChange }: { value: string; label: string; type?: "text" | "color" | "textarea" | "url"; placeholder?: string; onChange: (value: string) => void }) {
+  return (
+    <div>
+      <label className="block text-sm font-semibold text-gray-700 mb-1.5">{label}</label>
+      {type === "textarea" ? (
+        <textarea value={value} onChange={e => onChange(e.target.value)} rows={3} placeholder={placeholder} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8] resize-none" />
+      ) : type === "color" ? (
+        <div className="flex items-center gap-3">
+          <input type="color" value={value} onChange={e => onChange(e.target.value)} className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer flex-shrink-0" />
+          <input type="text" value={value} onChange={e => onChange(e.target.value)} className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]" />
+        </div>
+      ) : (
+        <input type={type === "url" ? "url" : "text"} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]" />
+      )}
+    </div>
+  );
+}
+
 export function AdminSettingsPage() {
   const { isAdmin, authFetch, logout } = useAdmin();
   const [, setLocation] = useLocation();
@@ -162,7 +181,9 @@ export function AdminSettingsPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await authFetch("/api/admin/settings", { method: "PUT", body: JSON.stringify(settings) });
+      const res = await authFetch("/api/admin/settings", { method: "PUT", body: JSON.stringify(settings) });
+      if (!res.ok) throw new Error(`Save failed (${res.status})`);
+      window.dispatchEvent(new Event("bazunk-settings-updated"));
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } finally { setSaving(false); }
@@ -180,6 +201,7 @@ export function AdminSettingsPage() {
         return;
       }
       await load();
+      window.dispatchEvent(new Event("bazunk-settings-updated"));
       setFeesSaved(true);
       setTimeout(() => setFeesSaved(false), 2500);
     } catch {
@@ -220,7 +242,7 @@ export function AdminSettingsPage() {
     setSettings(prev => ({ ...prev, [key]: value }));
   }
 
-  function Field({ k, label, type = "text", placeholder }: { k: keyof Settings; label: string; type?: "text" | "color" | "textarea" | "url"; placeholder?: string }) {
+"color" | "textarea" | "url"; placeholder?: string }) {
     return (
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">{label}</label>
@@ -310,14 +332,14 @@ export function AdminSettingsPage() {
           {tab === "branding" && (
             <>
               <SectionCard title="Site Identity">
-                <Field k="site_name" label="Site Name" placeholder="Bazunk" />
-                <Field k="site_tagline" label="Tagline" placeholder="Buy and sell anything, locally." />
+                <SettingsField value={settings.site_name} label="Site Name" placeholder="Bazunk" onChange={value => set("site_name", value)} />
+                <SettingsField value={settings.site_tagline} label="Tagline" placeholder="Buy and sell anything, locally." onChange={value => set("site_tagline", value)} />
               </SectionCard>
 
               <SectionCard title="Brand Colours">
                 <div className="grid grid-cols-2 gap-4">
-                  <Field k="primary_color" label="Primary (orange)" type="color" />
-                  <Field k="secondary_color" label="Secondary (blue)" type="color" />
+                  <SettingsField value={settings.primary_color} label="Primary (orange)" type="color" onChange={value => set("primary_color", value)} />
+                  <SettingsField value={settings.secondary_color} label="Secondary (blue)" type="color" onChange={value => set("secondary_color", value)} />
                 </div>
                 <div className="flex gap-3 mt-1">
                   <div className="flex-1 h-10 rounded-xl" style={{ background: settings.primary_color }} />
@@ -327,8 +349,8 @@ export function AdminSettingsPage() {
               </SectionCard>
 
               <SectionCard title="SEO (Search Engines)">
-                <Field k="seo_title" label="Browser / SEO Title" placeholder="Bazunk - Buy & Sell Anything Locally" />
-                <Field k="seo_description" label="Meta Description" type="textarea" placeholder="The smarter way to buy and sell locally..." />
+                <SettingsField value={settings.seo_title} label="Browser / SEO Title" placeholder="Bazunk - Buy & Sell Anything Locally" onChange={value => set("seo_title", value)} />
+                <SettingsField value={settings.seo_description} label="Meta Description" type="textarea" placeholder="The smarter way to buy and sell locally..." onChange={value => set("seo_description", value)} />
                 <p className="text-xs text-gray-400">The SEO title appears on browser tabs and in Google search results. Keep the description under 160 characters.</p>
               </SectionCard>
             </>
@@ -338,18 +360,18 @@ export function AdminSettingsPage() {
           {tab === "homepage" && (
             <>
               <SectionCard title="Hero Banner">
-                <Field k="hero_title" label="Main Headline" placeholder="Buy, Make an Offer & List for Free!" />
-                <Field k="hero_subtitle" label="Subheading" type="textarea" placeholder="The smarter way to buy and sell…" />
+                <SettingsField value={settings.hero_title} label="Main Headline" placeholder="Buy, Make an Offer & List for Free!" onChange={value => set("hero_title", value)} />
+                <SettingsField value={settings.hero_subtitle} label="Subheading" type="textarea" placeholder="The smarter way to buy and sell…" onChange={value => set("hero_subtitle", value)} />
                 <div className="grid grid-cols-2 gap-4">
-                  <Field k="hero_cta_primary" label="Primary Button Text" placeholder="Start Shopping" />
-                  <Field k="hero_cta_secondary" label="Secondary Button Text" placeholder="Become a Seller" />
+                  <SettingsField value={settings.hero_cta_primary} label="Primary Button Text" placeholder="Start Shopping" onChange={value => set("hero_cta_primary", value)} />
+                  <SettingsField value={settings.hero_cta_secondary} label="Secondary Button Text" placeholder="Become a Seller" onChange={value => set("hero_cta_secondary", value)} />
                 </div>
               </SectionCard>
 
               <SectionCard title="Announcement Banner">
                 <Toggle k="announcement_enabled" label="Show Announcement Banner"
                   desc="Displays a dismissible banner at the very top of every page" />
-                <Field k="announcement_text" label="Banner Message" placeholder="🎉 Welcome to Bazunk — buy and sell anything locally!" />
+                <SettingsField value={settings.announcement_text} label="Banner Message" placeholder="🎉 Welcome to Bazunk — buy and sell anything locally!" onChange={value => set("announcement_text", value)} />
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">Banner Colour</label>
                   <div className="flex items-center gap-3">
@@ -368,13 +390,13 @@ export function AdminSettingsPage() {
               </SectionCard>
 
               <SectionCard title='Features Section ("Why...?" heading)'>
-                <Field k="features_title" label="Section Heading" placeholder="Why Bazunk?" />
-                <Field k="features_subtitle" label="Section Subheading" type="textarea" placeholder="A marketplace built around trust…" />
+                <SettingsField value={settings.features_title} label="Section Heading" placeholder="Why Bazunk?" onChange={value => set("features_title", value)} />
+                <SettingsField value={settings.features_subtitle} label="Section Subheading" type="textarea" placeholder="A marketplace built around trust…" onChange={value => set("features_subtitle", value)} />
               </SectionCard>
 
               <SectionCard title="Categories Section">
-                <Field k="categories_title" label="Section Heading" placeholder="Shop by Category" />
-                <Field k="categories_subtitle" label="Section Subheading" type="textarea" placeholder="Find exactly what you're looking for…" />
+                <SettingsField value={settings.categories_title} label="Section Heading" placeholder="Shop by Category" onChange={value => set("categories_title", value)} />
+                <SettingsField value={settings.categories_subtitle} label="Section Subheading" type="textarea" placeholder="Find exactly what you're looking for…" onChange={value => set("categories_subtitle", value)} />
               </SectionCard>
             </>
           )}
@@ -383,9 +405,8 @@ export function AdminSettingsPage() {
           {tab === "footer" && (
             <>
               <SectionCard title="Footer Brand Text">
-                <Field k="footer_about" label="About / Tagline" type="textarea"
-                  placeholder="Buy, Sell, and Save More — The Feature-Packed Marketplace with Low Fees, Big Deals, and Endless Possibilities." />
-                <Field k="footer_copyright" label="Copyright Name" placeholder="Bazunk Marketplace" />
+                <SettingsField value={settings.footer_about} label="About / Tagline" type="textarea" placeholder="Buy, Sell, and Save More — The Feature-Packed Marketplace with Low Fees, Big Deals, and Endless Possibilities." onChange={value => set("footer_about", value)} />
+                <SettingsField value={settings.footer_copyright} label="Copyright Name" placeholder="Bazunk Marketplace" onChange={value => set("footer_copyright", value)} />
                 <p className="text-xs text-gray-400">Copyright line shows as: © 2025 <em>{settings.footer_copyright || "Bazunk Marketplace"}</em>. All rights reserved.</p>
               </SectionCard>
 
@@ -422,8 +443,8 @@ export function AdminSettingsPage() {
               <SectionCard title="Contact Information">
                 <p className="text-xs text-gray-400 -mt-1">Shown on the support / contact page.</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <Field k="contact_email" label="Support Email" placeholder="support@bazunk.com" />
-                  <Field k="contact_phone" label="Phone Number" placeholder="+44 …" />
+                  <SettingsField value={settings.contact_email} label="Support Email" placeholder="support@bazunk.com" onChange={value => set("contact_email", value)} />
+                  <SettingsField value={settings.contact_phone} label="Phone Number" placeholder="+44 …" onChange={value => set("contact_phone", value)} />
                 </div>
               </SectionCard>
             </>

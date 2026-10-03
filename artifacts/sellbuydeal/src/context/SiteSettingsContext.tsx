@@ -73,13 +73,18 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
   const [rawSettings, setRawSettings] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    fetch("/api/settings/public")
-      .then(r => r.ok ? r.json() : {})
-      .then((data: Record<string, string>) => {
-        setSettings({ ...DEFAULTS, ...data });
-        setRawSettings(data);
-      })
-      .catch(() => {});
+    const loadSettings = () => {
+      fetch("/api/settings/public", { cache: "no-store" })
+        .then(r => r.ok ? r.json() : {})
+        .then((data: Record<string, string>) => {
+          setSettings({ ...DEFAULTS, ...data });
+          setRawSettings(data);
+        })
+        .catch(() => {});
+    };
+    loadSettings();
+    window.addEventListener("bazunk-settings-updated", loadSettings);
+    return () => window.removeEventListener("bazunk-settings-updated", loadSettings);
   }, []);
 
   useEffect(() => {
