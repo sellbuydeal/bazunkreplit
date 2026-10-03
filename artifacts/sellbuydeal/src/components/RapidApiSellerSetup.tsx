@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@clerk/react";
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, Trash2, XCircle } from "lucide-react";
 
@@ -9,7 +9,7 @@ const APIs=[
  {name:"eBay UK/USA — Real-Time eBay Data",url:"https://rapidapi.com/mahmudulhasandev/api/real-time-ebay-data"},
  {name:"AliExpress — AliExpress DataHub",url:"https://rapidapi.com/ecommdatahub/api/aliexpress-datahub"},
 ];
-export function RapidApiSellerSetup({children}:{children:React.ReactNode}){
+export function RapidApiSellerSetup({children}:{children:ReactNode}){
  const { getToken, isLoaded, isSignedIn } = useAuth();
  const authFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => { const token = await getToken(); const headers = new Headers(init.headers || {}); if (token) headers.set("Authorization", `Bearer ${token}`); return fetch(input, { ...init, headers }); };
  const [status,setStatus]=useState<Status|null>(null),[key,setKey]=useState(""),[tests,setTests]=useState<Test[]>([]),[busy,setBusy]=useState(false),[msg,setMsg]=useState("");

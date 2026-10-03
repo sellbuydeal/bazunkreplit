@@ -83,6 +83,8 @@ interface ImportModalProps {
 const CONDITIONS = ["new", "like new", "good", "fair", "poor"];
 
 export function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportModalProps) {
+  const { getToken } = useClerkAuth();
+  const authFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => { const token = await getToken(); const headers = new Headers(init.headers || {}); if (token) headers.set("Authorization", `Bearer ${token}`); return fetch(input, { ...init, headers }); };
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [supplierPriceUsd, setSupplierPriceUsd] = useState("");
