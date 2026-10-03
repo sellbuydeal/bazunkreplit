@@ -14,7 +14,7 @@ type Auction = {
   id: string; title: string; description: string | null; images: string[];
   category: string | null; condition: string; seller_name: string; seller_email: string;
   starting_bid: string; current_bid: string | null; bid_count: number;
-  bid_increment: string; reserve_price: string | null; end_time: string;
+  bid_increment: string; has_reserve: boolean; reserve_met: boolean | null; extend_enabled?: boolean; end_time: string;
   status: string; winner_name: string | null; winner_email: string | null;
   winner_bid: string | null; created_at: string; bids: Bid[];
 };
@@ -237,6 +237,13 @@ export function AuctionDetailPage() {
               </div>
             )}
 
+            {auction.status === "ended" && !auction.winner_name && auction.has_reserve && auction.bid_count > 0 && (
+              <div className="bg-gray-50 rounded-2xl border border-gray-200 p-5">
+                <p className="font-bold text-gray-700">Auction ended — reserve not met</p>
+                <p className="text-sm text-gray-500">The highest bid didn't reach the seller's reserve price, so the item didn't sell.</p>
+              </div>
+            )}
+
             {/* Bid history */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5">
               <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
@@ -344,7 +351,16 @@ export function AuctionDetailPage() {
             <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-xs text-gray-500">
               <div className="flex justify-between"><span>Starting bid</span><span className="font-semibold text-gray-700">{formatPrice(startingBid)}</span></div>
               <div className="flex justify-between"><span>Bid increment</span><span className="font-semibold text-gray-700">+{formatPrice(parseFloat(auction.bid_increment))}</span></div>
-              {auction.reserve_price && <div className="flex justify-between"><span>Reserve price</span><span className="font-semibold text-gray-700">Hidden</span></div>}
+              {auction.has_reserve && (
+                <div className="flex justify-between"><span>Reserve price</span>
+                  <span className={`font-semibold ${auction.reserve_met ? "text-emerald-600" : "text-gray-700"}`}>
+                    {auction.reserve_met ? "Reserve met" : auction.bid_count > 0 ? "Not met yet" : "Hidden"}
+                  </span>
+                </div>
+              )}
+              {auction.extend_enabled && (
+                <div className="flex justify-between"><span>Auto-extend</span><span className="font-semibold text-gray-700">Late bids add time</span></div>
+              )}
               <div className="flex justify-between"><span>Listed</span><span className="font-semibold text-gray-700">{new Date(auction.created_at).toLocaleDateString("en-GB")}</span></div>
               <div className="flex justify-between"><span>Ends</span><span className="font-semibold text-gray-700">{new Date(auction.end_time).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span></div>
             </div>

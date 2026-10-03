@@ -10,7 +10,29 @@ import {
   sendAuctionEndedSellerNotification,
 } from "../email.js";
 
+import { storage } from "../storage.js";
+import { getPromoConfig } from "../lib/promoConfig.js";
+import { sendSystemMessage } from "../lib/systemMessages.js";
+
 const router = Router();
+
+/** Bids placed in the last EXTEND_WINDOW_MS of an auction with Auction Extensions push the end out so that long remains. */
+const EXTEND_WINDOW_MS = 2 * 60 * 1000;
+
+/**
+ * What the public may see of an auction. The reserve amount is a secret — only say whether
+ * one exists and (once there are bids) whether it has been met.
+ */
+function publicAuction(a: Record<string, unknown>): Record<string, unknown> {
+  const { reserve_price, ...rest } = a;
+  const hasReserve = reserve_price !== null && reserve_price !== undefined && reserve_price !== "";
+  const current = rest["current_bid"] ? parseFloat(rest["current_bid"] as string) : null;
+  return {
+    ...rest,
+    has_reserve: hasReserve,
+    reserve_met: hasReserve ? current !== null && current >= parseFloat(reserve_price as string) : null,
+  };
+}
 
 const VALID_STATUSES = ["active", "ended", "cancelled"];
 
@@ -23,7 +45,7 @@ router.get("/auctions", async (req, res) => {
   } else {
     rows = await db.execute(sql`SELECT * FROM auctions WHERE status = ${status} ${orderClause} LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`);
   }
-  res.json(rows.rows);
+  res.json(rows.rows.map(r => publicAuction(r as Record<string, unknown>)));
 });
 
 router.get("/auctions/my-bids", async (req, res) => {
@@ -37,7 +59,7 @@ router.get("/auctions/my-bids", async (req, res) => {
     ORDER BY a.end_time DESC
     LIMIT 50
   `);
-  res.json(rows.rows);
+  res.json(rows.rows.map(r => publicAuction(r as Record<string, unknown>)));
 });
 
 router.get("/auctions/my-listings", async (req, res) => {
@@ -55,10 +77,36 @@ router.get("/auctions/:id", async (req, res) => {
   // Auto-end if past end_time
   const a = auction as Record<string, unknown>;
   if (a["status"] === "active" && new Date(a["end_time"] as string) < new Date()) {
-    await db.execute(sql`UPDATE auctions SET status = 'ended', updated_at = NOW() WHERE id = ${id}`);
-    a["status"] = "ended";
+    const reserve = a["reserve_price"] ? parseFloat(a["reserve_price"] as string) : null;
+    const topBid = a["winner_bid"] ? parseFloat(a["winner_bid"] as string) : null;
+    const reserveMissed = reserve !== null && (topBid === null || topBid < reserve);
+    if (reserveMissed) {
+      // Highest bid didn't reach the hidden reserve: no sale, nobody wins.
+      const bidder = a["winner_email"] as string | null;
+      await db.execute(sql`
+        UPDATE auctions SET status = 'ended', winner_email = NULL, winner_name = NULL, winner_bid = NULL, updated_at = NOW() WHERE id = ${id}
+      `);
+      a["status"] = "ended"; a["winner_email"] = null; a["winner_name"] = null; a["winner_bid"] = null;
+      if (topBid !== null) {
+        void sendSystemMessage(a["seller_email"] as string, {
+          category: "Auctions",
+          subject: `Auction ended — reserve not met`,
+          body: `Your auction "${a["title"]}" ended with a top bid of £${topBid.toFixed(2)}, which didn't reach your reserve price, so it hasn't sold. You can relist it any time.`,
+        });
+        if (bidder) {
+          void sendSystemMessage(bidder, {
+            category: "Auctions",
+            subject: `Auction ended — reserve not met`,
+            body: `The auction "${a["title"]}" ended without meeting the seller's reserve price, so there is no winner this time.`,
+          });
+        }
+      }
+    } else {
+      await db.execute(sql`UPDATE auctions SET status = 'ended', updated_at = NOW() WHERE id = ${id}`);
+      a["status"] = "ended";
+    }
     // Send winner/seller end notifications (fire-and-forget)
-    if (a["winner_email"] && a["winner_name"] && a["winner_bid"]) {
+    if (!reserveMissed && a["winner_email"] && a["winner_name"] && a["winner_bid"]) {
       void sendAuctionWonNotification({
         winnerEmail: a["winner_email"] as string,
         winnerName: a["winner_name"] as string,
@@ -79,7 +127,7 @@ router.get("/auctions/:id", async (req, res) => {
     }
   }
   const bidsRes = await db.execute(sql`SELECT * FROM bids WHERE auction_id = ${id} ORDER BY created_at DESC LIMIT 30`);
-  res.json({ ...a, bids: bidsRes.rows });
+  res.json({ ...publicAuction(a), bids: bidsRes.rows });
 });
 
 router.post("/auctions", async (req, res) => {
@@ -90,21 +138,48 @@ router.post("/auctions", async (req, res) => {
     res.status(400).json({ error: "title, sellerEmail, sellerName, startingBid, endTime are required" });
     return;
   }
+  const wantsExtension = body["extendEnabled"] === true || body["extendEnabled"] === "true";
+  const wantsReserve = !!reservePrice && parseFloat(reservePrice) > 0;
+
+  // Optional paid add-ons (prices and availability are set in Admin → Promotions)
+  const reserveCfg = await getPromoConfig("reserve-auction");
+  const extendCfg = await getPromoConfig("auction-extension");
+  if (wantsReserve && reserveCfg && !reserveCfg.enabled) { res.status(400).json({ error: "Reserve prices aren't available right now." }); return; }
+  if (wantsExtension && extendCfg && !extendCfg.enabled) { res.status(400).json({ error: "Auction Extensions aren't available right now." }); return; }
+  const fee = (wantsReserve ? (reserveCfg?.cost ?? 0) : 0) + (wantsExtension ? (extendCfg?.cost ?? 0) : 0);
+  if (fee > 0) {
+    const balance = await storage.getCredits(sellerEmail);
+    if (balance < fee) {
+      res.status(402).json({ error: "Insufficient credits for the auction add-ons", balance, required: fee });
+      return;
+    }
+  }
+
   const id = `AUC-${randomUUID().slice(0, 8).toUpperCase()}`;
   await db.execute(sql`
     INSERT INTO auctions
       (id, title, description, images, category, condition, seller_email, seller_name,
-       starting_bid, reserve_price, bid_increment, end_time, status, created_at, updated_at)
+       starting_bid, reserve_price, bid_increment, end_time, extend_enabled, status, created_at, updated_at)
     VALUES (
       ${id}, ${title}, ${description ?? null}, ${JSON.stringify(images)},
       ${category ?? null}, ${condition ?? "used"}, ${sellerEmail}, ${sellerName},
       ${parseFloat(startingBid)},
-      ${reservePrice ? parseFloat(reservePrice) : null},
+      ${wantsReserve ? parseFloat(reservePrice) : null},
       ${bidIncrement ? parseFloat(bidIncrement) : 1.0},
-      ${endTime}, 'active', NOW(), NOW()
+      ${endTime}, ${wantsExtension}, 'active', NOW(), NOW()
     )
   `);
-  res.status(201).json({ id });
+  let newBalance: number | undefined;
+  if (fee > 0) {
+    newBalance = Number(await storage.addCredits(sellerEmail, -fee));
+    const parts = [wantsReserve && "Reserve Price", wantsExtension && "Auction Extensions"].filter(Boolean).join(" + ");
+    void sendSystemMessage(sellerEmail, {
+      category: "Promotions",
+      subject: `${parts} added to your auction`,
+      body: `You added ${parts} to "${title}" and spent ${Math.round(fee * 100)} credits. Your new balance is ${Math.round((newBalance ?? 0) * 100)} credits.`,
+    });
+  }
+  res.status(201).json({ id, creditsSpent: fee, newBalance });
 });
 
 router.post("/auctions/:id/bid", async (req, res) => {
@@ -143,6 +218,18 @@ router.post("/auctions/:id/bid", async (req, res) => {
         updated_at = NOW()
     WHERE id = ${id}
   `);
+  // Auction Extensions: a bid in the final minutes pushes the end time out
+  let extended = false;
+  let newEndTime: string | null = null;
+  if (auction["extend_enabled"] === true) {
+    const endMs = new Date(auction["end_time"] as string).getTime();
+    if (endMs - Date.now() <= EXTEND_WINDOW_MS) {
+      const target = new Date(Date.now() + EXTEND_WINDOW_MS);
+      await db.execute(sql`UPDATE auctions SET end_time = ${target.toISOString()} WHERE id = ${id} AND end_time < ${target.toISOString()}`);
+      extended = true;
+      newEndTime = target.toISOString();
+    }
+  }
   const newBidCount = (auction["bid_count"] as number ?? 0) + 1;
   const nextMinBid = bidAmount + increment;
   // Notify seller (fire-and-forget)
@@ -166,7 +253,7 @@ router.post("/auctions/:id/bid", async (req, res) => {
       minNextBid: nextMinBid,
     });
   }
-  res.status(201).json({ id: bidId, currentBid: bidAmount });
+  res.status(201).json({ id: bidId, currentBid: bidAmount, extended, endTime: newEndTime });
 });
 
 router.patch("/auctions/:id/cancel", async (req, res) => {

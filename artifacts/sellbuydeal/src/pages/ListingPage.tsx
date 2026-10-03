@@ -17,6 +17,7 @@ import { useCart } from "@/context/CartContext";
 import { useWatchlist } from "@/context/WatchlistContext";
 import { useOffers } from "@/context/OfferContext";
 import { useCurrency } from "@/context/CurrencyContext";
+import { useAuth } from "@/context/AuthContext";
 
 const CONDITION_COLORS: Record<string, string> = {
   "new":        "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -88,7 +89,56 @@ function RelatedListingsBox({ category, excludeId }: { category: string; exclude
   );
 }
 
-function SellerCard({ sellerName, sellerUsername, location, verified }: { sellerName: string; sellerUsername?: string; location: string; verified: boolean }) {
+function FollowSellerButton({ sellerEmail }: { sellerEmail: string }) {
+  const { user } = useAuth();
+  const [, navigate] = useWouter();
+  const [following, setFollowing] = useState(false);
+  const [followers, setFollowers] = useState(0);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const q = new URLSearchParams({ sellerEmail });
+    if (user?.email) q.set("followerEmail", user.email);
+    fetch(`/api/follows/status?${q}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d) { setFollowing(!!d.following); setFollowers(d.followers ?? 0); } })
+      .catch(() => {});
+  }, [sellerEmail, user?.email]);
+
+  if (user?.email && user.email.toLowerCase() === sellerEmail.toLowerCase()) {
+    return <p className="text-xs text-gray-400">{followers} follower{followers === 1 ? "" : "s"}</p>;
+  }
+
+  async function toggle() {
+    if (!user?.email) { navigate("/sign-in"); return; }
+    setBusy(true);
+    try {
+      const r = await fetch("/api/follows", {
+        method: following ? "DELETE" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ followerEmail: user.email, sellerEmail }),
+      });
+      if (r.ok) { const d = await r.json(); setFollowing(!!d.following); setFollowers(d.followers ?? 0); }
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-xs text-gray-400">{followers} follower{followers === 1 ? "" : "s"}</p>
+      <button
+        onClick={toggle}
+        disabled={busy}
+        className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors disabled:opacity-50 ${
+          following ? "bg-gray-100 text-gray-600 hover:bg-gray-200" : "bg-[#4A5CE8] text-white hover:opacity-90"
+        }`}
+      >
+        {following ? "Following" : "Follow seller"}
+      </button>
+    </div>
+  );
+}
+
+function SellerCard({ sellerName, sellerUsername, sellerEmail, location, verified }: { sellerName: string; sellerUsername?: string; sellerEmail?: string; location: string; verified: boolean }) {
   const initial = sellerName.charAt(0).toUpperCase();
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -113,6 +163,7 @@ function SellerCard({ sellerName, sellerUsername, location, verified }: { seller
           <div className="flex items-center gap-2 text-emerald-600 font-medium"><CheckCircle2 className="w-3.5 h-3.5" />ID Verified Seller</div>
         )}
       </div>
+      {sellerEmail && <FollowSellerButton sellerEmail={sellerEmail} />}
     </div>
   );
 }
@@ -129,7 +180,7 @@ function normaliseCondition(raw: unknown): string {
 }
 
 type SpecRow = { key: string; value: string };
-type ApiListingExtra = { _sellerName?: string; _sellerUsername?: string; _publicId?: string | null; _promotions?: string[]; _tags?: string[]; _specifications?: SpecRow[]; subcategory?: string; extra_categories?: string };
+type ApiListingExtra = { _sellerEmail?: string; _sellerName?: string; _sellerUsername?: string; _publicId?: string | null; _promotions?: string[]; _tags?: string[]; _specifications?: SpecRow[]; subcategory?: string; extra_categories?: string };
 
 const TAG_COLORS = [
   "bg-[#4A5CE8]/10 text-[#4A5CE8]",
@@ -160,6 +211,7 @@ function mapApiToProduct(l: Record<string, unknown>): typeof ALL_PRODUCTS[0] & A
     listed: (l.createdAt as string) ?? new Date().toISOString(),
     description: (l.description as string) ?? "",
     extra_categories: (l.extraCategories as string) ?? "",
+    _sellerEmail: (l.sellerEmail as string) ?? undefined,
     _sellerName: (l.sellerName as string) ?? "Seller",
     _sellerUsername: (l.sellerUsername as string) ?? undefined,
     _publicId: (l.publicId as string) ?? null,
@@ -187,6 +239,34 @@ export function ListingPage() {
   }, [id, staticProduct]);
 
   const product = staticProduct ?? apiProduct;
+  const { user: viewer } = useAuth();
+
+  // Count the view (and where it came from) for the seller's analytics
+  useEffect(() => {
+    if (!apiProduct?.id) return;
+    const sellerEmail = (apiProduct as ApiListingExtra)._sellerEmail;
+    if (viewer?.email && sellerEmail && viewer.email.toLowerCase() === sellerEmail.toLowerCase()) return;
+    let visitor = "";
+    try {
+      visitor = localStorage.getItem("bz_visitor") ?? "";
+      if (!visitor) { visitor = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem("bz_visitor", visitor); }
+    } catch { /* storage unavailable */ }
+    const params = new URLSearchParams(window.location.search);
+    const medium = (params.get("utm_medium") ?? "").toLowerCase();
+    let host = "";
+    try { host = document.referrer ? new URL(document.referrer).hostname.toLowerCase() : ""; } catch { host = ""; }
+    let source = "direct";
+    if (medium === "email") source = "email";
+    else if (medium === "social" || /(facebook|instagram|twitter|^t\.co$|x\.com|tiktok|pinterest|reddit|linkedin|whatsapp|youtube|snapchat)/.test(host)) source = "social";
+    else if (/(google|bing|duckduckgo|yahoo|ecosia|baidu)/.test(host)) source = "search";
+    else if (host && host === window.location.hostname) source = "internal";
+    else if (host) source = "referral";
+    fetch(`/api/listings/${apiProduct.id}/view`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source, visitor }),
+    }).catch(() => {});
+  }, [apiProduct?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { addToCart, openCart } = useCart();
   const { addToWatchlist, removeFromWatchlist, isWatched } = useWatchlist();
@@ -702,6 +782,7 @@ export function ListingPage() {
             <SellerCard
               sellerName={(product as typeof product & ApiListingExtra)._sellerName ?? product.title.split(" ")[0]}
               sellerUsername={(product as typeof product & ApiListingExtra)._sellerUsername}
+              sellerEmail={(product as typeof product & ApiListingExtra)._sellerEmail}
               location={product.location}
               verified={product.verified}
             />

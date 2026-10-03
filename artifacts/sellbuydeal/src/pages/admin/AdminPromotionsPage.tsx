@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { AdminLayout } from "./AdminLayout";
 import { Megaphone, Loader2, Trash2, RefreshCw, Package } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
+import { PromotionPricingPanel } from "./PromotionPricingPanel";
 
 interface PromoRow {
   id: number;
@@ -34,6 +35,10 @@ const TYPE_LABELS: Record<string, string> = {
   "featured":             "Featured Listing",
   "spotlight":            "Homepage Spotlight",
   "flash":                "Flash Sale Slot",
+  "follower-notify":      "Follower Notifications",
+  "scheduled-listing":    "Scheduled Listing",
+  "advanced-analytics":   "Advanced Analytics",
+  "social-share":         "Social Sharing Boost",
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -116,6 +121,10 @@ export function AdminPromotionsPage() {
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </button>
         </div>
+
+        <PromotionPricingPanel />
+
+        <h2 className="text-sm font-black uppercase tracking-wider text-gray-400 mb-3">Live promotions</h2>
 
         {/* Related Listings summary */}
         {relatedListings.length > 0 && (

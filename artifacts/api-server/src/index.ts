@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { startSyncJob } from "./lib/syncJob.js";
 import { loadRapidApiKeyFromDb } from "./lib/rapidapi.js";
+import { startListingScheduler } from "./lib/scheduler.js";
 
 const rawPort = process.env["PORT"];
 
@@ -488,6 +489,38 @@ async function runAppMigrations() {
     ON CONFLICT (key) DO NOTHING
   `, "site_settings.seed");
 
+  // ── Promotion tools: admin-editable prices, follows, scheduling, analytics, auction add-ons ──
+  await run(sql`
+    CREATE TABLE IF NOT EXISTS promotion_settings (
+      type TEXT PRIMARY KEY,
+      cost NUMERIC(10,2) NOT NULL,
+      days_valid INTEGER NOT NULL,
+      enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `, "promotion_settings");
+  await run(sql`
+    CREATE TABLE IF NOT EXISTS seller_follows (
+      follower_email TEXT NOT NULL,
+      seller_email TEXT NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      PRIMARY KEY (follower_email, seller_email)
+    )
+  `, "seller_follows");
+  await run(sql`CREATE INDEX IF NOT EXISTS seller_follows_seller_idx ON seller_follows (seller_email)`, "seller_follows_idx");
+  await run(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS publish_at TIMESTAMP WITH TIME ZONE`, "listings.publish_at");
+  await run(sql`ALTER TABLE auctions ADD COLUMN IF NOT EXISTS extend_enabled BOOLEAN NOT NULL DEFAULT FALSE`, "auctions.extend_enabled");
+  await run(sql`
+    CREATE TABLE IF NOT EXISTS listing_views (
+      id BIGSERIAL PRIMARY KEY,
+      listing_id INTEGER NOT NULL,
+      visitor TEXT,
+      source TEXT NOT NULL DEFAULT 'direct',
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    )
+  `, "listing_views");
+  await run(sql`CREATE INDEX IF NOT EXISTS listing_views_listing_idx ON listing_views (listing_id, created_at)`, "listing_views_idx");
+
   // Make the Digital and Adult categories available in the admin product category list
   await run(sql`
     INSERT INTO product_categories (id, name, slug, description) VALUES
@@ -533,6 +566,7 @@ app.listen(port, (err?: Error) => {
 runAppMigrations()
   .then(() => loadRapidApiKeyFromDb())
   .then(() => {
+    startListingScheduler();
     startSyncJob();
   })
   .catch((err: unknown) => logger.error({ err }, "Startup initialization error"));

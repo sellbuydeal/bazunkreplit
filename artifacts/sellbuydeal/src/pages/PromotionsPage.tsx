@@ -1,14 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowUp, Star, Home, Eye, Crown, Clock,
   Coins, ChevronLeft, Check, Zap, AlertCircle, X, Search, Package,
   Loader2, ChevronRight, Users, Send, Tag, Trophy, MessageSquare,
+  Bell, CalendarClock, BarChart3, Share2, Lock, Timer, RefreshCw, Percent, Truck, Bot,
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
+import { ShareCardModal, type ShareListing } from "@/components/ShareCardModal";
+import { ListingAnalyticsModal } from "@/components/ListingAnalyticsModal";
 
 interface Promotion {
   id: string;
@@ -21,6 +24,15 @@ interface Promotion {
   iconColor: string;
   popular?: boolean;
   perks: string[];
+  /** "auction" tools are bought while creating an auction; "soon" can't be bought yet */
+  mode?: "auction" | "soon";
+}
+
+interface PromoConfigEntry { cost: number; daysValid: number; enabled: boolean; comingSoon: boolean; kind: string }
+
+interface ActiveTool {
+  id: number; listing_id: number; type: string; expires_at: string;
+  title: string; image: string | null; price: string; status: string; publish_at: string | null; public_id: string | null;
 }
 
 interface Listing {
@@ -177,6 +189,72 @@ const PROMOTIONS: Promotion[] = [
     iconColor: "text-cyan-500",
     perks: ["Ask a Question button", "Schedule a Visit button", "14-day engagement"],
   },
+
+  // ── Seller tools ──
+  {
+    id: "follower-notify",
+    title: "Follower Notifications",
+    description: "Notify your followers the moment you list something new",
+    credits: 149, duration: 1, icon: Bell, iconBg: "bg-rose-50", iconColor: "text-rose-500",
+    perks: ["Message in every follower's inbox", "Sent instantly", "One-off — nothing to renew"],
+  },
+  {
+    id: "scheduled-listing",
+    title: "Scheduled Listings",
+    description: "Create it now, publish it later — you pick the date and time",
+    credits: 99, duration: 1, icon: CalendarClock, iconBg: "bg-indigo-50", iconColor: "text-indigo-500",
+    perks: ["Schedule up to 90 days ahead", "Hidden until it goes live", "Publishes automatically"],
+  },
+  {
+    id: "advanced-analytics",
+    title: "Advanced Analytics",
+    description: "Views, watchers, sales, conversion and where your buyers come from",
+    credits: 199, duration: 30, icon: BarChart3, iconBg: "bg-blue-50", iconColor: "text-blue-500",
+    perks: ["Views & unique visitors", "Traffic sources", "Conversion rate"],
+  },
+  {
+    id: "social-share",
+    title: "Social Sharing Boost",
+    description: "Generate a beautiful, ready-to-post listing card",
+    credits: 99, duration: 30, icon: Share2, iconBg: "bg-pink-50", iconColor: "text-pink-500",
+    perks: ["Square & landscape sizes", "Download or share in one tap", "Includes your link"],
+  },
+  {
+    id: "reserve-auction",
+    title: "Reserve Price Auctions",
+    description: "Set a hidden minimum — your item only sells if bidding reaches it",
+    credits: 99, duration: 1, icon: Lock, iconBg: "bg-slate-100", iconColor: "text-slate-600", mode: "auction",
+    perks: ["Reserve stays hidden from bidders", "No sale if it isn't met", "Added when you create an auction"],
+  },
+  {
+    id: "auction-extension",
+    title: "Auction Extensions",
+    description: "Bids in the final minutes extend the auction so nobody gets sniped",
+    credits: 99, duration: 1, icon: Timer, iconBg: "bg-orange-50", iconColor: "text-orange-500", mode: "auction",
+    perks: ["Last-minute bids add 2 minutes", "Encourages higher final prices", "Added when you create an auction"],
+  },
+
+  // ── Coming soon ──
+  {
+    id: "auto-relist", title: "Auto-relist", description: "Automatically relist items that don't sell",
+    credits: 149, duration: 30, icon: RefreshCw, iconBg: "bg-teal-50", iconColor: "text-teal-500", mode: "soon",
+    perks: ["Set it and forget it", "Keeps your item fresh in search"],
+  },
+  {
+    id: "seller-promo", title: "Seller Promotions", description: "Buy 2 get 1, percentage off, spend £50 save £5 and multi-buy deals",
+    credits: 199, duration: 30, icon: Percent, iconBg: "bg-red-50", iconColor: "text-red-500", mode: "soon",
+    perks: ["Encourage buyers to buy more", "Set your own offers"],
+  },
+  {
+    id: "shipping-discount", title: "Shipping Discounts", description: "Create your own shipping promotions for buyers",
+    credits: 99, duration: 30, icon: Truck, iconBg: "bg-sky-50", iconColor: "text-sky-500", mode: "soon",
+    perks: ["Free or reduced shipping offers", "Attract more buyers"],
+  },
+  {
+    id: "auto-replies", title: "Auto-replies", description: "Automatically answer common buyer questions",
+    credits: 149, duration: 30, icon: Bot, iconBg: "bg-violet-50", iconColor: "text-violet-500", mode: "soon",
+    perks: ["Instant answers, day or night", "Saves you time"],
+  },
 ];
 
 export function PromotionsPage() {
@@ -196,6 +274,46 @@ export function PromotionsPage() {
   const [applyResult, setApplyResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const [successFor, setSuccessFor] = useState<string | null>(null);
+  const [successText, setSuccessText] = useState("Promotion applied!");
+
+  // Live prices / availability set by the admin
+  const [config, setConfig] = useState<Record<string, PromoConfigEntry> | null>(null);
+  const [publishAt, setPublishAt] = useState("");
+
+  // Seller tools they've already bought (analytics, share cards, schedules)
+  const [tools, setTools] = useState<ActiveTool[]>([]);
+  const [shareFor, setShareFor] = useState<ShareListing | null>(null);
+  const [analyticsFor, setAnalyticsFor] = useState<number | null>(null);
+
+  const promotions = useMemo(() => {
+    return PROMOTIONS
+      .map(p => {
+        const c = config?.[p.id];
+        if (!c) return p;
+        return {
+          ...p,
+          credits: Math.round(c.cost * 100),
+          duration: c.daysValid,
+          mode: c.comingSoon ? ("soon" as const) : p.mode,
+          perks: p.perks.filter(perk => !/-day/i.test(perk)),
+          _hidden: !c.enabled && !c.comingSoon,
+        };
+      })
+      .filter(p => !(p as { _hidden?: boolean })._hidden);
+  }, [config]);
+
+  const loadTools = useCallback(() => {
+    if (!user?.email) return;
+    fetch(`/api/promotions/mine?email=${encodeURIComponent(user.email)}`)
+      .then(r => (r.ok ? r.json() : []))
+      .then(setTools)
+      .catch(() => {});
+  }, [user?.email]);
+
+  useEffect(() => {
+    fetch("/api/promotions/config").then(r => (r.ok ? r.json() : null)).then(setConfig).catch(() => {});
+  }, []);
+  useEffect(() => { loadTools(); }, [loadTools]);
 
   useEffect(() => {
     if (!user?.email) return;
@@ -212,6 +330,7 @@ export function PromotionsPage() {
     setSelectedPromo(promo);
     setSelectedListing(null);
     setListingSearch("");
+    setPublishAt("");
     setApplyResult(null);
     if (!user?.email) return;
     setListingsLoading(true);
@@ -245,16 +364,29 @@ export function PromotionsPage() {
           email: user.email,
           type: selectedPromo.id,
           listingId: selectedListing.id,
+          ...(selectedPromo.id === "scheduled-listing" && publishAt ? { publishAt: new Date(publishAt).toISOString() } : {}),
         }),
       });
       const data = await res.json();
       if (res.ok) {
         const newCr = Math.round((data.newBalance ?? 0) * 100);
         setBalanceCredits(newCr);
-        setSuccessFor(selectedPromo.id);
+        const boughtListing = selectedListing;
+        const boughtId = selectedPromo.id;
+        setSuccessText(
+          boughtId === "follower-notify" ? `Sent to ${data.notified ?? 0} follower${data.notified === 1 ? "" : "s"}!`
+          : boughtId === "scheduled-listing" ? "Scheduled!"
+          : "Promotion applied!");
+        setSuccessFor(boughtId);
         setTimeout(() => setSuccessFor(null), 4000);
         closeModal();
         refreshBalance?.();
+        loadTools();
+        if (boughtId === "social-share") {
+          setShareFor({ id: boughtListing.id, title: boughtListing.title, price: boughtListing.price, image: boughtListing.image });
+        } else if (boughtId === "advanced-analytics") {
+          setAnalyticsFor(boughtListing.id);
+        }
       } else {
         if (res.status === 402) {
           setApplyResult({ ok: false, msg: `Not enough credits. You need ${selectedPromo.credits} cr but have ${balanceCredits} cr.` });
@@ -328,10 +460,12 @@ export function PromotionsPage() {
 
         {/* Promotion cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {PROMOTIONS.map((promo, i) => {
+          {promotions.map((promo, i) => {
             const Icon = promo.icon;
             const canAfford = balanceCredits >= promo.credits;
             const isSuccess = successFor === promo.id;
+            const isSoon = promo.mode === "soon";
+            const isAuctionTool = promo.mode === "auction";
 
             return (
               <motion.div
@@ -368,7 +502,9 @@ export function PromotionsPage() {
                     <span className="text-xl font-black text-gray-900">{promo.credits.toLocaleString()} cr</span>
                     <span className="text-xs text-gray-400 ml-1.5">≈ £{(promo.credits / 100).toFixed(2)}</span>
                   </div>
-                  <span className="text-xs text-gray-400 font-medium">{promo.duration} days</span>
+                  <span className="text-xs text-gray-400 font-medium">
+                    {["follower-notify", "scheduled-listing", "reserve-auction", "auction-extension"].includes(promo.id) ? "one-off" : `${promo.duration} days`}
+                  </span>
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -379,8 +515,14 @@ export function PromotionsPage() {
                       animate={{ opacity: 1, scale: 1 }}
                       className="w-full py-2.5 rounded-xl bg-emerald-500 text-white font-bold text-sm flex items-center justify-center gap-2"
                     >
-                      <Check className="w-4 h-4" /> Promotion applied!
+                      <Check className="w-4 h-4" /> {successText}
                     </motion.div>
+                  ) : isSoon ? (
+                    <div key="soon" className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-400 font-bold text-sm text-center">Coming soon</div>
+                  ) : isAuctionTool ? (
+                    <Link key="auction" href="/auctions/create" className="w-full py-2.5 rounded-xl bg-[#1A1D2E] text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#2a2d3e] transition-colors">
+                      <Zap className="w-4 h-4" /> Add when you create an auction
+                    </Link>
                   ) : (
                     <motion.button
                       key="apply"
@@ -403,7 +545,7 @@ export function PromotionsPage() {
                   )}
                 </AnimatePresence>
 
-                {!canAfford && !isSuccess && (
+                {!canAfford && !isSuccess && !isSoon && !isAuctionTool && (
                   <p className="text-xs text-gray-400 text-center mt-2">
                     You need {(promo.credits - balanceCredits).toLocaleString()} more credits
                   </p>
@@ -412,6 +554,35 @@ export function PromotionsPage() {
             );
           })}
         </div>
+
+        {tools.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-sm font-black uppercase tracking-wider text-gray-400 mb-3">Your active tools</h2>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-100">
+              {tools.map(t => (
+                <div key={t.id} className="flex items-center gap-3 p-4">
+                  <div className="w-11 h-11 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden flex-shrink-0">
+                    {t.image ? <img src={t.image} alt="" className="w-full h-full object-cover" /> : <Package className="w-5 h-5 text-gray-300 m-3" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{t.title}</p>
+                    <p className="text-xs text-gray-400">
+                      {t.type === "advanced-analytics" && `Advanced Analytics · ${Math.max(0, Math.ceil((new Date(t.expires_at).getTime() - Date.now()) / 86400000))}d left`}
+                      {t.type === "social-share" && `Social Sharing Boost · ${Math.max(0, Math.ceil((new Date(t.expires_at).getTime() - Date.now()) / 86400000))}d left`}
+                      {t.type === "scheduled-listing" && (t.status === "scheduled" && t.publish_at ? `Goes live ${new Date(t.publish_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}` : "Scheduled listing — now live")}
+                    </p>
+                  </div>
+                  {t.type === "advanced-analytics" && (
+                    <button onClick={() => setAnalyticsFor(t.listing_id)} className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs font-bold hover:bg-blue-100">View analytics</button>
+                  )}
+                  {t.type === "social-share" && (
+                    <button onClick={() => setShareFor({ id: t.listing_id, title: t.title, price: t.price, image: t.image, publicId: t.public_id })} className="px-3 py-1.5 rounded-lg bg-pink-50 text-pink-600 text-xs font-bold hover:bg-pink-100">Open share card</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <p className="text-center text-xs text-gray-400 mt-6">
           Promotions are applied per listing. You choose which listing to promote after clicking Apply Now.
@@ -448,7 +619,7 @@ export function PromotionsPage() {
                   <div>
                     <h2 className="font-black text-gray-900 text-base">{selectedPromo.title}</h2>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      {selectedPromo.credits.toLocaleString()} credits · {selectedPromo.duration} days
+                      {selectedPromo.credits.toLocaleString()} credits{["follower-notify", "scheduled-listing"].includes(selectedPromo.id) ? "" : ` · ${selectedPromo.duration} days`}
                     </p>
                   </div>
                 </div>
@@ -543,6 +714,20 @@ export function PromotionsPage() {
                 </div>
               )}
 
+              {selectedPromo.id === "scheduled-listing" && (
+                <div className="mx-5 mb-3 flex-shrink-0">
+                  <label className="block text-xs font-bold text-gray-700 mb-1.5">Publish on</label>
+                  <input
+                    type="datetime-local"
+                    value={publishAt}
+                    min={new Date(Date.now() + 6 * 60000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                    onChange={e => setPublishAt(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">The listing is hidden from buyers until then and goes live automatically.</p>
+                </div>
+              )}
+
               {/* Confirm footer */}
               <div className="p-5 border-t border-gray-100 flex-shrink-0">
                 {selectedListing && (
@@ -550,7 +735,7 @@ export function PromotionsPage() {
                     <div>
                       <p className="text-xs font-bold text-gray-700 truncate">{selectedListing.title}</p>
                       <p className="text-[10px] text-gray-400 mt-0.5">
-                        Will be promoted for {selectedPromo.duration} days
+                        {["follower-notify", "scheduled-listing"].includes(selectedPromo.id) ? "One-off action" : `Will be promoted for ${selectedPromo.duration} days`}
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0 ml-3">
@@ -568,7 +753,7 @@ export function PromotionsPage() {
                   </button>
                   <button
                     onClick={applyPromotion}
-                    disabled={!selectedListing || applying}
+                    disabled={!selectedListing || applying || (selectedPromo.id === "scheduled-listing" && !publishAt)}
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#4A5CE8] text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40"
                   >
                     {applying ? (
@@ -583,6 +768,11 @@ export function PromotionsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {shareFor && <ShareCardModal listing={shareFor} onClose={() => setShareFor(null)} />}
+      {analyticsFor !== null && user?.email && (
+        <ListingAnalyticsModal listingId={analyticsFor} email={user.email} onClose={() => setAnalyticsFor(null)} />
+      )}
     </div>
   );
 }

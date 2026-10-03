@@ -53,8 +53,19 @@ const DURATIONS: { label: string; hours: number }[] = [
 
 export function CreateAuctionPage() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, refreshBalance } = useAuth();
   const { currency } = useCurrency();
+
+  // Optional paid add-ons (prices set by the admin)
+  const [promoCfg, setPromoCfg] = useState<Record<string, { cost: number; enabled: boolean }> | null>(null);
+  const [extendEnabled, setExtendEnabled] = useState(false);
+  useEffect(() => {
+    fetch("/api/promotions/config").then(r => (r.ok ? r.json() : null)).then(setPromoCfg).catch(() => {});
+  }, []);
+  const reserveCfg = promoCfg?.["reserve-auction"];
+  const extendCfg = promoCfg?.["auction-extension"];
+  const reserveFeeCr = reserveCfg ? Math.round(reserveCfg.cost * 100) : 0;
+  const extendFeeCr = extendCfg ? Math.round(extendCfg.cost * 100) : 0;
 
   const [title, setTitle]               = useState("");
   const [description, setDescription]   = useState("");
@@ -165,6 +176,7 @@ export function CreateAuctionPage() {
           sellerUsername: user.username,
           startingBid: toGBP(startBid),
           reservePrice: reservePrice ? toGBP(parseFloat(reservePrice)) : null,
+          extendEnabled,
           bidIncrement: toGBP(increment),
           endTime,
           tags: tags.trim() || null,
@@ -172,7 +184,13 @@ export function CreateAuctionPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Failed to create auction"); return; }
+      if (!res.ok) {
+        setError(res.status === 402
+          ? "You don't have enough credits for the auction add-ons you selected. Top up your credits or untick an add-on."
+          : (data.error ?? "Failed to create auction"));
+        return;
+      }
+      refreshBalance?.();
       setSuccess(data.id);
     } finally {
       setSubmitting(false);
@@ -484,10 +502,11 @@ export function CreateAuctionPage() {
               </div>
             </div>
 
+            {(!reserveCfg || reserveCfg.enabled) && (
             <div className="mb-5">
               <label className="text-sm font-medium text-gray-700 mb-1.5 block">
                 Reserve Price ({currency.symbol}){" "}
-                <span className="text-gray-400 font-normal text-xs">— optional, hidden from bidders</span>
+                <span className="text-gray-400 font-normal text-xs">— optional, hidden from bidders{reserveFeeCr > 0 && ` · ${reserveFeeCr} credits if used`}</span>
               </label>
               <input
                 type="number"
@@ -498,7 +517,21 @@ export function CreateAuctionPage() {
                 placeholder="Leave blank for no reserve"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F26B21]/30 focus:border-[#F26B21]"
               />
+              <p className="text-[11px] text-gray-400 mt-1">If bidding doesn't reach your reserve, the item doesn't sell.</p>
             </div>
+            )}
+
+            {(!extendCfg || extendCfg.enabled) && (
+            <label className="mb-5 flex items-start gap-3 rounded-xl border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+              <input type="checkbox" checked={extendEnabled} onChange={e => setExtendEnabled(e.target.checked)} className="mt-1" />
+              <span>
+                <span className="block text-sm font-medium text-gray-700">
+                  Auction Extensions{extendFeeCr > 0 && <span className="text-gray-400 font-normal text-xs"> · {extendFeeCr} credits</span>}
+                </span>
+                <span className="block text-xs text-gray-400">A bid in the final 2 minutes extends the auction by 2 minutes, so last-second bids can't snipe it.</span>
+              </span>
+            </label>
+            )}
 
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5 block">

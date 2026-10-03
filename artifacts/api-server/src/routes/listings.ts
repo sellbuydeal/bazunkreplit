@@ -159,6 +159,10 @@ router.get("/listings/:id", async (req, res) => {
       [row] = await db.select().from(listingsTable).where(eq(listingsTable.publicId, rawId)).limit(1);
     }
     if (!row) { res.status(404).json({ error: "not found" }); return; }
+    if (row.status === "scheduled") {
+      const viewer = typeof req.query.email === "string" ? req.query.email.toLowerCase() : "";
+      if (viewer !== String(row.sellerEmail).toLowerCase()) { res.status(404).json({ error: "not found" }); return; }
+    }
     const [withPromo] = await attachPromotions([row]);
 
     let sellerVerified = false;
