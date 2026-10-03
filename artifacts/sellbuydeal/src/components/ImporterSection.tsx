@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, Search, Zap,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { CATEGORIES as SITE_CATEGORIES } from "@/data/categories";
 
 interface SupplierImport {
   id: number;
@@ -77,10 +78,6 @@ interface ImportModalProps {
   userName: string;
 }
 
-const CATEGORIES = [
-  "electronics", "fashion", "home", "gaming", "sports",
-  "beauty", "books", "automotive", "toys", "other",
-];
 const CONDITIONS = ["new", "like new", "good", "fair", "poor"];
 
 function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportModalProps) {
@@ -88,7 +85,8 @@ function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportModalPro
   const [title, setTitle] = useState("");
   const [supplierPriceUsd, setSupplierPriceUsd] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-  const [category, setCategory] = useState("other");
+  const [category, setCategory] = useState("");
+  const [subcategory, setSubcategory] = useState("");
   const [condition, setCondition] = useState("new");
   const [description, setDescription] = useState("");
   const [markupType, setMarkupType] = useState<"percentage" | "fixed">("percentage");
@@ -102,7 +100,8 @@ function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportModalPro
   const mv = parseFloat(markupValue) || 0;
   const bazunkPreview = usd > 0 ? calcBazunkPrice(usd, markupType, mv) : null;
 
-  const canSubmit = url.trim() && title.trim() && usd > 0 && !loading;
+  const subcategories = SITE_CATEGORIES.find(c => c.slug === category)?.subcategories ?? [];
+  const canSubmit = url.trim() && title.trim() && usd > 0 && !!category && !loading;
 
   async function handleImport() {
     setError("");
@@ -119,6 +118,7 @@ function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportModalPro
           supplierPriceUsd: usd,
           imageUrl: imageUrl.trim() || null,
           category,
+          subcategory: subcategory || null,
           condition,
           description: description.trim() || null,
           markupType,
@@ -213,12 +213,24 @@ function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportModalPro
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Category</label>
-                <select value={category} onChange={e => setCategory(e.target.value)} className={`${inputCls} bg-white capitalize`}>
-                  {CATEGORIES.map(c => <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Category <span className="text-red-400">*</span></label>
+                <select value={category} onChange={e => { setCategory(e.target.value); setSubcategory(""); }} className={`${inputCls} bg-white`}>
+                  <option value="">Select category</option>
+                  {SITE_CATEGORIES.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
                 </select>
               </div>
             </div>
+
+            {/* Subcategory (same list as Quick Sell) */}
+            {subcategories.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Subcategory <span className="text-gray-400 font-normal">(optional)</span></label>
+                <select value={subcategory} onChange={e => setSubcategory(e.target.value)} className={`${inputCls} bg-white`}>
+                  <option value="">All subcategories</option>
+                  {subcategories.map(s => <option key={s.slug} value={s.slug}>{s.name}</option>)}
+                </select>
+              </div>
+            )}
 
             {/* Condition + Image URL */}
             <div className="grid grid-cols-2 gap-3">

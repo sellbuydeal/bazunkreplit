@@ -85,6 +85,7 @@ router.post("/supplier/import", async (req, res) => {
   const supplierPriceUsd = parseFloat(String(body.supplierPriceUsd ?? "0"));
   const imageUrl = body.imageUrl ? String(body.imageUrl) : null;
   const category = body.category ? String(body.category) : "other";
+  const subcategory = body.subcategory ? String(body.subcategory) : null;
   const condition = body.condition ? String(body.condition) : "new";
   const description = body.description ? String(body.description) : "";
   const markupType = body.markupType ? String(body.markupType) : "percentage";
@@ -119,8 +120,8 @@ router.post("/supplier/import", async (req, res) => {
   const bazunkPrice = calculateBazunkPrice(supplierPriceUsd, markupType, markupValue);
 
   const [listing] = (await db.execute(sql`
-    INSERT INTO listings (title, price, category, description, condition, image, seller_email, seller_name, status)
-    VALUES (${title}, ${bazunkPrice}, ${category}, ${description || "Imported from AliExpress."}, ${condition}, ${imageUrl}, ${sellerEmail}, ${sellerName}, 'active')
+    INSERT INTO listings (title, price, category, subcategory, description, condition, image, seller_email, seller_name, status)
+    VALUES (${title}, ${bazunkPrice}, ${category}, ${subcategory}, ${description || "Imported from AliExpress."}, ${condition}, ${imageUrl}, ${sellerEmail}, ${sellerName}, 'active')
     RETURNING *
   `)).rows as Record<string, unknown>[];
 
