@@ -238,8 +238,32 @@ export function BrowsePage() {
   const [apiListings, setApiListings] = useState<(typeof ALL_PRODUCTS[0] & { subcategory?: string; promotions: string[] })[]>([]);
   const [hasMoreListings, setHasMoreListings] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  const [subcategoryCounts, setSubcategoryCounts] = useState<Record<string, number>>({});
 
-  const LISTING_BATCH = 60;
+
+  const LISTING_BATCH = 24;
+
+  useEffect(() => {
+    fetch("/api/listings/category-counts")
+      .then((r) => {
+        if (!r.ok) throw new Error(`category counts ${r.status}`);
+        return r.json();
+      })
+      .then((rows: Array<{ category?: string; subcategory?: string; count?: number | string }>) => {
+        const cats: Record<string, number> = {};
+        const subs: Record<string, number> = {};
+        for (const row of Array.isArray(rows) ? rows : []) {
+          if (!row.category) continue;
+          const count = Number(row.count ?? 0);
+          cats[row.category] = (cats[row.category] ?? 0) + count;
+          if (row.subcategory) subs[`${row.category}:${row.subcategory}`] = count;
+        }
+        setCategoryCounts(cats);
+        setSubcategoryCounts(subs);
+      })
+      .catch((err) => console.warn("Could not load category counts", err));
+  }, []);
 
   useEffect(() => {
     fetch(`/api/listings?limit=${LISTING_BATCH}&offset=0`)
@@ -453,7 +477,7 @@ export function BrowsePage() {
       <FilterSection title="Category">
         <div className="space-y-1 max-h-72 overflow-y-auto pr-1">
           {CATEGORIES.map((cat) => {
-            const count = allListings.filter((p) => p.category === cat.slug).length;
+            const count = categoryCounts[cat.slug] ?? 0;
             if (count === 0) return null;
             const isChecked = selectedCategories.includes(cat.slug);
             return (
@@ -474,7 +498,7 @@ export function BrowsePage() {
                 {isChecked && cat.subcategories.length > 0 && (
                   <div className="ml-5 mt-0.5 space-y-0.5 border-l-2 border-[#4A5CE8]/15 pl-2.5">
                     {cat.subcategories.map((sub) => {
-                      const subCount = allListings.filter((p) => p.category === cat.slug && (p as { subcategory?: string }).subcategory === sub.slug).length;
+                      const subCount = subcategoryCounts[`${cat.slug}:${sub.slug}`] ?? 0;
                       return (
                         <label key={sub.slug} className="flex items-center justify-between gap-2 cursor-pointer group py-0.5">
                           <div className="flex items-center gap-2">

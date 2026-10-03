@@ -66,7 +66,7 @@ router.get("/listings", async (req, res) => {
       return;
     }
 
-    const parsedLimit = isNaN(parseInt(limit)) ? 40 : parseInt(limit);
+    const parsedLimit = Math.min(isNaN(parseInt(limit)) ? 40 : parseInt(limit), 100);
     const parsedOffset = isNaN(parseInt(offset)) ? 0 : parseInt(offset);
 
     // Browse/list views only need card fields. Avoid sending large description, tags,
@@ -108,6 +108,9 @@ router.get("/listings", async (req, res) => {
 
     const withPromos = await attachPromotions(rows);
     withPromos.sort((a, b) => promoRank(b.promotions) - promoRank(a.promotions));
+    // Public browse cards change relatively infrequently; a tiny cache removes repeated
+    // database work while keeping new/edited listings fresh within seconds.
+    res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=45");
     res.json(withPromos);
   } catch (err) {
     console.error("Error fetching listings:", err);
