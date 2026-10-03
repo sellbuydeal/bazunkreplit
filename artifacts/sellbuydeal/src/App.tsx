@@ -33,11 +33,13 @@ import { CategoriesPage } from "@/pages/CategoriesPage";
 import { SellPage } from "@/pages/SellPage";
 import { QuickSellPage } from "@/pages/QuickSellPage";
 import { DashboardPage } from "@/pages/DashboardPage";
+import { ImportersPage } from "@/pages/ImportersPage";
 import { BrowsePage } from "@/pages/BrowsePage";
 import { ListingPage } from "@/pages/ListingPage";
 import { CheckoutPage } from "@/pages/CheckoutPage";
 import { BundlePage } from "@/pages/BundlePage";
 import { ClassifiedsPage } from "@/pages/ClassifiedsPage";
+import { MessagesPage } from "@/pages/MessagesPage";
 import { SellerProfilePage } from "@/pages/SellerProfilePage";
 import { CreditsPage } from "@/pages/CreditsPage";
 import { PromotionsPage } from "@/pages/PromotionsPage";
@@ -249,12 +251,14 @@ function Router() {
       <Route path="/sell" component={SellPage} />
       <Route path="/sell/quick" component={QuickSellPage} />
       <Route path="/dashboard" component={DashboardPage} />
+      <Route path="/importers" component={ImportersPage} />
       <Route path="/browse" component={BrowsePage} />
       <Route path="/search" component={BrowsePage} />
       <Route path="/listing/:id" component={ListingPage} />
       <Route path="/checkout" component={CheckoutPage} />
       <Route path="/bundle" component={BundlePage} />
       <Route path="/classifieds" component={ClassifiedsPage} />
+      <Route path="/messages" component={MessagesPage} />
       <Route path="/seller/:id" component={SellerProfilePage} />
       <Route path="/credits" component={CreditsPage} />
       <Route path="/promotions" component={PromotionsPage} />

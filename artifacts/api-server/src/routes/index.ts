@@ -21,8 +21,8 @@ import supportRouter from "./support.js";
 import rewardsRouter from "./rewards.js";
 import verificationRouter from "./verification.js";
 import userImporterRouter from "./userImporter.js";
+import userRapidApiRouter from "./userRapidApi.js";
 import referralsRouter from "./referrals.js";
-import watchersRouter from "./watchers.js";
 
 const router: IRouter = Router();
 
@@ -49,7 +49,7 @@ router.use(supportRouter);
 router.use(rewardsRouter);
 router.use(verificationRouter);
 router.use(userImporterRouter);
+router.use(userRapidApiRouter);
 router.use(referralsRouter);
-router.use(watchersRouter);
 
 export default router;

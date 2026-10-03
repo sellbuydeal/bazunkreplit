@@ -49,6 +49,7 @@ async function runAppMigrations() {
   `, "users");
 
   await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`, "users.banned");
+  await run(sql`CREATE TABLE IF NOT EXISTS user_rapidapi_keys (email TEXT PRIMARY KEY, encrypted_key TEXT NOT NULL, key_last4 TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`, "user_rapidapi_keys");
 
   await run(sql`
     CREATE TABLE IF NOT EXISTS credit_transactions (
@@ -590,16 +591,6 @@ async function runAppMigrations() {
     )
   `, "listing_views");
   await run(sql`CREATE INDEX IF NOT EXISTS listing_views_listing_idx ON listing_views (listing_id, created_at)`, "listing_views_idx");
-
-  await run(sql`
-    CREATE TABLE IF NOT EXISTS user_rapidapi_keys (
-      user_email TEXT PRIMARY KEY,
-      encrypted_key TEXT NOT NULL,
-      key_hint TEXT,
-      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    )
-  `, "user_rapidapi_keys");
 
   // Make the Digital and Adult categories available in the admin product category list
   await run(sql`

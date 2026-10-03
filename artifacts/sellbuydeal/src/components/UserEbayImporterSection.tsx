@@ -7,6 +7,7 @@ import {
   Globe,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useAuth as useClerkAuth } from "@clerk/react";
 import { CATEGORIES as SITE_CATEGORIES } from "@/data/categories";
 
 type EbaySite = "uk" | "us";
@@ -53,6 +54,8 @@ const inputCls = "px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outl
 
 export function UserEbayImporterSection() {
   const { user } = useAuth();
+  const { getToken } = useClerkAuth();
+  const authFetch = useCallback(async (input: RequestInfo | URL, init: RequestInit = {}) => { const token = await getToken(); return fetch(input, { ...init, headers: { ...(init.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) } }); }, [getToken]);
 
   const [site, setSite] = useState<EbaySite>("uk");
   const [query, setQuery]             = useState("");
@@ -107,7 +110,7 @@ export function UserEbayImporterSection() {
     setSelected(new Set());
     setImportMsg(null);
     try {
-      const r = await fetch(`/api/user/search-ebay?q=${encodeURIComponent(q)}&site=${currentSite}&page=${currentPage}`);
+      const r = await authFetch(`/api/user/search-ebay?q=${encodeURIComponent(q)}&site=${currentSite}&page=${currentPage}`);
       const d = await r.json() as { products?: SearchResult[]; error?: string };
       if (!r.ok) { setSearchErr(d.error ?? "Search failed"); setResults([]); }
       else { setResults(d.products ?? []); setHasSearched(true); }
@@ -141,7 +144,7 @@ export function UserEbayImporterSection() {
     setImporting(true);
     setImportMsg(null);
     try {
-      const r = await fetch("/api/user/import-ebay", {
+      const r = await authFetch("/api/user/import-ebay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -21,6 +21,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRawSettings } from "@/context/SiteSettingsContext";
 import { useWatchlist, getCurrentPrice } from "@/context/WatchlistContext";
 import { useCart } from "@/context/CartContext";
+import { MOCK_CONVERSATIONS } from "@/data/messages";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useLiveStream } from "@/context/LiveStreamContext";
@@ -28,12 +29,8 @@ import { PLATFORM_META, type LivePlatform } from "@/data/livestreams";
 import { LiveKitBroadcaster } from "@/components/LiveKitBroadcaster";
 import { ALL_PRODUCTS } from "@/data/products";
 
-import { ImporterSection } from "@/components/ImporterSection";
 import { SellerSales } from "@/components/SellerSales";
 import { ReviewModal } from "@/components/ReviewModal";
-import { UserAmazonImporterSection } from "@/components/UserAmazonImporterSection";
-import { UserEbayImporterSection } from "@/components/UserEbayImporterSection";
-import { UserClassifiedsImporterSection } from "@/components/UserClassifiedsImporterSection";
 import { CATEGORIES as SITE_CATEGORIES } from "@/data/categories";
 
 import tshirtImage from "/tshirt.png";
@@ -79,10 +76,7 @@ const SIDEBAR_CATEGORIES: SidebarCategory[] = [
     id: "importers", label: "Importers", icon: ArrowDownToLine,
     gradient: "from-[#1A1D2E] to-slate-600", bg: "bg-[#1A1D2E]",
     items: [
-      { id: "amazon-import",    label: "Amazon UK",   icon: ShoppingBag, iconBg: "bg-[#F26B21]" },
-      { id: "ebay-import",      label: "eBay",        icon: ShoppingBag, iconBg: "bg-[#4A5CE8]" },
-      { id: "aliexpress-import",       label: "AliExpress",  icon: Package,     iconBg: "bg-[#1A1D2E]" },
-      { id: "classifieds-import",      label: "Classifieds", icon: FileText,    iconBg: "bg-[#10B981]" },
+      { id: "open-importers", label: "Product Importers", icon: ShoppingBag, iconBg: "bg-[#4A5CE8]" },
     ],
   },
   {
@@ -5689,6 +5683,7 @@ export function DashboardPage() {
                               key={item.id}
                               onClick={() => {
                                 if (item.id === "my-store") { setMyStoreOpen(true); setSidebarOpen(false); setMobileExpandedCat(null); return; }
+                                if (item.id === "open-importers") { setLocation("/importers"); setSidebarOpen(false); setMobileExpandedCat(null); return; }
                                 setActiveSection(item.id);
                                 setSidebarOpen(false);
                                 setMobileExpandedCat(null);
@@ -6066,6 +6061,79 @@ export function DashboardPage() {
                 </div>
               </div>
             )}
+            {activeSection === "messages" && (
+              <div className="bg-white rounded-2xl border border-gray-100 flex flex-col" style={{ minHeight: 400 }}>
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-bold text-gray-900">Messages</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {MOCK_CONVERSATIONS.reduce((s, c) => s + c.unread, 0)} unread · {MOCK_CONVERSATIONS.length} conversations
+                    </p>
+                  </div>
+                  <Link href="/messages" className="flex items-center gap-1.5 text-xs text-[#4A5CE8] font-semibold hover:underline">
+                    Open Inbox <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {MOCK_CONVERSATIONS.map((convo) => {
+                    const last = convo.messages[convo.messages.length - 1];
+                    const initials = convo.with.avatar;
+                    const avatarColors: Record<string, string> = {
+                      MD: "bg-blue-500", SM: "bg-emerald-500", PK: "bg-purple-500",
+                      JT: "bg-amber-500", TA: "bg-[#4A5CE8]",
+                    };
+                    const color = avatarColors[initials] ?? "bg-gray-400";
+                    return (
+                      <Link
+                        key={convo.id}
+                        href="/messages"
+                        className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="relative flex-shrink-0">
+                          <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center text-white text-sm font-bold`}>
+                            {initials}
+                          </div>
+                          {convo.unread > 0 && (
+                            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#F26B21] text-white text-[9px] font-bold flex items-center justify-center">
+                              {convo.unread}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <p className={`text-sm ${convo.unread > 0 ? "font-bold text-gray-900" : "font-semibold text-gray-700"}`}>
+                              {convo.with.name}
+                            </p>
+                            <span className="text-[10px] text-gray-400 flex-shrink-0 ml-2">
+                              {new Date(last.timestamp).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#F26B21] font-medium truncate mb-0.5">{convo.listingTitle}</p>
+                          <p className={`text-xs truncate ${convo.unread > 0 ? "text-gray-700 font-medium" : "text-gray-400"}`}>
+                            {last.senderId === "me" ? "You: " : ""}{last.text}
+                          </p>
+                        </div>
+                        {last.senderId === "me" && (
+                          <div className="flex-shrink-0">
+                            {last.read
+                              ? <CheckCheck className="w-3.5 h-3.5 text-[#4A5CE8]" />
+                              : <Check className="w-3.5 h-3.5 text-gray-400" />}
+                          </div>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+                <div className="p-4 border-t border-gray-100">
+                  <Link
+                    href="/messages"
+                    className="w-full py-2.5 rounded-xl bg-[#4A5CE8] text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+                  >
+                    <MessageSquare className="w-4 h-4" /> Open Full Inbox
+                  </Link>
+                </div>
+              </div>
+            )}
             {activeSection === "credits" && <CreditsSection user={user} />}
             {activeSection === "promotions" && (
               <div className="bg-white rounded-2xl border border-gray-100 flex flex-col" style={{ minHeight: 400 }}>
@@ -6265,11 +6333,6 @@ export function DashboardPage() {
             {activeSection === "my-auctions" && <MyAuctionsSection />}
             {activeSection === "my-bids" && <MyBidsSection />}
             {activeSection === "my-flash-sales" && <MyFlashSalesSection />}
-            {activeSection === "importer" && <ImporterSection />}
-            {activeSection === "aliexpress-import" && <ImporterSection />}
-            {activeSection === "amazon-import" && <UserAmazonImporterSection />}
-            {activeSection === "ebay-import" && <UserEbayImporterSection />}
-            {activeSection === "classifieds-import" && <UserClassifiedsImporterSection />}
             {activeSection === "support-tickets" && <SupportTicketsSection user={user} />}
           </motion.div>
         </main>

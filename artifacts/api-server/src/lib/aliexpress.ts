@@ -45,9 +45,9 @@ export function calculateBazunkPrice(
 
 export async function fetchAliExpressProduct(
   productId: string,
-  rapidApiKey?: string,
+  suppliedApiKey?: string,
 ): Promise<AliExpressProduct> {
-  const apiKey = rapidApiKey || process.env.RAPIDAPI_KEY;
+  const apiKey = suppliedApiKey || process.env.RAPIDAPI_KEY;
   if (!apiKey) {
     throw new Error("RAPIDAPI_KEY is not configured");
   }

@@ -6,6 +6,7 @@ import {
   ChevronRight, CheckSquare, Square, ArrowDownToLine, RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useAuth as useClerkAuth } from "@clerk/react";
 import { CATEGORIES as SITE_CATEGORIES } from "@/data/categories";
 
 interface SearchResult {
@@ -37,6 +38,8 @@ const inputCls = "px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outl
 
 export function UserAmazonImporterSection() {
   const { user } = useAuth();
+  const { getToken } = useClerkAuth();
+  const authFetch = useCallback(async (input: RequestInfo | URL, init: RequestInit = {}) => { const token = await getToken(); return fetch(input, { ...init, headers: { ...(init.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) } }); }, [getToken]);
 
   // ── Search state ──────────────────────────────────────────────
   const [query, setQuery]           = useState("");
@@ -114,7 +117,7 @@ export function UserAmazonImporterSection() {
     setSelected(new Set());
     setImportMsg(null);
     try {
-      const r = await fetch(`/api/user/search-amazon?q=${encodeURIComponent(q)}&page=${page}`);
+      const r = await authFetch(`/api/user/search-amazon?q=${encodeURIComponent(q)}&page=${page}`);
       const d = await r.json() as { products?: SearchResult[]; error?: string };
       if (!r.ok) { setSearchErr(d.error ?? "Search failed"); setResults([]); }
       else { setResults(d.products ?? []); setHasSearched(true); }
@@ -142,7 +145,7 @@ export function UserAmazonImporterSection() {
     setImporting(true);
     setImportMsg(null);
     try {
-      const r = await fetch("/api/user/import-amazon", {
+      const r = await authFetch("/api/user/import-amazon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

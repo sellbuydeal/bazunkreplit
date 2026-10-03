@@ -4,42 +4,14 @@ import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { fetchAmazonDetails, buildAmazonDescription } from "../lib/amazon.js";
 import { rapidApiErrorMessage } from "../lib/rapidapi.js";
-import { authEmail, getRapidApiKeyForEmail, saveUserRapidApiKey, deleteUserRapidApiKey, userRapidApiStatus, testUserRapidApiKey, isBazunkAdmin } from "../lib/userRapidApi.js";
+import { rapidKeyForRequest } from "../lib/userRapidApi.js";
 
 const router = Router();
 
-router.get("/user/rapidapi", async (req, res) => {
-  const email=await authEmail(req); if(!email){res.status(401).json({error:"Sign in required"});return;}
-  res.json(await userRapidApiStatus(email));
-});
-router.put("/user/rapidapi", async (req,res)=>{
-  const email=await authEmail(req); if(!email){res.status(401).json({error:"Sign in required"});return;}
-  if(await isBazunkAdmin(email)){res.status(400).json({error:"Bazunk Admin uses the server RapidAPI key configured in Admin → Importers."});return;}
-  const key=String(req.body?.key||"").trim();
-  try { await saveUserRapidApiKey(email,key); res.json({ok:true,...await userRapidApiStatus(email)}); }
-  catch(e){res.status(400).json({error:e instanceof Error?e.message:"Could not save key"});}
-});
-router.delete("/user/rapidapi", async(req,res)=>{
-  const email=await authEmail(req); if(!email){res.status(401).json({error:"Sign in required"});return;}
-  if(!(await isBazunkAdmin(email))) await deleteUserRapidApiKey(email); res.json({ok:true});
-});
-router.post("/user/rapidapi/test", async(req,res)=>{
-  const email=await authEmail(req); if(!email){res.status(401).json({error:"Sign in required"});return;}
-  const supplied=String(req.body?.key||"").trim(); const stored=await getRapidApiKeyForEmail(email); const key=supplied||stored.key;
-  if(!key){res.status(400).json({error:"Add your RapidAPI key first."});return;}
-  res.json({results:await testUserRapidApiKey(key)});
-});
-
-async function importerKey(req: any, res: any): Promise<{key:string;email:string;admin:boolean}|null> {
-  const email=await authEmail(req); if(!email){res.status(401).json({error:"Sign in required"});return null;}
-  const k=await getRapidApiKeyForEmail(email);
-  if(!k.key){res.status(403).json({error:k.admin?"Bazunk RapidAPI is not configured in Admin → Importers.":"Connect your own RapidAPI key in Importers before using live product search or import."});return null;}
-  return {key:k.key,email,admin:k.admin};
-}
-
 // GET /api/user/search-amazon — live Amazon UK search (any signed-in user)
 router.get("/user/search-amazon", async (req, res) => {
-  const access = await importerKey(req,res); if(!access)return; const apiKey=access.key;
+  const { key: apiKey } = await rapidKeyForRequest(req);
+  if (!apiKey) { res.status(503).json({ error: "Amazon search is not configured yet" }); return; }
 
   const q    = (req.query.q as string)?.trim();
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
@@ -88,7 +60,8 @@ router.get("/user/search-amazon", async (req, res) => {
 
 // POST /api/user/import-amazon — import chosen ASINs to the user's own account
 router.post("/user/import-amazon", async (req, res) => {
-  const access = await importerKey(req,res); if(!access)return; const apiKey=access.key;
+  const { key: apiKey } = await rapidKeyForRequest(req);
+  if (!apiKey) { res.status(503).json({ error: "Amazon import is not configured yet" }); return; }
 
   interface SelectedProduct {
     asin: string; title: string; price_gbp: number;
@@ -101,7 +74,6 @@ router.post("/user/import-amazon", async (req, res) => {
   const category    = (req.body.category    as string) || "other";
   const subcategory = (req.body.subcategory as string) || null;
   const sellerEmail = (req.body.sellerEmail as string)?.trim();
-  if (sellerEmail && !access.admin && sellerEmail.toLowerCase() !== access.email) { res.status(403).json({ error: "You can only import to your own seller account." }); return; }
 
   if (!sellerEmail)    { res.status(400).json({ error: "sellerEmail required" }); return; }
   if (!products.length){ res.status(400).json({ error: "products array required" }); return; }
@@ -164,7 +136,8 @@ router.post("/user/import-amazon", async (req, res) => {
 
 // GET /api/user/search-ebay — live eBay search (any signed-in user)
 router.get("/user/search-ebay", async (req, res) => {
-  const access = await importerKey(req,res); if(!access)return; const apiKey=access.key;
+  const { key: apiKey } = await rapidKeyForRequest(req);
+  if (!apiKey) { res.status(503).json({ error: "eBay search is not configured yet" }); return; }
 
   const q    = (req.query.q as string)?.trim();
   const site = (req.query.site as string ?? "uk") === "us" ? "us" : "uk";
@@ -245,7 +218,8 @@ router.get("/user/search-ebay", async (req, res) => {
 
 // POST /api/user/import-ebay — import chosen eBay listings to the user's own account
 router.post("/user/import-ebay", async (req, res) => {
-  const access = await importerKey(req,res); if(!access)return; const apiKey=access.key;
+  const { key: apiKey } = await rapidKeyForRequest(req);
+  if (!apiKey) { res.status(503).json({ error: "eBay import is not configured yet" }); return; }
 
   interface SelectedEbay {
     item_id: string; title: string; price: number; currency: "GBP" | "USD";
@@ -265,7 +239,6 @@ router.post("/user/import-ebay", async (req, res) => {
   const category    = (req.body.category    as string) || "other";
   const subcategory = (req.body.subcategory as string) || null;
   const sellerEmail = (req.body.sellerEmail as string)?.trim();
-  if (sellerEmail && !access.admin && sellerEmail.toLowerCase() !== access.email) { res.status(403).json({ error: "You can only import to your own seller account." }); return; }
 
   if (!sellerEmail)     { res.status(400).json({ error: "sellerEmail required" }); return; }
   if (!products.length) { res.status(400).json({ error: "products array required" }); return; }

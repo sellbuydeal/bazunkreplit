@@ -2,7 +2,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "./logger.js";
 import { fetchAliExpressProduct, calculateBazunkPrice } from "./aliexpress.js";
-import { getRapidApiKeyForEmail } from "./userRapidApi.js";
+import { rapidKeyForEmail } from "./userRapidApi.js";
 
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
@@ -56,9 +56,9 @@ async function syncRow(row: ImportRow): Promise<{ ok: boolean; error?: string }>
       return { ok: false, error: `Unsupported source: ${row.supplierSource}` };
     }
 
-    const access = await getRapidApiKeyForEmail(row.sellerEmail);
-    if (!access.key) return { ok: false, error: "Seller RapidAPI key is not connected" };
-    const product = await fetchAliExpressProduct(row.supplierId, access.key);
+    const apiKey = await rapidKeyForEmail(row.sellerEmail);
+    if (!apiKey) return { ok: false, error: "Seller RapidAPI key is not connected" };
+    const product = await fetchAliExpressProduct(row.supplierId, apiKey);
     const bazunkPrice = calculateBazunkPrice(
       product.priceUsd,
       row.markupType,
@@ -103,6 +103,11 @@ async function syncRow(row: ImportRow): Promise<{ ok: boolean; error?: string }>
 }
 
 export function startSyncJob(): void {
+  if (!process.env.RAPIDAPI_KEY) {
+    logger.info("RAPIDAPI_KEY not set — supplier auto-sync disabled");
+    return;
+  }
+
   logger.info({ intervalMs: SYNC_INTERVAL_MS }, "Supplier sync job started");
 
   setInterval(async () => {
