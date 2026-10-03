@@ -10,7 +10,9 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { MOCK_CONVERSATIONS, type Conversation, type Message } from "@/data/messages";
+import { type Conversation, type Message } from "@/data/messages";
+import { useSession } from "@clerk/react";
+import { useAuth } from "@/context/AuthContext";
 import { useOffers, type Offer, type OfferStatus } from "@/context/OfferContext";
 import { useCart } from "@/context/CartContext";
 import { ALL_PRODUCTS } from "@/data/products";
@@ -494,7 +496,10 @@ function OfferDetail({
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function MessagesPage() {
-  const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(true);
+  const { session } = useSession();
+  const { user } = useAuth();
   const [activeId, setActiveId] = useState<number | null>(null);
   const [inputText, setInputText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -521,6 +526,7 @@ export function MessagesPage() {
   function openConvo(id: number) {
     setActiveId(id);
     setMobileView("chat");
+    loadConversation(id);
     setConversations((prev) =>
       prev.map((c) =>
         c.id === id
@@ -530,40 +536,45 @@ export function MessagesPage() {
     );
   }
 
-  function sendMessage() {
-    if (!inputText.trim() || !activeId) return;
-    const text = inputText.trim();
-    setInputText("");
-    const newMsg: Message = {
-      id: Date.now(),
-      senderId: "me",
-      text,
-      timestamp: new Date().toISOString(),
-      read: false,
-    };
-    setConversations((prev) =>
-      prev.map((c) => c.id === activeId ? { ...c, messages: [...c.messages, newMsg] } : c)
-    );
-    setTimeout(() => {
-      const replies = [
-        "Thanks for getting back to me!",
-        "That sounds good to me.",
-        "Great, let me know if you have any other questions.",
-        "Works for me, I'll confirm shortly.",
-        "Appreciate the quick response!",
-      ];
-      const reply: Message = {
-        id: Date.now() + 1,
-        senderId: "them",
-        text: replies[Math.floor(Math.random() * replies.length)],
-        timestamp: new Date().toISOString(),
-        read: false,
-      };
-      setConversations((prev) =>
-        prev.map((c) => c.id === activeId ? { ...c, messages: [...c.messages, reply] } : c)
-      );
-    }, 1500);
+  async function loadConversation(id: number) {
+    if (!session) return;
+    const token = await session.getToken();
+    const r = await fetch(`/api/messages/conversations/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!r.ok) return;
+    const data = await r.json();
+    setConversations(prev => prev.map(c => c.id === id ? { ...c, messages: data.messages || [], unread: 0 } : c));
   }
+
+  async function sendMessage() {
+    if (!inputText.trim() || !activeId || !session) return;
+    const text = inputText.trim(); setInputText("");
+    try {
+      const token = await session.getToken();
+      const r = await fetch(`/api/messages/conversations/${activeId}/messages`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ text }) });
+      const msg = await r.json();
+      if (!r.ok) { setInputText(text); return; }
+      setConversations(prev => prev.map(c => c.id === activeId ? { ...c, messages: [...c.messages, msg] } : c));
+    } catch { setInputText(text); }
+  }
+
+  useEffect(() => {
+    if (!session || !user) { setMessagesLoading(false); return; }
+    let cancelled=false;
+    (async()=>{
+      try {
+        const token=await session.getToken();
+        const r=await fetch("/api/messages/conversations",{headers:{Authorization:`Bearer ${token}`}});
+        if(!r.ok) return; const rows=await r.json();
+        const mapped: Conversation[] = rows.map((x:any)=>({...x,messages:[{id:-x.id,senderId:"them",text:x.lastText,timestamp:x.lastAt,read:x.unread===0}]}));
+        if(cancelled) return; setConversations(mapped);
+        const wanted=Number(new URLSearchParams(window.location.search).get("conversation"));
+        const first=(wanted && mapped.some(c=>c.id===wanted))?wanted:(mapped[0]?.id ?? null);
+        if(first){ setActiveId(first); setMobileView("chat"); setTimeout(()=>loadConversation(first),0); }
+      } finally { if(!cancelled) setMessagesLoading(false); }
+    })();
+    return()=>{cancelled=true};
+  },[session,user?.email]);
+
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

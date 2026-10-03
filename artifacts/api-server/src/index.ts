@@ -489,6 +489,20 @@ async function runAppMigrations() {
     ON CONFLICT (key) DO NOTHING
   `, "site_settings.seed");
 
+  // ── Buyer / seller marketplace messaging ──
+  await run(sql`CREATE TABLE IF NOT EXISTS marketplace_conversations (
+    id BIGSERIAL PRIMARY KEY, listing_id INTEGER NOT NULL REFERENCES listings(id) ON DELETE CASCADE,
+    buyer_email TEXT NOT NULL, seller_email TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(listing_id,buyer_email,seller_email)
+  )`, "marketplace_conversations");
+  await run(sql`CREATE TABLE IF NOT EXISTS marketplace_messages (
+    id BIGSERIAL PRIMARY KEY, conversation_id BIGINT NOT NULL REFERENCES marketplace_conversations(id) ON DELETE CASCADE,
+    sender_email TEXT NOT NULL, text TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(), read_at TIMESTAMPTZ
+  )`, "marketplace_messages");
+  await run(sql`CREATE INDEX IF NOT EXISTS marketplace_conversations_buyer_idx ON marketplace_conversations (LOWER(buyer_email), updated_at DESC)`, "marketplace_conversations_buyer_idx");
+  await run(sql`CREATE INDEX IF NOT EXISTS marketplace_conversations_seller_idx ON marketplace_conversations (LOWER(seller_email), updated_at DESC)`, "marketplace_conversations_seller_idx");
+  await run(sql`CREATE INDEX IF NOT EXISTS marketplace_messages_conversation_idx ON marketplace_messages (conversation_id, created_at)`, "marketplace_messages_conversation_idx");
+
   // ── Reviews & seller reputation ──
   await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMP WITH TIME ZONE`, "orders.shipped_at");
   await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE`, "orders.delivered_at");

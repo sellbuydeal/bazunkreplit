@@ -18,6 +18,7 @@ import { useWatchlist } from "@/context/WatchlistContext";
 import { useOffers } from "@/context/OfferContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useAuth } from "@/context/AuthContext";
+import { useSession } from "@clerk/react";
 import { SellerProfileCard } from "@/components/SellerProfileCard";
 
 const CONDITION_COLORS: Record<string, string> = {
@@ -242,6 +243,21 @@ export function ListingPage() {
 
   const product = staticProduct ?? apiProduct;
   const { user: viewer } = useAuth();
+  const { session } = useSession();
+  const [startingMessage, setStartingMessage] = useState(false);
+
+  async function handleMessageSeller() {
+    if (!viewer || !session) { navigate(`/sign-in?redirect=${encodeURIComponent(`/listing/${id}`)}`); return; }
+    if (!apiProduct?.id) { navigate("/messages"); return; }
+    try {
+      setStartingMessage(true);
+      const token = await session.getToken();
+      const r = await fetch("/api/messages/conversations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ listingId: apiProduct.id }) });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) { window.alert(data.error || "Could not start conversation"); return; }
+      navigate(`/messages?conversation=${data.id}`);
+    } catch { window.alert("Could not start conversation. Please try again."); } finally { setStartingMessage(false); }
+  }
 
   // Count the view (and where it came from) for the seller's analytics
   useEffect(() => {
@@ -751,11 +767,12 @@ export function ListingPage() {
 
               {/* Message Seller */}
               <button
-                onClick={() => navigate("/messages")}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm border border-gray-200 text-gray-700 hover:border-gray-300 transition-colors mb-4"
+                onClick={handleMessageSeller}
+                disabled={startingMessage}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm border border-gray-200 text-gray-700 hover:border-gray-300 transition-colors mb-4 disabled:opacity-60"
                 data-testid="button-message-seller"
               >
-                <MessageSquare className="w-4 h-4" /> Message Seller
+                <MessageSquare className="w-4 h-4" /> {startingMessage ? "Opening chat…" : "Message Seller"}
               </button>
 
               {/* Watchlist */}
