@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useAuth as useClerkAuth } from "@clerk/react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -900,10 +901,36 @@ function MyListingsSection({ userEmail }: { userEmail: string }) {
 function OverviewContent({ user, onNavigate }: { user: { name: string; email: string; username: string; balance: number }; onNavigate: (section: string) => void }) {
   const initial = user.name.charAt(0).toUpperCase();
   const [myListings, setMyListings] = useState<StoredListing[]>([]);
+  const { getToken } = useClerkAuth();
+  const [referral, setReferral] = useState<any>(null);
+  const [referralCopied, setReferralCopied] = useState(false);
 
   useEffect(() => {
     fetchMyListings(user.email).then(setMyListings);
   }, [user.email]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const response = await fetch('/api/referrals/me', { headers: { Authorization: `Bearer ${token}` } });
+        if (response.ok && !cancelled) setReferral(await response.json());
+      } catch {
+        // Referral card remains useful even if the optional stats request is unavailable.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [getToken]);
+
+  const referralLink = referral?.code ? `${window.location.origin}/rewards/referrals?ref=${referral.code}` : '';
+  const copyReferralLink = async () => {
+    if (!referralLink) return;
+    await navigator.clipboard.writeText(referralLink);
+    setReferralCopied(true);
+    window.setTimeout(() => setReferralCopied(false), 1800);
+  };
 
   return (
     <div className="flex-1 p-6 space-y-6">
@@ -987,6 +1014,41 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
             <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center shadow-sm">
               <BarChart2 className="w-4 h-4 text-white" />
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Referral rewards — deliberately prominent on the dashboard */}
+      <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-[#F26B21] via-[#E85D2A] to-[#4A5CE8] text-white shadow-sm">
+        <div className="p-5 md:p-6 flex flex-col lg:flex-row lg:items-center gap-5">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center"><Gift className="w-5 h-5" /></div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-white/70">Referral Rewards</p>
+                <h2 className="text-xl md:text-2xl font-black">Invite Friends, Earn Credits</h2>
+              </div>
+            </div>
+            <p className="text-sm text-white/85 max-w-2xl">You both earn when your friend joins Bazunk, then unlock more rewards after their first purchase and when they start selling.</p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="rounded-full bg-white/15 px-3 py-1.5">✓ Friend joins</span>
+              <span className="rounded-full bg-white/15 px-3 py-1.5">✓ First purchase</span>
+              <span className="rounded-full bg-white/15 px-3 py-1.5">✓ Starts selling</span>
+              {referral && <span className="rounded-full bg-white text-[#3B4FD8] px-3 py-1.5">{referral.totalEarned || 0} credits earned</span>}
+            </div>
+          </div>
+          <div className="lg:w-[360px] space-y-2">
+            {referralLink && (
+              <div className="flex rounded-xl bg-white/10 border border-white/20 p-1.5">
+                <input aria-label="Your referral link" readOnly value={referralLink} className="min-w-0 flex-1 bg-transparent px-2 text-xs text-white outline-none" />
+                <button type="button" onClick={copyReferralLink} className="shrink-0 rounded-lg bg-white px-3 py-2 text-xs font-black text-[#3B4FD8] hover:bg-white/90">
+                  {referralCopied ? <><Check className="inline w-3.5 h-3.5 mr-1" />Copied</> : <><Copy className="inline w-3.5 h-3.5 mr-1" />Copy link</>}
+                </button>
+              </div>
+            )}
+            <Link href="/rewards/referrals" className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1A1D2E] px-4 py-3 text-sm font-black text-white hover:bg-black/80">
+              <Users className="w-4 h-4" /> View my referrals <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
         </div>
       </div>
