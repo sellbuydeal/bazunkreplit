@@ -5,6 +5,7 @@ import {
   Calendar, RotateCcw, HelpCircle, Gift, Type,
   Coins, Trophy, Crown, ChevronRight, Loader2,
   CheckCircle2, XCircle, Zap, Star, Lock,
+  CalendarCheck, Brain, Ticket, PackageOpen, Dices,
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -29,11 +30,17 @@ interface LeaderboardEntry {
 }
 
 const ICON_MAP: Record<string, React.ElementType> = {
-  calendar: Calendar,
+  calendar: CalendarCheck,
   loader: RotateCcw,
-  "help-circle": HelpCircle,
-  gift: Gift,
-  type: Type,
+  "help-circle": Brain,
+  gift: PackageOpen,
+  type: Ticket,
+  "daily-checkin": CalendarCheck,
+  "spin-wheel": RotateCcw,
+  "daily-quiz": Brain,
+  "scratch-card": Ticket,
+  "mystery-box": PackageOpen,
+  "lucky-number": Dices,
 };
 
 const ICON_BG: Record<string, string> = {
@@ -275,7 +282,7 @@ function GameModal({
   const { user } = useAuth();
   const [result, setResult] = useState<{ won: boolean; creditsEarned: number; message: string; playsRemaining: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const Icon = ICON_MAP[game.icon] ?? Gift;
+  const Icon = ICON_MAP[game.id] ?? ICON_MAP[game.icon] ?? Gift;
 
   const play = useCallback(async (answer?: unknown) => {
     setError(null);
@@ -526,7 +533,7 @@ export function RewardsPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {enabledGames.map((game, i) => {
-                    const Icon = ICON_MAP[game.icon] ?? Gift;
+                    const Icon = ICON_MAP[game.id] ?? ICON_MAP[game.icon] ?? Gift;
                     const done = game.playsRemaining === 0;
                     return (
                       <motion.div

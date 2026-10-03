@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { Gift, ChevronRight } from "lucide-react";
+import { Gift, ChevronRight, CalendarCheck, RotateCcw, Brain, Ticket, PackageOpen, Dices } from "lucide-react";
+
+const GAME_ICONS: Record<string, React.ElementType> = {
+  "daily-checkin": CalendarCheck,
+  "spin-wheel": RotateCcw,
+  "daily-quiz": Brain,
+  "scratch-card": Ticket,
+  "mystery-box": PackageOpen,
+  "lucky-number": Dices,
+};
 
 interface TeaserGame {
   id: string;
@@ -36,23 +45,28 @@ export function RewardsTeaser() {
                 <Gift className="w-4 h-4 text-[#F26B21]" />
                 <span className="text-[#F26B21] font-black text-xs uppercase tracking-widest">Daily Rewards</span>
               </div>
-              <h2 className="text-2xl font-black text-white">Play games. Earn free credits.</h2>
-              <p className="text-white/50 text-sm mt-1">New plays every day — spend your credits on promotions and perks.</p>
+              <h2 className="text-2xl font-black text-white">Bazunk Rewards Arcade</h2>
+              <p className="text-white/50 text-sm mt-1">Play daily games, win free Bazunk credits and use them on promotions and perks.</p>
             </div>
             <Link href="/rewards" className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#F26B21] text-white text-sm font-bold hover:opacity-90 transition-opacity self-start md:self-auto">
               Play now <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
           <div className="relative grid grid-cols-2 md:grid-cols-5 gap-3">
-            {games.map(g => (
-              <Link key={g.id} href="/rewards" className="rounded-2xl bg-white/10 border border-white/10 hover:bg-white/15 transition-colors p-4 text-center">
-                <div className="text-2xl mb-2">{g.icon}</div>
+            {games.map(g => {
+              const Icon = GAME_ICONS[g.id] ?? Gift;
+              return (
+              <Link key={g.id} href="/rewards" className="rounded-2xl bg-white/10 border border-white/10 hover:bg-white/15 transition-colors p-4 text-center group">
+                <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 border border-white/10 group-hover:scale-105 transition-transform">
+                  <Icon className="h-6 w-6 text-[#F26B21]" />
+                </div>
                 <p className="text-white font-bold text-sm leading-tight">{g.name}</p>
                 <p className="text-amber-400 text-xs font-semibold mt-1">
                   {g.creditsMin === g.creditsMax ? `+${g.creditsMax}` : `+${g.creditsMin}–${g.creditsMax}`} credits
                 </p>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

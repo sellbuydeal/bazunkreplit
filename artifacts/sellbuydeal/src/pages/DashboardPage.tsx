@@ -942,7 +942,7 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
         </div>
         <div className="hidden lg:flex items-center gap-2">
           <Link href="/rewards" className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F26B21]/10 hover:bg-[#F26B21]/20 transition-colors text-[#F26B21] border border-[#F26B21]/20 text-sm font-semibold">
-            <Gift className="w-4 h-4" /> Rewards
+            <Dices className="w-4 h-4" /> Rewards Arcade
           </Link>
           <Link href="/promotions" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#7C3AED]/10 hover:bg-[#7C3AED]/20 transition-colors text-[#7C3AED] border border-[#7C3AED]/20 text-sm font-semibold">
             <Megaphone className="w-4 h-4" /> Promotions
@@ -1017,6 +1017,23 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
           </div>
         </div>
       </div>
+
+      {/* Rewards Arcade — direct dashboard entry to daily games */}
+      <Link href="/rewards" className="block rounded-2xl bg-[#1A1D2E] border border-gray-800 p-5 text-white hover:-translate-y-0.5 hover:shadow-lg transition-all">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#F26B21]/15 flex items-center justify-center">
+              <Dices className="w-6 h-6 text-[#F26B21]" />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider text-[#F26B21]">Daily Rewards</p>
+              <h2 className="text-lg md:text-xl font-black">Bazunk Rewards Arcade</h2>
+              <p className="text-sm text-white/65 mt-0.5">Play daily games and earn free credits for promotions and perks.</p>
+            </div>
+          </div>
+          <div className="hidden sm:flex items-center gap-1 text-sm font-black text-[#F26B21]">Play now <ChevronRight className="w-4 h-4" /></div>
+        </div>
+      </Link>
 
       {/* Referral rewards — deliberately prominent on the dashboard */}
       <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-[#F26B21] via-[#E85D2A] to-[#4A5CE8] text-white shadow-sm">
