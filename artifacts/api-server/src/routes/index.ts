@@ -6,6 +6,7 @@ import setupRouter from "./setup.js";
 import productsRouter from "./products.js";
 import disputesRouter from "./disputes.js";
 import ordersRouter from "./orders.js";
+import reviewsRouter from "./reviews.js";
 import returnsRouter from "./returns.js";
 import auctionsRouter from "./auctions.js";
 import flashSalesRouter from "./flashSales.js";
@@ -28,6 +29,8 @@ router.use(adminRouter);
 router.use(setupRouter);
 router.use(productsRouter);
 router.use(disputesRouter);
+// reviewsRouter first: its GET /orders/seller must win over ordersRouter's GET /orders/:id
+router.use(reviewsRouter);
 router.use(ordersRouter);
 router.use(returnsRouter);
 router.use(auctionsRouter);

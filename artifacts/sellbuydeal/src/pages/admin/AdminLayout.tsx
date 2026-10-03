@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { LayoutDashboard, Users, Settings, CreditCard, LogOut, ShieldCheck, Package, Shield, RotateCcw, Gavel, Zap, LifeBuoy, Gift, Megaphone, List, ArrowDownToLine, FileText } from "lucide-react";
+import { LayoutDashboard, Users, Settings, CreditCard, LogOut, ShieldCheck, Package, Shield, RotateCcw, Gavel, Zap, LifeBuoy, Gift, Megaphone, List, ArrowDownToLine, FileText, Star } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
 
 const NAV = [
@@ -17,6 +17,7 @@ const NAV = [
   { label: "Support",    href: "/admin/support",    icon: LifeBuoy        },
   { label: "Rewards",    href: "/admin/rewards",    icon: Gift            },
   { label: "Promotions", href: "/admin/promotions", icon: Megaphone       },
+  { label: "Reviews",    href: "/admin/reviews",    icon: Star            },
   { label: "Settings",   href: "/admin/settings",   icon: Settings        },
 ];
 

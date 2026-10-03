@@ -81,6 +81,7 @@ import VideoPage from "@/pages/VideoPage";
 import { RewardsPage } from "@/pages/RewardsPage";
 import { AdminRewardsPage } from "@/pages/admin/AdminRewardsPage";
 import { AdminPromotionsPage } from "@/pages/admin/AdminPromotionsPage";
+import { AdminReviewsPage } from "@/pages/admin/AdminReviewsPage";
 import { AdminVerificationPage } from "@/pages/admin/AdminVerificationPage";
 import { LockerShippingPage } from "@/pages/LockerShippingPage";
 import { ShippingLabelsPage } from "@/pages/ShippingLabelsPage";
@@ -286,6 +287,7 @@ function Router() {
       <Route path="/admin/support" component={AdminSupportPage} />
       <Route path="/admin/rewards" component={AdminRewardsPage} />
       <Route path="/admin/promotions" component={AdminPromotionsPage} />
+      <Route path="/admin/reviews" component={AdminReviewsPage} />
       <Route path="/admin/verification" component={AdminVerificationPage} />
       <Route path="/setup" component={SetupWizardPage} />
       <Route path="/video" component={VideoPage} />

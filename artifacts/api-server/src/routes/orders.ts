@@ -29,7 +29,9 @@ router.get("/orders", async (req, res) => {
     return;
   }
   const rows = await db.execute(sql`
-    SELECT * FROM orders WHERE buyer_email = ${email} ORDER BY created_at DESC
+    SELECT o.*,
+           (SELECT r.rating FROM reviews r WHERE r.order_id = o.id AND r.role = 'buyer_to_seller') AS my_review_rating
+    FROM orders o WHERE o.buyer_email = ${email} ORDER BY o.created_at DESC
   `);
   res.json(rows.rows);
 });
@@ -57,6 +59,8 @@ router.patch("/orders/:id/status", async (req, res) => {
         tracking_number = COALESCE(${trackingNumber ?? null}, tracking_number),
         carrier = COALESCE(${carrier ?? null}, carrier),
         estimated_delivery = COALESCE(${estimatedDelivery ?? null}, estimated_delivery),
+        shipped_at = CASE WHEN ${status} IN ('shipped', 'out_for_delivery', 'delivered') THEN COALESCE(shipped_at, NOW()) ELSE shipped_at END,
+        delivered_at = CASE WHEN ${status} = 'delivered' THEN COALESCE(delivered_at, NOW()) ELSE delivered_at END,
         updated_at = NOW()
     WHERE id = ${id} AND buyer_email = ${buyerEmail ?? ""}
   `);
@@ -81,6 +85,8 @@ router.patch("/admin/orders/:id", requireAdmin, async (req, res) => {
         tracking_number = COALESCE(${trackingNumber ?? null}, tracking_number),
         carrier = COALESCE(${carrier ?? null}, carrier),
         estimated_delivery = COALESCE(${estimatedDelivery ?? null}, estimated_delivery),
+        shipped_at = CASE WHEN ${status} IN ('shipped', 'out_for_delivery', 'delivered') THEN COALESCE(shipped_at, NOW()) ELSE shipped_at END,
+        delivered_at = CASE WHEN ${status} = 'delivered' THEN COALESCE(delivered_at, NOW()) ELSE delivered_at END,
         updated_at = NOW()
     WHERE id = ${id}
   `);

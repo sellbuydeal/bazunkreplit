@@ -29,6 +29,8 @@ import { LiveKitBroadcaster } from "@/components/LiveKitBroadcaster";
 import { ALL_PRODUCTS } from "@/data/products";
 
 import { ImporterSection } from "@/components/ImporterSection";
+import { SellerSales } from "@/components/SellerSales";
+import { ReviewModal } from "@/components/ReviewModal";
 import { UserAmazonImporterSection } from "@/components/UserAmazonImporterSection";
 import { UserEbayImporterSection } from "@/components/UserEbayImporterSection";
 import { UserClassifiedsImporterSection } from "@/components/UserClassifiedsImporterSection";
@@ -134,6 +136,7 @@ type MockOrder = {
   status: string; statusColor: string; seller: string; image: string;
   trackingNumber?: string; carrier?: string; estimatedDelivery?: string;
   address?: string; trackingStep: number;
+  rawStatus?: string; reviewRating?: number | null;
 };
 type MockReturn = {
   id: string; orderId: string; title: string; price: number;
@@ -175,6 +178,8 @@ function toDashboardOrder(o: any): MockOrder {
     estimatedDelivery: o.estimated_delivery ?? undefined,
     address: o.address ?? undefined,
     trackingStep: ui.step,
+    rawStatus: String(o.status),
+    reviewRating: o.my_review_rating ?? null,
   };
 }
 
@@ -2521,6 +2526,18 @@ const LOGO_COLORS = [
 
 function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void }) {
   const { user } = useAuth();
+  const [ratingText, setRatingText] = useState("New");
+  useEffect(() => {
+    if (!user?.email) return;
+    fetch(`/api/sellers/reputation?email=${encodeURIComponent(user.email)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!d) return;
+        if (d.positivePercent !== null) setRatingText(`${d.positivePercent}% positive`);
+        else if (d.reviews?.total > 0) setRatingText(`${d.reviews.total} review${d.reviews.total === 1 ? "" : "s"}`);
+      })
+      .catch(() => {});
+  }, [user?.email]);
   const [myListings, setMyListings] = useState<StoredListing[]>([]);
   useEffect(() => { fetchMyListings(user?.email ?? '').then(setMyListings); }, [user?.email]);
 
@@ -3031,7 +3048,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
           { label: "Total Views",  value: store.totalViews,  icon: Eye,     color: "text-[#4A5CE8]", bg: "bg-blue-50" },
           { label: "Followers",    value: store.followers,   icon: Users,   color: "text-pink-500",  bg: "bg-pink-50" },
           { label: "Active Items", value: myListings.filter(l => l.status === "active").length, icon: Package, color: "text-[#F26B21]", bg: "bg-orange-50" },
-          { label: "Rating",       value: "New",             icon: Star,    color: "text-amber-500", bg: "bg-amber-50" },
+          { label: "Rating",       value: ratingText,        icon: Star,    color: "text-amber-500", bg: "bg-amber-50" },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white rounded-2xl border border-gray-100 p-4">
             <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center mb-3`}>
@@ -3376,6 +3393,7 @@ function OrdersSection() {
     return () => { cancelled = true; };
   }, [user?.email]);
   const [trackingOrder, setTrackingOrder] = useState<MockOrder | null>(null);
+  const [reviewOrder, setReviewOrder] = useState<MockOrder | null>(null);
   const [returnOrder, setReturnOrder] = useState<MockOrder | null>(null);
   const [existingReturnIds] = useState<Set<string>>(new Set(MOCK_RETURNS_DATA.map(r => r.orderId)));
 
@@ -3467,6 +3485,20 @@ function OrdersSection() {
                   >
                     <Truck className="w-3 h-3" /> Track
                   </button>
+                  {["shipped", "out_for_delivery", "delivered"].includes(order.rawStatus ?? "") && (
+                    order.reviewRating != null ? (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> You rated {order.reviewRating}/5
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setReviewOrder(order)}
+                        className="flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg transition-colors"
+                      >
+                        <Star className="w-3 h-3" /> Review seller
+                      </button>
+                    )
+                  )}
                   {order.status === "Delivered" && !existingReturnIds.has(order.id) && (
                     <button
                       onClick={() => openReturn(order)}
@@ -3485,6 +3517,17 @@ function OrdersSection() {
             </div>
           ))}
         </div>
+      )}
+
+      {reviewOrder && user?.email && (
+        <ReviewModal
+          orderId={reviewOrder.id}
+          itemTitle={reviewOrder.title}
+          reviewerEmail={user.email}
+          role="buyer"
+          onClose={() => setReviewOrder(null)}
+          onDone={rating => setOrders(prev => prev.map(o => o.id === reviewOrder.id ? { ...o, reviewRating: rating } : o))}
+        />
       )}
 
       {/* Tracking Modal */}
@@ -5807,93 +5850,7 @@ export function DashboardPage() {
               </div>
             )}
             {activeSection === "orders" && <OrdersSection />}
-            {activeSection === "sales" && (
-              <div className="bg-white rounded-2xl border border-gray-100 flex flex-col" style={{ minHeight: 400 }}>
-                <div className="p-5 border-b border-gray-100">
-                  <h2 className="font-bold text-gray-900">Sales</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">{MOCK_SALES.length} sales · £{MOCK_SALES.reduce((s, x) => s + x.price - x.fee, 0).toFixed(2)} net earned</p>
-                </div>
-                {MOCK_SALES.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center py-10 text-center px-6">
-                    <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
-                      <TrendingUp className="w-8 h-8 text-gray-200" />
-                    </div>
-                    <p className="font-semibold text-gray-700 mb-1">No sales yet</p>
-                    <p className="text-sm text-gray-400 mb-5">List your first item to start selling</p>
-                    <Link href="/sell/quick" className="px-6 py-2.5 rounded-xl bg-[#F26B21] text-white font-bold text-sm hover:opacity-90 transition-opacity">
-                      Create a Listing
-                    </Link>
-                    {/* Platform fee rates reference */}
-                    <div className="mt-8 w-full max-w-lg text-left">
-                      <div className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
-                        <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-                          <Percent className="w-4 h-4 text-[#4A5CE8]" />
-                          <p className="text-sm font-bold text-gray-800">Platform Fee Rates</p>
-                          <span className="ml-auto text-xs text-gray-400">Deducted from sale price on completion</span>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                          {[
-                            { name: "Electronics", slug: "electronics", def: "10" },
-                            { name: "Phones & Tablets", slug: "cell-phones", def: "10" },
-                            { name: "Fashion & Clothing", slug: "clothing-shoes-jewelry", def: "12" },
-                            { name: "Automotive", slug: "automotive", def: "5" },
-                            { name: "Home & Garden", slug: "home-garden", def: "10" },
-                            { name: "Sports & Outdoors", slug: "sports-outdoors", def: "10" },
-                            { name: "Books", slug: "books", def: "12" },
-                            { name: "Beauty & Personal Care", slug: "beauty-personal-care", def: "12" },
-                            { name: "Baby Products", slug: "baby-products", def: "10" },
-                            { name: "Appliances", slug: "appliances", def: "8" },
-                            { name: "All other categories", slug: "default", def: "10" },
-                          ].map(cat => {
-                            const rate = rawSettings[`fee_rate_${cat.slug}`] ?? rawSettings["fee_rate_default"] ?? cat.def;
-                            return (
-                              <div key={cat.slug} className="flex items-center justify-between px-4 py-2 text-sm">
-                                <span className="text-gray-600">{cat.name}</span>
-                                <div className="flex items-center gap-3">
-                                  <span className="font-bold text-gray-900">{rate}%</span>
-                                  <span className="text-xs text-gray-400">e.g. £{(100 * parseFloat(rate) / 100).toFixed(2)} on £100</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="px-4 py-2.5 bg-emerald-50 border-t border-emerald-100">
-                          <p className="text-xs text-emerald-700 font-semibold">Listing is free — fees only apply when your item sells</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="divide-y divide-gray-50">
-                      {MOCK_SALES.map((sale) => (
-                        <div key={sale.id} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50/50 transition-colors">
-                          <div className="w-14 h-14 rounded-xl bg-gray-50 border border-gray-100 flex-shrink-0 overflow-hidden">
-                            <img src={sale.image} alt={sale.title} className="w-full h-full object-contain p-1.5" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-800 line-clamp-1">{sale.title}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">Buyer: {sale.buyer} · {sale.date}</p>
-                            <p className="text-xs text-gray-400">{sale.id} · Fee: £{sale.fee.toFixed(2)}</p>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="font-bold text-gray-900 text-sm">£{sale.price.toFixed(2)}</p>
-                            <p className="text-xs text-emerald-600 font-semibold">+£{(sale.price - sale.fee).toFixed(2)} net</p>
-                            <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${sale.statusColor}`}>{sale.status}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="p-5 border-t border-gray-100 bg-gray-50/50">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Total earnings (after fees)</span>
-                        <span className="font-black text-gray-900">£{MOCK_SALES.reduce((s, x) => s + x.price - x.fee, 0).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+            {activeSection === "sales" && <SellerSales />}
             {activeSection === "watchlist" && (
               <div className="bg-white rounded-2xl border border-gray-100 flex flex-col" style={{ minHeight: 400 }}>
                 <div className="p-5 border-b border-gray-100 flex items-center justify-between">

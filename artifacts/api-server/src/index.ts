@@ -489,6 +489,26 @@ async function runAppMigrations() {
     ON CONFLICT (key) DO NOTHING
   `, "site_settings.seed");
 
+  // ── Reviews & seller reputation ──
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMP WITH TIME ZONE`, "orders.shipped_at");
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE`, "orders.delivered_at");
+  await run(sql`
+    CREATE TABLE IF NOT EXISTS reviews (
+      id BIGSERIAL PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      role TEXT NOT NULL,                -- 'buyer_to_seller' | 'seller_to_buyer'
+      reviewer_email TEXT NOT NULL,
+      reviewee_email TEXT NOT NULL,
+      rating INTEGER NOT NULL,
+      comment TEXT,
+      item_title TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+      UNIQUE (order_id, role)
+    )
+  `, "reviews");
+  await run(sql`CREATE INDEX IF NOT EXISTS reviews_reviewee_idx ON reviews (reviewee_email, role)`, "reviews_reviewee_idx");
+  await run(sql`CREATE INDEX IF NOT EXISTS orders_seller_idx ON orders (seller_email)`, "orders_seller_idx");
+
   // ── Promotion tools: admin-editable prices, follows, scheduling, analytics, auction add-ons ──
   await run(sql`
     CREATE TABLE IF NOT EXISTS promotion_settings (

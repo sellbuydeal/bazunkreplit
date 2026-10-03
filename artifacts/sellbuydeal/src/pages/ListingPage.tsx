@@ -18,6 +18,7 @@ import { useWatchlist } from "@/context/WatchlistContext";
 import { useOffers } from "@/context/OfferContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useAuth } from "@/context/AuthContext";
+import { SellerProfileCard } from "@/components/SellerProfileCard";
 
 const CONDITION_COLORS: Record<string, string> = {
   "new":        "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -163,7 +164,8 @@ function SellerCard({ sellerName, sellerUsername, sellerEmail, location, verifie
           <div className="flex items-center gap-2 text-emerald-600 font-medium"><CheckCircle2 className="w-3.5 h-3.5" />ID Verified Seller</div>
         )}
       </div>
-      {sellerEmail && <FollowSellerButton sellerEmail={sellerEmail} />}
+      {sellerEmail && <SellerProfileCard sellerEmail={sellerEmail} />}
+      {sellerEmail && <div className="mt-4 pt-4 border-t border-gray-100"><FollowSellerButton sellerEmail={sellerEmail} /></div>}
     </div>
   );
 }
