@@ -218,7 +218,7 @@ export function Navbar() {
           </div>
 
           {/* Desktop nav */}
-          <div className="hidden xl:flex items-center gap-1 text-sm font-medium flex-shrink-0">
+          <div className="hidden xl:flex items-center gap-1.5 text-sm font-medium flex-shrink-0 mr-2">
 
             {/* Primary links */}
             {primaryLinks.map(({ href, label, live }) => {
@@ -347,7 +347,7 @@ export function Navbar() {
           <div className="flex items-center gap-2.5 flex-1 min-w-0 justify-end">
 
             {/* Desktop search */}
-            <div ref={searchRef} className="relative w-[260px] 2xl:w-[320px] flex-none hidden lg:block ml-3">
+            <div ref={searchRef} className="relative w-[250px] 2xl:w-[310px] flex-none hidden lg:block ml-3">
               <form onSubmit={handleSubmit}>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <Input
@@ -373,7 +373,7 @@ export function Navbar() {
                     <>
                       {liveSearchResults.length > 0 && (
                         <div>
-                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-4 pt-3 pb-1">Listings</p>
+                          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-4 pt-3 pb-1">Bazunk listings</p>
                           {liveSearchResults.map((product:any) => (
                             <Link key={product.id} href={`/listing/${product.publicId || product.id}`} onClick={() => setSearchOpen(false)}
                               className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group">
@@ -440,7 +440,25 @@ export function Navbar() {
               )}
             </div>
 
-            {/* Sell dropdown */}
+            {/* Logged OUT actions */}
+            {!user && (
+              <>
+                <Link href="/sell" className="hidden 2xl:flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#F26B21]/40 text-[#F26B21] text-sm font-semibold hover:bg-[#F26B21]/5 transition-colors whitespace-nowrap" data-testid="link-sell-info">
+                  <Tag className="w-3.5 h-3.5" /> Start Selling
+                </Link>
+                <Link href="/sign-in" className="hidden md:flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#4A5CE8]/30 text-sm font-semibold text-[#4A5CE8] hover:bg-[#4A5CE8]/5 hover:border-[#4A5CE8] transition-colors whitespace-nowrap" data-testid="link-sign-in">
+                  Sign In
+                </Link>
+                <Link href="/sign-up" className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#F26B21] text-white text-sm font-semibold hover:bg-[#D97706] transition-colors shadow-sm whitespace-nowrap" data-testid="link-register">
+                  Join Free
+                </Link>
+              </>
+            )}
+
+            {/* Logged IN actions */}
+            {user && (
+              <>
+                {/* Sell dropdown */}
                 <div ref={sellRef} className="relative hidden md:block flex-shrink-0">
                   <button
                     onClick={() => setSellOpen(!sellOpen)}
@@ -600,20 +618,19 @@ export function Navbar() {
         <div className="h-[3px] w-full bg-gradient-to-r from-[#1E6FE8] via-[#4A5CE8] to-[#F5B301]" />
       </nav>
 
-      {/* Floating currency selector — kept out of the crowded desktop header */}
+      {/* Floating currency selector */}
       <div ref={currencyRef} className="fixed right-4 bottom-4 z-40 hidden md:block">
         <button onClick={() => setCurrencyOpen(!currencyOpen)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-700 bg-white shadow-lg hover:border-[#4A5CE8] hover:text-[#4A5CE8] transition-colors"
-          data-testid="button-currency-floating">
-          <span>{currency.flag}</span><span>{currency.code || currency.symbol} {currency.symbol}</span>
+          className="flex items-center gap-2 px-3.5 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-700 bg-white shadow-lg hover:border-[#4A5CE8] hover:text-[#4A5CE8] transition-colors">
+          <span>{currency.flag}</span><span>{currency.code} {currency.symbol}</span>
           <ChevronDown className={`w-3 h-3 transition-transform ${currencyOpen ? "rotate-180" : ""}`} />
         </button>
         {currencyOpen && (
           <div className="absolute right-0 bottom-[calc(100%+8px)] w-52 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 py-1">
-            {CURRENCIES.map((c) => (
+            {(Object.values(CURRENCIES) as typeof CURRENCIES[CurrencyCode][]).map((c) => (
               <button key={c.code} onClick={() => { setCurrency(c.code); setCurrencyOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
-                <span>{c.flag}</span><span className="font-semibold">{c.code}</span><span className="text-gray-400">{c.symbol}</span>
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left ${currency.code === c.code ? "bg-[#4A5CE8]/5 text-[#4A5CE8] font-semibold" : "text-gray-700 hover:bg-gray-50"}`}>
+                <span>{c.flag}</span><span className="flex-1">{c.name}</span><span className="text-gray-400">{c.symbol}</span>
               </button>
             ))}
           </div>
