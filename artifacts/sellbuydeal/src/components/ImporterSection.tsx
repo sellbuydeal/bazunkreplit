@@ -1,3 +1,4 @@
+import { RapidApiSellerSetup } from "./RapidApiSellerSetup";
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -379,7 +380,7 @@ function MarkupEditModal({ item, onSave, onClose }: MarkupEditProps) {
   );
 }
 
-export function ImporterSection() {
+function ImporterSectionInner() {
   const { user } = useAuth();
   const [imports, setImports] = useState<SupplierImport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -728,3 +729,6 @@ function DeleteButton({ onDelete, disabled }: { onDelete: (withListing: boolean)
     </div>
   );
 }
+
+
+export function ImporterSection() { return <RapidApiSellerSetup><ImporterSectionInner /></RapidApiSellerSetup>; }

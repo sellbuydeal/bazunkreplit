@@ -194,11 +194,6 @@ router.post("/supplier/imports/:id/sync", async (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) { res.status(400).json({ error: "invalid id" }); return; }
 
-  if (!process.env.RAPIDAPI_KEY) {
-    res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." });
-    return;
-  }
-
   const result = await syncImport(id);
   if (!result.ok) {
     res.status(502).json({ error: result.error });
@@ -209,11 +204,6 @@ router.post("/supplier/imports/:id/sync", async (req, res) => {
 
 // Sync all imports
 router.post("/supplier/sync", async (req, res) => {
-  if (!process.env.RAPIDAPI_KEY) {
-    res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." });
-    return;
-  }
-
   // Run in background, return immediately
   syncAllImports().catch(() => {});
   res.json({ ok: true, message: "Sync started in background" });

@@ -1,3 +1,4 @@
+import { RapidApiSellerSetup } from "./RapidApiSellerSetup";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -51,7 +52,7 @@ function parseSpecs(raw: string): { ebay_price?: number; markup_pct?: number; sh
 
 const inputCls = "px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8] bg-white";
 
-export function UserEbayImporterSection() {
+function UserEbayImporterSectionInner() {
   const { user } = useAuth();
 
   const [site, setSite] = useState<EbaySite>("uk");
@@ -419,3 +420,6 @@ export function UserEbayImporterSection() {
     </div>
   );
 }
+
+
+export function UserEbayImporterSection() { return <RapidApiSellerSetup><UserEbayImporterSectionInner /></RapidApiSellerSetup>; }

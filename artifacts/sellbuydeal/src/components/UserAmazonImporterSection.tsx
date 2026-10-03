@@ -1,3 +1,4 @@
+import { RapidApiSellerSetup } from "./RapidApiSellerSetup";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -35,7 +36,7 @@ function parseSpecs(raw: string): { amazon_price_gbp?: number; markup_pct?: numb
 
 const inputCls = "px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F26B21]/30 focus:border-[#F26B21] bg-white";
 
-export function UserAmazonImporterSection() {
+function UserAmazonImporterSectionInner() {
   const { user } = useAuth();
 
   // ── Search state ──────────────────────────────────────────────
@@ -397,3 +398,6 @@ export function UserAmazonImporterSection() {
     </div>
   );
 }
+
+
+export function UserAmazonImporterSection() { return <RapidApiSellerSetup><UserAmazonImporterSectionInner /></RapidApiSellerSetup>; }
