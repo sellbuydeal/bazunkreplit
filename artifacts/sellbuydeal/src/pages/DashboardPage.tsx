@@ -21,6 +21,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRawSettings } from "@/context/SiteSettingsContext";
 import { useWatchlist, getCurrentPrice } from "@/context/WatchlistContext";
 import { useCart } from "@/context/CartContext";
+import { MOCK_CONVERSATIONS } from "@/data/messages";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useLiveStream } from "@/context/LiveStreamContext";
@@ -83,6 +84,14 @@ const SIDEBAR_CATEGORIES: SidebarCategory[] = [
       { id: "ebay-import",      label: "eBay",        icon: ShoppingBag, iconBg: "bg-[#4A5CE8]" },
       { id: "aliexpress-import",       label: "AliExpress",  icon: Package,     iconBg: "bg-[#1A1D2E]" },
       { id: "classifieds-import",      label: "Classifieds", icon: FileText,    iconBg: "bg-[#10B981]" },
+    ],
+  },
+  {
+    id: "comms", label: "Inbox", icon: MessageSquare,
+    gradient: "from-purple-500 to-purple-600", bg: "bg-purple-500",
+    items: [
+      { id: "notifications", label: "Notifications", icon: Bell,          iconBg: "bg-[#4A5CE8]"  },
+      { id: "messages",      label: "Messages",      icon: MessageSquare, iconBg: "bg-purple-500" },
     ],
   },
   {
@@ -387,12 +396,6 @@ function ListingActions({ listing, userEmail, onUpdated, onDeleted }: {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reviseOpen, setReviseOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
-  const [watcherOfferOpen, setWatcherOfferOpen] = useState(false);
-  const [watcherDiscount, setWatcherDiscount] = useState("10");
-  const [watcherHours, setWatcherHours] = useState("24");
-  const [watcherSending, setWatcherSending] = useState(false);
-  const [watcherResult, setWatcherResult] = useState("");
-  const { getToken } = useClerkAuth();
   const [draft, setDraft] = useState({ title: "", price: "", description: "", condition: "good", category: "", categoryTop: "", image: "", extraCategories: [] as ExtraCat[] });
   const [addingExtraCat, setAddingExtraCat] = useState(false);
   const [newExtraCatTop, setNewExtraCatTop] = useState("");
@@ -467,17 +470,6 @@ function ListingActions({ listing, userEmail, onUpdated, onDeleted }: {
     if (res.ok) onDeleted(listing.id);
   }
 
-  async function sendWatcherOffer() {
-    setWatcherSending(true); setWatcherResult("");
-    try {
-      const token = await getToken();
-      const r = await fetch(`/api/listings/${listing.id}/watcher-offer`, { method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${token}`}, body:JSON.stringify({percent:Number(watcherDiscount),hours:Number(watcherHours)}) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || "Could not send offer");
-      setWatcherResult(`Offer sent to ${d.sent} watcher${d.sent===1?"":"s"} at £${Number(d.offerPrice).toFixed(2)}.`);
-    } catch(e:any) { setWatcherResult(e.message || "Could not send offer"); } finally { setWatcherSending(false); }
-  }
-
   async function handlePromote(type: string) {
     setPromoting(type);
     setPromoteResult(null);
@@ -529,9 +521,6 @@ function ListingActions({ listing, userEmail, onUpdated, onDeleted }: {
               <button onClick={() => { setMenuOpen(false); setPromoteOpen(true); }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                 <TrendingUp className="w-3.5 h-3.5 text-[#F26B21]" /> Promote Listing
               </button>
-              <button onClick={() => { setMenuOpen(false); setWatcherOfferOpen(true); setWatcherResult(""); }} disabled={listing.watchers < 1} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors">
-                <Users className="w-3.5 h-3.5 text-purple-500" /> Send offer to watchers ({listing.watchers})
-              </button>
               <button onClick={handleSuspend} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                 <PauseCircle className="w-3.5 h-3.5 text-amber-500" />
                 {listing.status === "active" ? "Suspend Listing" : "Re-activate"}
@@ -544,24 +533,6 @@ function ListingActions({ listing, userEmail, onUpdated, onDeleted }: {
           )}
         </AnimatePresence>
       </div>
-
-      <AnimatePresence>
-        {watcherOfferOpen && (
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={e=>{if(e.target===e.currentTarget)setWatcherOfferOpen(false)}}>
-            <motion.div initial={{scale:.96,y:12}} animate={{scale:1,y:0}} exit={{scale:.96,y:12}} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-              <div className="flex items-center justify-between mb-1"><h3 className="text-lg font-bold text-gray-900">Send offer to watchers</h3><button onClick={()=>setWatcherOfferOpen(false)}><X className="w-5 h-5 text-gray-400"/></button></div>
-              <p className="text-sm text-gray-500 mb-5"><strong>{listing.watchers}</strong> {listing.watchers===1?"person is":"people are"} watching this item. Send them a private limited-time discount.</p>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="text-xs font-semibold text-gray-600">Discount %<input type="number" min="1" max="80" value={watcherDiscount} onChange={e=>setWatcherDiscount(e.target.value)} className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm"/></label>
-                <label className="text-xs font-semibold text-gray-600">Valid for hours<input type="number" min="1" max="168" value={watcherHours} onChange={e=>setWatcherHours(e.target.value)} className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm"/></label>
-              </div>
-              <div className="mt-4 rounded-xl bg-purple-50 p-3 text-sm text-purple-800">{watcherDiscount || 0}% off for watchers for the next {watcherHours || 0} hours.</div>
-              {watcherResult && <p className="mt-3 text-sm font-medium text-gray-700">{watcherResult}</p>}
-              <button disabled={watcherSending || listing.watchers<1} onClick={sendWatcherOffer} className="mt-5 w-full rounded-xl bg-[#F26B21] text-white font-bold py-3 disabled:opacity-50">{watcherSending?"Sending…":`Send offer to ${listing.watchers} watcher${listing.watchers===1?"":"s"}`}</button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ── Revise Modal ── */}
       <AnimatePresence>
@@ -971,7 +942,7 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
         </div>
         <div className="hidden lg:flex items-center gap-2">
           <Link href="/rewards" className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F26B21]/10 hover:bg-[#F26B21]/20 transition-colors text-[#F26B21] border border-[#F26B21]/20 text-sm font-semibold">
-            <Gift className="w-4 h-4" /> Rewards Arcade
+            <Gift className="w-4 h-4" /> Rewards
           </Link>
           <Link href="/promotions" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#7C3AED]/10 hover:bg-[#7C3AED]/20 transition-colors text-[#7C3AED] border border-[#7C3AED]/20 text-sm font-semibold">
             <Megaphone className="w-4 h-4" /> Promotions
@@ -1046,23 +1017,6 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
           </div>
         </div>
       </div>
-
-      {/* Rewards Arcade — direct dashboard entry to daily games */}
-      <Link href="/rewards" className="block rounded-2xl bg-[#1A1D2E] border border-gray-800 p-5 text-white hover:-translate-y-0.5 hover:shadow-lg transition-all">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-[#F26B21]/15 flex items-center justify-center">
-              <Gift className="w-6 h-6 text-[#F26B21]" />
-            </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-wider text-[#F26B21]">Daily Rewards</p>
-              <h2 className="text-lg md:text-xl font-black">Bazunk Rewards Arcade</h2>
-              <p className="text-sm text-white/65 mt-0.5">Play daily games and earn free credits for promotions and perks.</p>
-            </div>
-          </div>
-          <div className="hidden sm:flex items-center gap-1 text-sm font-black text-[#F26B21]">Play now <ChevronRight className="w-4 h-4" /></div>
-        </div>
-      </Link>
 
       {/* Referral rewards — deliberately prominent on the dashboard */}
       <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-[#F26B21] via-[#E85D2A] to-[#4A5CE8] text-white shadow-sm">
@@ -5903,6 +5857,59 @@ export function DashboardPage() {
             className="h-full"
           >
             {activeSection === "overview" && <OverviewContent user={user} onNavigate={setActiveSection} />}
+            {activeSection === "notifications" && (
+              <div className="bg-white rounded-2xl border border-gray-100 flex flex-col" style={{ minHeight: 400 }}>
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-bold text-gray-900">Notifications</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">{notifs.filter(n => n.unread).length} unread</p>
+                  </div>
+                  {notifs.some(n => n.unread) && (
+                    <button
+                      onClick={() => setNotifs(prev => prev.map(n => ({ ...n, unread: false })))}
+                      className="text-xs text-[#4A5CE8] font-semibold hover:underline"
+                      data-testid="button-mark-all-read"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                {notifs.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center py-16 text-center px-6">
+                    <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-4">
+                      <Bell className="w-8 h-8 text-gray-200" />
+                    </div>
+                    <p className="font-semibold text-gray-700 mb-1">No notifications</p>
+                    <p className="text-sm text-gray-400">We'll notify you about price drops, messages, and order updates</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {notifs.map((n) => {
+                      const Icon = n.icon;
+                      return (
+                        <div
+                          key={n.id}
+                          className={`flex items-start gap-3 px-5 py-4 hover:bg-gray-50 transition-colors cursor-pointer ${n.unread ? "bg-blue-50/30" : ""}`}
+                          onClick={() => setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, unread: false } : x))}
+                        >
+                          <div className={`w-9 h-9 rounded-full ${n.iconBg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                            <Icon className={`w-4 h-4 ${n.iconColor}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className={`text-sm ${n.unread ? "font-bold text-gray-900" : "font-semibold text-gray-700"}`}>{n.title}</p>
+                              <span className="text-[10px] text-gray-400 flex-shrink-0 mt-0.5">{n.time}</span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{n.desc}</p>
+                          </div>
+                          {n.unread && <div className="w-2 h-2 rounded-full bg-[#4A5CE8] flex-shrink-0 mt-2" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
             {activeSection === "orders" && <OrdersSection />}
             {activeSection === "sales" && <SellerSales />}
             {activeSection === "watchlist" && (
@@ -6065,6 +6072,79 @@ export function DashboardPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+            {activeSection === "messages" && (
+              <div className="bg-white rounded-2xl border border-gray-100 flex flex-col" style={{ minHeight: 400 }}>
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-bold text-gray-900">Messages</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {MOCK_CONVERSATIONS.reduce((s, c) => s + c.unread, 0)} unread · {MOCK_CONVERSATIONS.length} conversations
+                    </p>
+                  </div>
+                  <Link href="/messages" className="flex items-center gap-1.5 text-xs text-[#4A5CE8] font-semibold hover:underline">
+                    Open Inbox <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {MOCK_CONVERSATIONS.map((convo) => {
+                    const last = convo.messages[convo.messages.length - 1];
+                    const initials = convo.with.avatar;
+                    const avatarColors: Record<string, string> = {
+                      MD: "bg-blue-500", SM: "bg-emerald-500", PK: "bg-purple-500",
+                      JT: "bg-amber-500", TA: "bg-[#4A5CE8]",
+                    };
+                    const color = avatarColors[initials] ?? "bg-gray-400";
+                    return (
+                      <Link
+                        key={convo.id}
+                        href="/messages"
+                        className="flex items-center gap-3 px-5 py-3.5 hover:bg-gray-50 transition-colors"
+                      >
+                        <div className="relative flex-shrink-0">
+                          <div className={`w-10 h-10 rounded-full ${color} flex items-center justify-center text-white text-sm font-bold`}>
+                            {initials}
+                          </div>
+                          {convo.unread > 0 && (
+                            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#F26B21] text-white text-[9px] font-bold flex items-center justify-center">
+                              {convo.unread}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <p className={`text-sm ${convo.unread > 0 ? "font-bold text-gray-900" : "font-semibold text-gray-700"}`}>
+                              {convo.with.name}
+                            </p>
+                            <span className="text-[10px] text-gray-400 flex-shrink-0 ml-2">
+                              {new Date(last.timestamp).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#F26B21] font-medium truncate mb-0.5">{convo.listingTitle}</p>
+                          <p className={`text-xs truncate ${convo.unread > 0 ? "text-gray-700 font-medium" : "text-gray-400"}`}>
+                            {last.senderId === "me" ? "You: " : ""}{last.text}
+                          </p>
+                        </div>
+                        {last.senderId === "me" && (
+                          <div className="flex-shrink-0">
+                            {last.read
+                              ? <CheckCheck className="w-3.5 h-3.5 text-[#4A5CE8]" />
+                              : <Check className="w-3.5 h-3.5 text-gray-400" />}
+                          </div>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+                <div className="p-4 border-t border-gray-100">
+                  <Link
+                    href="/messages"
+                    className="w-full py-2.5 rounded-xl bg-[#4A5CE8] text-white font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+                  >
+                    <MessageSquare className="w-4 h-4" /> Open Full Inbox
+                  </Link>
                 </div>
               </div>
             )}
