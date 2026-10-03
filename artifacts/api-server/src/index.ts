@@ -520,6 +520,20 @@ async function runAppMigrations() {
       UNIQUE (order_id, role)
     )
   `, "reviews");
+  await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS seller_reply TEXT`, "reviews.seller_reply");
+  await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS seller_replied_at TIMESTAMP WITH TIME ZONE`, "reviews.seller_replied_at");
+  await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS removed_at TIMESTAMP WITH TIME ZONE`, "reviews.removed_at");
+  await run(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS removed_reason TEXT`, "reviews.removed_reason");
+  await run(sql`CREATE TABLE IF NOT EXISTS review_reports (
+    id BIGSERIAL PRIMARY KEY,
+    review_id BIGINT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+    reporter_email TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    details TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(review_id, reporter_email)
+  )`, "review_reports");
+  await run(sql`CREATE INDEX IF NOT EXISTS review_reports_review_idx ON review_reports (review_id, created_at DESC)`, "review_reports_review_idx");
   await run(sql`CREATE INDEX IF NOT EXISTS reviews_reviewee_idx ON reviews (reviewee_email, role)`, "reviews_reviewee_idx");
   await run(sql`CREATE INDEX IF NOT EXISTS orders_seller_idx ON orders (seller_email)`, "orders_seller_idx");
   // Performance indexes for public listing grids and case-insensitive reputation lookups.

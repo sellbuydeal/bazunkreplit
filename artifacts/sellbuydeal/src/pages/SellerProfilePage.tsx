@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "wouter";
-import { Calendar, CheckCircle2, Clock, Package, Repeat2, ShoppingBag, Star, Trophy } from "lucide-react";
+import { Calendar, CheckCircle2, Clock, Flag, Package, Repeat2, ShieldCheck, ShoppingBag, Star, Trophy } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { useSession } from "@clerk/react";
+import { useAuth } from "@/context/AuthContext";
 
 interface Reputation {
   reviews: { total: number; positive: number; neutral: number; negative: number; average: number };
@@ -14,7 +16,7 @@ interface Reputation {
   memberSince: string | null;
   profile: { name: string; username: string | null; verified: boolean };
 }
-interface ReviewRow { id: number; rating: number; comment: string | null; item_title: string | null; created_at: string; reviewer: string }
+interface ReviewRow { id: number; rating: number; comment: string | null; item_title: string | null; created_at: string; reviewer: string; verified_purchase?: boolean; seller_reply?: string | null; seller_replied_at?: string | null }
 interface ListingRow { id: number; publicId?: string | null; public_id?: string | null; title: string; price: string; image: string | null; condition: string }
 
 function Stars({ rating, size = "w-4 h-4" }: { rating: number; size?: string }) {
@@ -29,12 +31,15 @@ function dispatchLabel(hours: number) {
 
 export function SellerProfilePage() {
   const { id } = useParams<{ id: string }>();
+  const { session } = useSession();
+  const { user } = useAuth();
   const sellerEmail = useMemo(() => { try { return decodeURIComponent(id ?? ""); } catch { return id ?? ""; } }, [id]);
   const [rep, setRep] = useState<Reputation | null>(null);
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [listings, setListings] = useState<ListingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [actionBusy, setActionBusy] = useState<number | null>(null);
 
   useEffect(() => {
     if (!sellerEmail) { setError("Seller not found"); setLoading(false); return; }
@@ -51,6 +56,38 @@ export function SellerProfilePage() {
 
   const breakdown = useMemo(() => [5,4,3,2,1].map(star => ({ star, count: reviews.filter(r => r.rating === star).length })), [reviews]);
   const maxBreakdown = Math.max(1, ...breakdown.map(x => x.count));
+  const isSeller = !!user?.email && user.email.toLowerCase() === sellerEmail.toLowerCase();
+
+  async function authPost(url: string, body: unknown) {
+    const token = await session?.getToken();
+    if (!token) throw new Error("Please sign in first");
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error ?? "Something went wrong");
+    return data;
+  }
+
+  async function replyToReview(review: ReviewRow) {
+    const reply = window.prompt("Reply publicly to this review (up to 1,000 characters):");
+    if (!reply?.trim()) return;
+    setActionBusy(review.id);
+    try {
+      const data = await authPost(`/api/reviews/${review.id}/reply`, { reply });
+      setReviews(prev => prev.map(r => r.id === review.id ? { ...r, seller_reply: data.reply, seller_replied_at: data.repliedAt } : r));
+    } catch (e) { window.alert(e instanceof Error ? e.message : "Couldn't save reply"); }
+    finally { setActionBusy(null); }
+  }
+
+  async function reportReview(review: ReviewRow) {
+    const reason = window.prompt("Report reason: abusive, spam, personal_information, not_about_transaction, or other");
+    if (!reason) return;
+    const normalised = reason.trim().toLowerCase().replace(/\s+/g, "_");
+    const details = window.prompt("Add details for Bazunk moderation (optional):") ?? "";
+    setActionBusy(review.id);
+    try { await authPost(`/api/reviews/${review.id}/report`, { reason: normalised, details }); window.alert("Thanks. Bazunk moderation has received your report."); }
+    catch (e) { window.alert(e instanceof Error ? e.message : "Couldn't report review"); }
+    finally { setActionBusy(null); }
+  }
 
   return <>
     <Navbar />
@@ -91,7 +128,15 @@ export function SellerProfilePage() {
 
           <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 mt-6">
             <h2 className="font-black text-xl text-gray-900 mb-5">Seller reviews</h2>
-            {reviews.length === 0 ? <p className="text-sm text-gray-400 py-6 text-center">No reviews have been left for this seller yet.</p> : <div className="divide-y divide-gray-100">{reviews.map(review => <article key={review.id} className="py-5 first:pt-0"><div className="flex justify-between gap-4"><div><div className="flex items-center gap-2"><Stars rating={review.rating} /><span className="text-xs font-semibold text-gray-500">Verified purchase</span></div><p className="text-xs text-gray-400 mt-1">{review.reviewer} · {review.item_title ?? "Bazunk purchase"}</p></div><time className="text-xs text-gray-400 whitespace-nowrap">{new Date(review.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</time></div>{review.comment && <p className="text-sm text-gray-700 leading-relaxed mt-3">{review.comment}</p>}</article>)}</div>}
+            {reviews.length === 0 ? <p className="text-sm text-gray-400 py-6 text-center">No reviews have been left for this seller yet.</p> : <div className="divide-y divide-gray-100">{reviews.map(review => <article key={review.id} className="py-5 first:pt-0">
+              <div className="flex justify-between gap-4"><div><div className="flex items-center gap-2 flex-wrap"><Stars rating={review.rating} />{review.verified_purchase && <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full"><ShieldCheck className="w-3 h-3" /> Verified purchase</span>}</div><p className="text-xs text-gray-400 mt-1">{review.reviewer} · {review.item_title ?? "Bazunk purchase"}</p></div><time className="text-xs text-gray-400 whitespace-nowrap">{new Date(review.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</time></div>
+              {review.comment && <p className="text-sm text-gray-700 leading-relaxed mt-3">{review.comment}</p>}
+              {review.seller_reply && <div className="mt-3 ml-3 rounded-xl bg-gray-50 border-l-4 border-[#4A5CE8] p-3"><p className="text-[11px] font-black text-gray-700 mb-1">Seller response</p><p className="text-sm text-gray-700">{review.seller_reply}</p>{review.seller_replied_at && <p className="text-[10px] text-gray-400 mt-1">{new Date(review.seller_replied_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</p>}</div>}
+              <div className="flex gap-3 mt-3">
+                {isSeller && !review.seller_reply && <button disabled={actionBusy === review.id} onClick={() => replyToReview(review)} className="text-xs font-bold text-[#4A5CE8] hover:underline disabled:opacity-50">{actionBusy === review.id ? "Saving…" : "Reply publicly"}</button>}
+                <button disabled={actionBusy === review.id} onClick={() => reportReview(review)} className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 disabled:opacity-50"><Flag className="w-3 h-3" /> Report review</button>
+              </div>
+            </article>)}</div>}
           </section>
         </>}
       </div>

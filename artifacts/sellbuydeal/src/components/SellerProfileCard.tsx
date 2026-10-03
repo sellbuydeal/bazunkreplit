@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Star, ChevronDown } from "lucide-react";
+import { Star, ChevronDown, ShieldCheck } from "lucide-react";
 import { Link } from "wouter";
 
 interface Reputation {
@@ -11,7 +11,7 @@ interface Reputation {
   replyMedianHours: number | null;
   memberSince: string | null;
 }
-interface ReviewRow { id: number; rating: number; comment: string | null; item_title: string | null; created_at: string; reviewer: string }
+interface ReviewRow { id: number; rating: number; comment: string | null; item_title: string | null; created_at: string; reviewer: string; verified_purchase?: boolean; seller_reply?: string | null }
 
 function dispatchLabel(h: number): string {
   if (h <= 24) return "Usually dispatches within 24h";
@@ -104,10 +104,11 @@ export function SellerProfileCard({ sellerEmail }: { sellerEmail: string }) {
           {reviews?.map(r => (
             <div key={r.id} className="rounded-xl bg-gray-50 p-3">
               <div className="flex items-center justify-between gap-2">
-                <Stars n={r.rating} />
+                <div className="flex items-center gap-1.5"><Stars n={r.rating} />{r.verified_purchase && <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700"><ShieldCheck className="w-3 h-3" /> Verified purchase</span>}</div>
                 <span className="text-[10px] text-gray-400">{new Date(r.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
               </div>
               {r.comment && <p className="text-xs text-gray-700 mt-1.5 leading-relaxed">{r.comment}</p>}
+              {r.seller_reply && <div className="mt-2 border-l-2 border-[#4A5CE8] pl-2"><p className="text-[9px] font-bold text-gray-500">Seller response</p><p className="text-[11px] text-gray-600 mt-0.5">{r.seller_reply}</p></div>}
               <p className="text-[10px] text-gray-400 mt-1.5">{r.reviewer} · {r.item_title ?? "Purchase"}</p>
             </div>
           ))}

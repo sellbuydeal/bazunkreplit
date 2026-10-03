@@ -33,7 +33,7 @@ async function sellerReputation(email: string) {
              COUNT(*) FILTER (WHERE rating = 3)::int AS neutral,
              COUNT(*) FILTER (WHERE rating <= 2)::int AS negative,
              COALESCE(ROUND(AVG(rating)::numeric, 2), 0)::float AS average
-      FROM reviews WHERE role = 'buyer_to_seller' AND LOWER(reviewee_email) = LOWER(${email})
+      FROM reviews WHERE role = 'buyer_to_seller' AND removed_at IS NULL AND LOWER(reviewee_email) = LOWER(${email})
     `),
     db.execute(sql`
       SELECT COUNT(*)::int AS n FROM orders
@@ -103,7 +103,7 @@ router.get("/buyers/reputation", async (req, res) => {
   try {
     const rev = (await db.execute(sql`
       SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE rating >= 4)::int AS positive
-      FROM reviews WHERE role = 'seller_to_buyer' AND LOWER(reviewee_email) = LOWER(${email})
+      FROM reviews WHERE role = 'seller_to_buyer' AND removed_at IS NULL AND LOWER(reviewee_email) = LOWER(${email})
     `)).rows[0] as { total: number; positive: number };
     const orders = (await db.execute(sql`
       SELECT COUNT(*)::int AS n FROM orders WHERE LOWER(buyer_email) = LOWER(${email}) AND status <> 'cancelled'
@@ -128,9 +128,9 @@ router.get("/reviews/seller", async (req, res) => {
   if (!email) { res.status(400).json({ error: "email required" }); return; }
   try {
     const rows = await db.execute(sql`
-      SELECT r.id, r.rating, r.comment, r.item_title, r.created_at, split_part(r.reviewer_email, '@', 1) AS reviewer
+      SELECT r.id, r.rating, r.comment, r.item_title, r.created_at, r.seller_reply, r.seller_replied_at, TRUE AS verified_purchase, split_part(r.reviewer_email, '@', 1) AS reviewer
       FROM reviews r
-      WHERE r.role = 'buyer_to_seller' AND LOWER(r.reviewee_email) = LOWER(${email})
+      WHERE r.role = 'buyer_to_seller' AND r.removed_at IS NULL AND LOWER(r.reviewee_email) = LOWER(${email})
       ORDER BY r.created_at DESC LIMIT ${limit} OFFSET ${offset}
     `);
     // Only the start of the buyer's email is shown, partly masked
@@ -193,6 +193,56 @@ router.post("/reviews", async (req, res) => {
   }
 });
 
+// ── Review replies & reporting ───────────────────────────────────────────────
+
+router.post("/reviews/:id/reply", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const reply = typeof req.body?.reply === "string" ? req.body.reply.trim().slice(0, 1000) : "";
+  if (!id || !reply) { res.status(400).json({ error: "Write a reply first" }); return; }
+  try {
+    const email = await authenticatedEmail(req);
+    if (!email) { res.status(401).json({ error: "Please sign in to reply" }); return; }
+    const review = (await db.execute(sql`
+      SELECT id, reviewee_email, role, seller_reply, removed_at FROM reviews WHERE id = ${id} LIMIT 1
+    `)).rows[0] as any;
+    if (!review || review.removed_at) { res.status(404).json({ error: "Review not found" }); return; }
+    if (review.role !== "buyer_to_seller" || String(review.reviewee_email).toLowerCase() !== email.toLowerCase()) {
+      res.status(403).json({ error: "Only the seller reviewed here can reply" }); return;
+    }
+    if (review.seller_reply) { res.status(409).json({ error: "You've already replied to this review" }); return; }
+    await db.execute(sql`UPDATE reviews SET seller_reply = ${reply}, seller_replied_at = NOW() WHERE id = ${id}`);
+    res.json({ ok: true, reply, repliedAt: new Date().toISOString() });
+  } catch (err) {
+    logger.error({ err }, "Review reply failed");
+    res.status(500).json({ error: "Failed to save your reply" });
+  }
+});
+
+const REPORT_REASONS = new Set(["abusive", "spam", "personal_information", "not_about_transaction", "other"]);
+router.post("/reviews/:id/report", async (req, res) => {
+  const id = parseInt(req.params.id);
+  const reason = typeof req.body?.reason === "string" ? req.body.reason : "";
+  const details = typeof req.body?.details === "string" ? req.body.details.trim().slice(0, 1000) : "";
+  if (!id || !REPORT_REASONS.has(reason)) { res.status(400).json({ error: "Choose a valid report reason" }); return; }
+  try {
+    const email = await authenticatedEmail(req);
+    if (!email) { res.status(401).json({ error: "Please sign in to report a review" }); return; }
+    const review = (await db.execute(sql`SELECT id, reviewer_email, removed_at FROM reviews WHERE id = ${id} LIMIT 1`)).rows[0] as any;
+    if (!review || review.removed_at) { res.status(404).json({ error: "Review not found" }); return; }
+    if (String(review.reviewer_email).toLowerCase() === email.toLowerCase()) { res.status(400).json({ error: "You can't report your own review" }); return; }
+    const inserted = await db.execute(sql`
+      INSERT INTO review_reports (review_id, reporter_email, reason, details)
+      VALUES (${id}, ${email}, ${reason}, ${details || null})
+      ON CONFLICT (review_id, reporter_email) DO NOTHING RETURNING id
+    `);
+    if (!inserted.rows.length) { res.status(409).json({ error: "You've already reported this review" }); return; }
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    logger.error({ err }, "Review report failed");
+    res.status(500).json({ error: "Failed to report review" });
+  }
+});
+
 // ── Seller side: see their orders and dispatch them ─────────────────────────
 
 router.get("/orders/seller", async (req, res) => {
@@ -248,17 +298,31 @@ router.post("/orders/:id/dispatch", async (req, res) => {
 
 router.get("/admin/reviews", requireAdmin, async (_req, res) => {
   const rows = await db.execute(sql`
-    SELECT id, order_id, role, reviewer_email, reviewee_email, rating, comment, item_title, created_at
-    FROM reviews ORDER BY created_at DESC LIMIT 300
+    SELECT r.id, r.order_id, r.role, r.reviewer_email, r.reviewee_email, r.rating, r.comment, r.item_title,
+           r.created_at, r.seller_reply, r.seller_replied_at, r.removed_at, r.removed_reason,
+           COUNT(rr.id)::int AS report_count,
+           COALESCE(json_agg(json_build_object('reason', rr.reason, 'details', rr.details, 'reporter', rr.reporter_email, 'created_at', rr.created_at)
+             ORDER BY rr.created_at DESC) FILTER (WHERE rr.id IS NOT NULL), '[]'::json) AS reports
+    FROM reviews r LEFT JOIN review_reports rr ON rr.review_id = r.id
+    GROUP BY r.id ORDER BY COUNT(rr.id) DESC, r.created_at DESC LIMIT 300
   `);
   res.json(rows.rows);
 });
 
 router.delete("/admin/reviews/:id", requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
+  const reason = typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 500) : "Removed by admin";
   if (!id) { res.status(400).json({ error: "bad id" }); return; }
-  await db.execute(sql`DELETE FROM reviews WHERE id = ${id}`);
+  await db.execute(sql`UPDATE reviews SET removed_at = NOW(), removed_reason = ${reason || "Removed by admin"} WHERE id = ${id}`);
   logger.info({ id }, "Admin removed review");
+  res.json({ ok: true });
+});
+
+router.post("/admin/reviews/:id/restore", requireAdmin, async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id) { res.status(400).json({ error: "bad id" }); return; }
+  await db.execute(sql`UPDATE reviews SET removed_at = NULL, removed_reason = NULL WHERE id = ${id}`);
+  logger.info({ id }, "Admin restored review");
   res.json({ ok: true });
 });
 
