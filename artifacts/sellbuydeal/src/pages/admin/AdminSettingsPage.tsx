@@ -242,29 +242,6 @@ export function AdminSettingsPage() {
     setSettings(prev => ({ ...prev, [key]: value }));
   }
 
-"color" | "textarea" | "url"; placeholder?: string }) {
-    return (
-      <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-1.5">{label}</label>
-        {type === "textarea" ? (
-          <textarea value={settings[k] as string} onChange={e => set(k, e.target.value)}
-            rows={3} placeholder={placeholder}
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8] resize-none" />
-        ) : type === "color" ? (
-          <div className="flex items-center gap-3">
-            <input type="color" value={settings[k] as string} onChange={e => set(k, e.target.value)}
-              className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer flex-shrink-0" />
-            <input type="text" value={settings[k] as string} onChange={e => set(k, e.target.value)}
-              className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]" />
-          </div>
-        ) : (
-          <input type={type === "url" ? "url" : "text"} value={settings[k] as string} onChange={e => set(k, e.target.value)}
-            placeholder={placeholder}
-            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]" />
-        )}
-      </div>
-    );
-  }
 
   function Toggle({ k, label, desc, danger }: { k: keyof Settings; label: string; desc?: string; danger?: boolean }) {
     const on = settings[k] === "true";
