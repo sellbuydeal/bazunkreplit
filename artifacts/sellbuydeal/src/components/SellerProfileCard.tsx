@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Star, ChevronDown } from "lucide-react";
+import { Link } from "wouter";
 
 interface Reputation {
   reviews: { total: number; positive: number; neutral: number; negative: number; average: number };
@@ -94,6 +95,9 @@ export function SellerProfileCard({ sellerEmail }: { sellerEmail: string }) {
           </button>
         </>
       )}
+      <Link href={`/seller/${encodeURIComponent(sellerEmail)}`} className="mt-2 ml-3 inline-flex text-xs font-bold text-[#4A5CE8] hover:underline">
+        View full profile
+      </Link>
       {showReviews && (
         <div className="mt-3 space-y-3">
           {!reviews && <p className="text-xs text-gray-400">Loading…</p>}

@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Loader2, Package, Truck, Star, TrendingUp, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { ReviewModal } from "./ReviewModal";
+import { useSession } from "@clerk/react";
 
 interface SaleRow {
   id: string; item_title: string; item_image: string | null; price: string; status: string;
@@ -25,6 +26,7 @@ const CARRIERS = ["Royal Mail", "Evri", "DPD", "DHL", "UPS", "Yodel", "Parcelfor
 /** Seller dashboard → Sales: see orders, dispatch them, and review buyers. */
 export function SellerSales() {
   const { user } = useAuth();
+  const { session } = useSession();
   const [rows, setRows] = useState<SaleRow[] | null>(null);
   const [error, setError] = useState("");
   const [dispatching, setDispatching] = useState<SaleRow | null>(null);
@@ -35,13 +37,14 @@ export function SellerSales() {
   const [reviewFor, setReviewFor] = useState<SaleRow | null>(null);
 
   const load = useCallback(async () => {
-    if (!user?.email) return;
+    if (!user?.email || !session) return;
     try {
-      const r = await fetch(`/api/orders/seller?email=${encodeURIComponent(user.email)}`);
+      const token = await session.getToken();
+      const r = await fetch(`/api/orders/seller`, { headers: { Authorization: `Bearer ${token}` } });
       if (!r.ok) { setError("Couldn't load your sales."); return; }
       setRows(await r.json());
     } catch { setError("Couldn't reach the server."); }
-  }, [user?.email]);
+  }, [user?.email, session]);
   useEffect(() => { void load(); }, [load]);
 
   async function dispatch() {
@@ -49,8 +52,8 @@ export function SellerSales() {
     setBusy(true); setDError("");
     try {
       const r = await fetch(`/api/orders/${dispatching.id}/dispatch`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sellerEmail: user.email, carrier, trackingNumber: tracking }),
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await session?.getToken()}` },
+        body: JSON.stringify({ carrier, trackingNumber: tracking }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setDError(d.error ?? "Couldn't dispatch"); return; }
@@ -151,7 +154,7 @@ export function SellerSales() {
       )}
 
       {reviewFor && user?.email && (
-        <ReviewModal orderId={reviewFor.id} itemTitle={reviewFor.item_title} reviewerEmail={user.email} role="seller"
+        <ReviewModal orderId={reviewFor.id} itemTitle={reviewFor.item_title} role="seller"
           onClose={() => setReviewFor(null)}
           onDone={rating => setRows(prev => prev?.map(r => r.id === reviewFor.id ? { ...r, my_review_rating: rating } : r) ?? prev)} />
       )}

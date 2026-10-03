@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
+import { clerkClient, getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/adminAuth.js";
@@ -12,6 +13,13 @@ const SENT = sql`('shipped', 'out_for_delivery', 'delivered')`;
 
 const MIN_REVIEWS_FOR_PERCENT = 3;   // below this we say "not enough reviews yet" instead of a misleading 100%
 const MIN_ORDERS_FOR_DISPATCH = 3;   // dispatch speed needs a few orders to be meaningful
+
+async function authenticatedEmail(req: Request): Promise<string | null> {
+  const { isAuthenticated, userId } = getAuth(req);
+  if (!isAuthenticated || !userId) return null;
+  const user = await clerkClient.users.getUser(userId);
+  return user.primaryEmailAddress?.emailAddress?.trim().toLowerCase() ?? null;
+}
 
 // ── Reputation ───────────────────────────────────────────────────────────────
 
@@ -47,7 +55,11 @@ async function sellerReputation(email: string) {
       AND shipped_at >= created_at AND created_at > NOW() - INTERVAL '90 days'
   `)).rows[0] as { n: number; median_hours: number | null };
 
-  const since = (await db.execute(sql`SELECT created_at FROM users WHERE LOWER(email) = LOWER(${email}) LIMIT 1`)).rows[0] as { created_at?: string } | undefined;
+  const seller = (await db.execute(sql`
+    SELECT u.name, u.created_at, u.verification_status,
+           (SELECT l.seller_username FROM listings l WHERE LOWER(l.seller_email) = LOWER(${email}) AND l.seller_username IS NOT NULL ORDER BY l.created_at DESC LIMIT 1) AS username
+    FROM users u WHERE LOWER(u.email) = LOWER(${email}) LIMIT 1
+  `)).rows[0] as { name?: string | null; created_at?: string; verification_status?: string; username?: string | null } | undefined;
 
   const enoughReviews = rev.total >= MIN_REVIEWS_FOR_PERCENT;
   return {
@@ -59,7 +71,12 @@ async function sellerReputation(email: string) {
     dispatchSampleSize: disp.n,
     // Buyer ↔ seller messaging isn't built yet, so there is nothing to measure here.
     replyMedianHours: null as number | null,
-    memberSince: since?.created_at ?? null,
+    memberSince: seller?.created_at ?? null,
+    profile: {
+      name: seller?.name || email.split("@")[0],
+      username: seller?.username ?? null,
+      verified: seller?.verification_status === "verified",
+    },
   };
 }
 
@@ -127,12 +144,14 @@ router.get("/reviews/seller", async (req, res) => {
 // ── Writing reviews ──────────────────────────────────────────────────────────
 
 router.post("/reviews", async (req, res) => {
-  const { orderId, reviewerEmail, rating, comment } = req.body as { orderId?: string; reviewerEmail?: string; rating?: number; comment?: string };
+  const { orderId, rating, comment } = req.body as { orderId?: string; rating?: number; comment?: string };
   const stars = Math.round(Number(rating));
-  if (!orderId || !reviewerEmail) { res.status(400).json({ error: "orderId and reviewerEmail are required" }); return; }
+  if (!orderId) { res.status(400).json({ error: "orderId is required" }); return; }
   if (!(stars >= 1 && stars <= 5)) { res.status(400).json({ error: "Choose a rating from 1 to 5" }); return; }
   const text = typeof comment === "string" ? comment.trim().slice(0, 1000) : "";
   try {
+    const reviewerEmail = await authenticatedEmail(req);
+    if (!reviewerEmail) { res.status(401).json({ error: "Please sign in to leave a review" }); return; }
     const order = (await db.execute(sql`SELECT id, buyer_email, seller_email, item_title, status FROM orders WHERE id = ${orderId}`)).rows[0] as
       { id: string; buyer_email: string; seller_email: string | null; item_title: string; status: string } | undefined;
     if (!order) { res.status(404).json({ error: "Order not found" }); return; }
@@ -173,9 +192,9 @@ router.post("/reviews", async (req, res) => {
 // ── Seller side: see their orders and dispatch them ─────────────────────────
 
 router.get("/orders/seller", async (req, res) => {
-  const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
-  if (!email) { res.status(400).json({ error: "email required" }); return; }
   try {
+    const email = await authenticatedEmail(req);
+    if (!email) { res.status(401).json({ error: "Please sign in to view your sales" }); return; }
     const rows = await db.execute(sql`
       SELECT o.id, o.item_title, o.item_image, o.price, o.status, o.tracking_number, o.carrier, o.address,
              o.created_at, o.shipped_at, split_part(o.buyer_email, '@', 1) AS buyer_name, o.buyer_email,
@@ -191,9 +210,10 @@ router.get("/orders/seller", async (req, res) => {
 });
 
 router.post("/orders/:id/dispatch", async (req, res) => {
-  const { sellerEmail, carrier, trackingNumber } = req.body as { sellerEmail?: string; carrier?: string; trackingNumber?: string };
-  if (!sellerEmail) { res.status(400).json({ error: "sellerEmail required" }); return; }
+  const { carrier, trackingNumber } = req.body as { carrier?: string; trackingNumber?: string };
   try {
+    const sellerEmail = await authenticatedEmail(req);
+    if (!sellerEmail) { res.status(401).json({ error: "Please sign in to dispatch orders" }); return; }
     const order = (await db.execute(sql`SELECT id, buyer_email, seller_email, item_title, status FROM orders WHERE id = ${req.params.id}`)).rows[0] as
       { id: string; buyer_email: string; seller_email: string | null; item_title: string; status: string } | undefined;
     if (!order) { res.status(404).json({ error: "Order not found" }); return; }

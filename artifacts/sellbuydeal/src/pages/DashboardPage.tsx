@@ -3523,7 +3523,6 @@ function OrdersSection() {
         <ReviewModal
           orderId={reviewOrder.id}
           itemTitle={reviewOrder.title}
-          reviewerEmail={user.email}
           role="buyer"
           onClose={() => setReviewOrder(null)}
           onDone={rating => setOrders(prev => prev.map(o => o.id === reviewOrder.id ? { ...o, reviewRating: rating } : o))}

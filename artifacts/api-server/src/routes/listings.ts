@@ -54,7 +54,7 @@ function promoRank(promotions: string[]): number {
 
 router.get("/listings", async (req, res) => {
   try {
-    const { category, sub, limit = "40", offset = "0", ids } = req.query as Record<string, string>;
+    const { category, sub, sellerEmail, limit = "40", offset = "0", ids } = req.query as Record<string, string>;
 
     if (ids) {
       const idList = ids.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n));
@@ -71,11 +71,13 @@ router.get("/listings", async (req, res) => {
       .select()
       .from(listingsTable)
       .where(
-        category && category !== "all"
-          ? sub
-            ? and(eq(listingsTable.status, "active"), eq(listingsTable.category, category), eq(listingsTable.subcategory, sub))
-            : and(eq(listingsTable.status, "active"), eq(listingsTable.category, category))
-          : eq(listingsTable.status, "active")
+        sellerEmail
+          ? and(eq(listingsTable.status, "active"), sql`LOWER(${listingsTable.sellerEmail}) = LOWER(${sellerEmail})`)
+          : category && category !== "all"
+            ? sub
+              ? and(eq(listingsTable.status, "active"), eq(listingsTable.category, category), eq(listingsTable.subcategory, sub))
+              : and(eq(listingsTable.status, "active"), eq(listingsTable.category, category))
+            : eq(listingsTable.status, "active")
       )
       .orderBy(desc(listingsTable.createdAt))
       .limit(parsedLimit)

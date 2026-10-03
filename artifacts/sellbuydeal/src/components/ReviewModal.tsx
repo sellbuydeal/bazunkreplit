@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { X, Star, Loader2, Check } from "lucide-react";
+import { useSession } from "@clerk/react";
 
 const LABELS = ["", "Poor", "Fair", "Good", "Very good", "Excellent"];
 
 export function ReviewModal({
-  orderId, itemTitle, reviewerEmail, role, onClose, onDone,
+  orderId, itemTitle, role, onClose, onDone,
 }: {
-  orderId: string; itemTitle: string; reviewerEmail: string; role: "buyer" | "seller";
+  orderId: string; itemTitle: string; role: "buyer" | "seller";
   onClose: () => void; onDone: (rating: number) => void;
 }) {
+  const { session } = useSession();
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState("");
@@ -20,10 +22,12 @@ export function ReviewModal({
   async function submit() {
     setBusy(true); setError("");
     try {
+      const token = await session?.getToken();
+      if (!token) { setError("Please sign in again to leave a review"); return; }
       const r = await fetch("/api/reviews", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, reviewerEmail, rating, comment }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ orderId, rating, comment }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setError(d.error ?? "Couldn't save your review"); return; }
