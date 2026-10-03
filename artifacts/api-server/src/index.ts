@@ -59,6 +59,12 @@ async function runAppMigrations() {
     )
   `, "credit_transactions");
 
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE`, "users.referral_code");
+  await run(sql`CREATE TABLE IF NOT EXISTS referrals (id TEXT PRIMARY KEY, referrer_email TEXT NOT NULL, referred_email TEXT NOT NULL UNIQUE, referral_code TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(), joined_rewarded_at TIMESTAMPTZ, purchase_rewarded_at TIMESTAMPTZ, seller_rewarded_at TIMESTAMPTZ)`, "referrals");
+  await run(sql`CREATE TABLE IF NOT EXISTS referral_rewards (id TEXT PRIMARY KEY, referral_id TEXT NOT NULL, milestone TEXT NOT NULL, referrer_credits NUMERIC(10,2) NOT NULL DEFAULT 0, friend_credits NUMERIC(10,2) NOT NULL DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW())`, "referral_rewards");
+  await run(sql`CREATE TABLE IF NOT EXISTS referral_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`, "referral_settings");
+  for (const [k,v] of Object.entries({enabled:'1',join_referrer:'5',join_friend:'5',purchase_referrer:'10',purchase_friend:'10',seller_referrer:'15',seller_friend:'10'})) await run(sql`INSERT INTO referral_settings(key,value) VALUES(${k},${v}) ON CONFLICT(key) DO NOTHING`, `referral_settings.${k}`);
+
   await run(sql`
     CREATE TABLE IF NOT EXISTS listings (
       id SERIAL PRIMARY KEY,

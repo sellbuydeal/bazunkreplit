@@ -7,6 +7,8 @@ import { storage } from "../storage.js";
 import { refreshSellerMilestones } from "../lib/milestones.js";
 import { sendSystemMessage } from "../lib/systemMessages.js";
 
+import { awardReferralMilestone } from "../lib/referrals.js";
+
 const router = Router();
 
 function makePublicId(id: number): string {
@@ -316,6 +318,7 @@ router.post("/listings", async (req, res) => {
         "Tip: you can promote it with credits to reach more buyers.",
     });
 
+    if (status === 'active') void awardReferralMilestone(sellerEmail, 'seller');
     res.status(201).json({ ...listing, promotions: [] });
 
   } catch (err) {

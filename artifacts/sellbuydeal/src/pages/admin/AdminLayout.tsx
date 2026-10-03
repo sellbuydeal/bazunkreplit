@@ -16,6 +16,7 @@ const NAV = [
   { label: "Returns",    href: "/admin/returns",    icon: RotateCcw       },
   { label: "Support",    href: "/admin/support",    icon: LifeBuoy        },
   { label: "Rewards",    href: "/admin/rewards",    icon: Gift            },
+  { label: "Referrals",  href: "/admin/referrals",  icon: Users           },
   { label: "Promotions", href: "/admin/promotions", icon: Megaphone       },
   { label: "Reviews",    href: "/admin/reviews",    icon: Star            },
   { label: "Settings",   href: "/admin/settings",   icon: Settings        },

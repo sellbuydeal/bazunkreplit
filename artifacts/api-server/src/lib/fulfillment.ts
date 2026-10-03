@@ -1,3 +1,4 @@
+import { awardReferralMilestone } from "./referrals.js";
 import { db, creditTransactionsTable } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -102,6 +103,7 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
     }
 
     if (emailItems.length) {
+      void awardReferralMilestone(buyerEmail, 'purchase');
       void sendSystemMessage(buyerEmail, {
         category: "Orders",
         subject: "Order confirmed",

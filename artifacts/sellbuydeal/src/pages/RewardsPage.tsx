@@ -487,6 +487,7 @@ export function RewardsPage() {
       </div>
 
       <main className="flex-1 container mx-auto max-w-5xl px-4 py-8">
+        {user && <Link href="/rewards/referrals" className="mb-6 block rounded-2xl bg-gradient-to-r from-[#F26B21] to-[#4A5CE8] text-white p-5 shadow-sm"><div className="flex items-center justify-between gap-4"><div><p className="font-black text-lg">Invite a friend — you both earn credits</p><p className="text-white/80 text-sm">Earn again when your friend makes their first purchase and starts selling.</p></div><ChevronRight className="shrink-0" /></div></Link>}
         {!user && (
           <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white rounded-2xl border border-[#F26B21]/20 p-5">
             <div className="w-11 h-11 rounded-full bg-[#F26B21]/10 flex items-center justify-center flex-shrink-0">

@@ -87,6 +87,8 @@ import { LockerShippingPage } from "@/pages/LockerShippingPage";
 import { ShippingLabelsPage } from "@/pages/ShippingLabelsPage";
 import BuyerProtectionPage from "@/pages/BuyerProtectionPage";
 import CashbackPage from "@/pages/CashbackPage";
+import { ReferralsPage } from "@/pages/ReferralsPage";
+import { AdminReferralsPage } from "@/pages/admin/AdminReferralsPage";
 
 
 // ─── Clerk setup ─────────────────────────────────────────────────────────────
@@ -286,11 +288,13 @@ function Router() {
       <Route path="/admin/flash-sales" component={AdminFlashSalesPage} />
       <Route path="/admin/support" component={AdminSupportPage} />
       <Route path="/admin/rewards" component={AdminRewardsPage} />
+      <Route path="/admin/referrals" component={AdminReferralsPage} />
       <Route path="/admin/promotions" component={AdminPromotionsPage} />
       <Route path="/admin/reviews" component={AdminReviewsPage} />
       <Route path="/admin/verification" component={AdminVerificationPage} />
       <Route path="/setup" component={SetupWizardPage} />
       <Route path="/video" component={VideoPage} />
+      <Route path="/rewards/referrals" component={ReferralsPage} />
       <Route path="/rewards" component={RewardsPage} />
       <Route path="/treasure-hunt">{() => { window.location.replace("/rewards"); return null; }}</Route>
       <Route path="/shipping/lockers" component={LockerShippingPage} />
