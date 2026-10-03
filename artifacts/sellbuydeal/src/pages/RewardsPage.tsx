@@ -476,19 +476,22 @@ export function RewardsPage() {
       </div>
 
       <main className="flex-1 container mx-auto max-w-5xl px-4 py-8">
-        {!user ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="w-20 h-20 rounded-full bg-[#F26B21]/10 flex items-center justify-center mb-5">
-              <Gift className="w-10 h-10 text-[#F26B21]" />
+        {!user && (
+          <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-white rounded-2xl border border-[#F26B21]/20 p-5">
+            <div className="w-11 h-11 rounded-full bg-[#F26B21]/10 flex items-center justify-center flex-shrink-0">
+              <Gift className="w-5 h-5 text-[#F26B21]" />
             </div>
-            <h2 className="text-2xl font-black text-gray-900 mb-2">Sign in to play</h2>
-            <p className="text-gray-500 text-sm mb-6 max-w-sm">Create an account or sign in to play games and earn credits every day.</p>
-            <div className="flex gap-3">
-              <Link href="/sign-in" className="px-6 py-3 rounded-xl bg-[#1A1D2E] text-white font-bold hover:opacity-90 transition-opacity">Sign In</Link>
-              <Link href="/sign-up" className="px-6 py-3 rounded-xl bg-[#F26B21] text-white font-bold hover:opacity-90 transition-opacity">Join Free</Link>
+            <div className="flex-1">
+              <p className="font-black text-gray-900">Free to join — sign in to start earning</p>
+              <p className="text-sm text-gray-500">Have a look at today's games below. Create an account or sign in to play and collect credits every day.</p>
+            </div>
+            <div className="flex gap-2">
+              <Link href="/sign-in" className="px-5 py-2.5 rounded-xl bg-[#1A1D2E] text-white text-sm font-bold hover:opacity-90 transition-opacity">Sign In</Link>
+              <Link href="/sign-up" className="px-5 py-2.5 rounded-xl bg-[#F26B21] text-white text-sm font-bold hover:opacity-90 transition-opacity">Join Free</Link>
             </div>
           </div>
-        ) : (
+        )}
+        {(
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             {/* Games grid */}
@@ -548,6 +551,11 @@ export function RewardsPage() {
                           <span className="text-xs text-gray-400">{game.dailyPlaysPerUser}× per day</span>
                         </div>
 
+                        {!user ? (
+                          <Link href="/sign-in" className="w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-[#F26B21] text-white hover:opacity-90 transition-opacity">
+                            <Lock className="w-3.5 h-3.5" /> Sign in to play
+                          </Link>
+                        ) : (
                         <button
                           onClick={() => !done && setActiveGame(game)}
                           disabled={done}
@@ -559,6 +567,7 @@ export function RewardsPage() {
                         >
                           {done ? <><Lock className="w-3.5 h-3.5" /> Played</> : <><Zap className="w-3.5 h-3.5" /> Play Now</>}
                         </button>
+                        )}
                       </motion.div>
                     );
                   })}
@@ -568,6 +577,7 @@ export function RewardsPage() {
 
             {/* Sidebar */}
             <div className="space-y-5">
+              {user && (
               <div className="bg-white rounded-2xl border border-gray-100 p-5">
                 <div className="flex items-center gap-2 mb-4">
                   <Coins className="w-4 h-4 text-[#F26B21]" />
@@ -583,6 +593,7 @@ export function RewardsPage() {
                   Spend credits <ChevronRight className="w-3 h-3" />
                 </Link>
               </div>
+              )}
 
               <div className="bg-white rounded-2xl border border-gray-100 p-5">
                 <div className="flex items-center gap-2 mb-4">
@@ -596,7 +607,7 @@ export function RewardsPage() {
                 ) : (
                   <div className="space-y-2">
                     {leaderboard.map((entry, i) => {
-                      const isMe = entry.user_email === user.email;
+                      const isMe = entry.user_email === user?.email;
                       const medals = ["🥇", "🥈", "🥉"];
                       const handle = entry.user_email.split("@")[0].slice(0, 12);
                       return (

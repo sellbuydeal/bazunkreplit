@@ -1,3 +1,4 @@
+import { isBanned } from "../lib/banned.js";
 import { Router } from "express";
 import { db, listingsTable, listingPromotionsTable } from "@workspace/db";
 import { eq, desc, and, gt, sql, inArray } from "drizzle-orm";
@@ -188,6 +189,11 @@ router.post("/listings", async (req, res) => {
     const sellerEmail = (body.sellerEmail || body.email || req.headers["x-user-email"]) as string;
 
     console.log("POST /api/listings payload received:", { title, price, category, sellerEmail });
+
+    if (await isBanned(sellerEmail)) {
+      res.status(403).json({ error: "This account has been suspended and can't create listings." });
+      return;
+    }
 
     if (!title || !price || !sellerEmail) {
       console.error("Missing required fields:", { title, price, sellerEmail });

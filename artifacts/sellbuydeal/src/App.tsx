@@ -27,6 +27,7 @@ import { CategorySection } from "@/components/CategorySection";
 import { FeaturedListings } from "@/components/FeaturedListings";
 import { FeaturedFeatures } from "@/components/FeaturedFeatures";
 import { Footer } from "@/components/Footer";
+import { RewardsTeaser } from "@/components/RewardsTeaser";
 import { AdSlot } from "@/components/AdSlot";
 import { CategoriesPage } from "@/pages/CategoriesPage";
 import { SellPage } from "@/pages/SellPage";
@@ -218,6 +219,7 @@ function Home() {
         <Hero />
         <CategorySection />
         <LiveNowStrip />
+        <RewardsTeaser />
         <FeaturedListings />
         <FeaturedFeatures />
         <AdSlot slotKey="home_bottom" />

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import {
   Search, Ban, CheckCircle, RefreshCw, Trophy,
   ChevronDown, ChevronUp, Save, Loader2, Pencil, Trash2, X, AlertTriangle,
+  Mail, UserPlus, Download,
 } from "lucide-react";
 import { AdminLayout } from "./AdminLayout";
 import { useAdmin } from "@/context/AdminContext";
@@ -55,6 +56,26 @@ export function AdminUsersPage() {
   const [deleteUser, setDeleteUser] = useState<User | null>(null);
   const [deleteSaving, setDeleteSaving] = useState(false);
 
+  // Load / sync feedback
+  const [loadError, setLoadError] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Add user modal
+  const [addOpen, setAddOpen] = useState(false);
+  const [addEmail, setAddEmail] = useState("");
+  const [addName, setAddName] = useState("");
+  const [addCredits, setAddCredits] = useState("");
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState("");
+
+  // Message modal
+  const [msgUser, setMsgUser] = useState<User | null>(null);
+  const [msgSubject, setMsgSubject] = useState("");
+  const [msgBody, setMsgBody] = useState("");
+  const [msgSending, setMsgSending] = useState(false);
+  const [msgResult, setMsgResult] = useState<{ ok: boolean; text: string } | null>(null);
+
   // Milestones
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
   const [milestoneData, setMilestoneData] = useState<Record<string, { progress: number; completed: boolean }>>({});
@@ -68,11 +89,16 @@ export function AdminUsersPage() {
 
   async function load() {
     setLoading(true);
+    setLoadError("");
     try {
-      const params = new URLSearchParams({ limit: "50" });
+      const params = new URLSearchParams({ limit: "200" });
       if (search) params.set("search", search);
       const res = await authFetch(`/api/admin/users?${params}`);
       if (res.ok) { const d = await res.json(); setUsers(d.users); setTotal(d.total); }
+      else if (res.status === 401) setLoadError("Your admin session has expired — sign out and back in.");
+      else setLoadError(`Couldn't load users (error ${res.status}).`);
+    } catch {
+      setLoadError("Couldn't reach the server.");
     } finally { setLoading(false); }
   }
 
@@ -143,6 +169,58 @@ export function AdminUsersPage() {
     await load();
   }
 
+  async function syncUsers() {
+    setSyncing(true); setSyncMsg(null);
+    try {
+      const res = await authFetch("/api/admin/users/sync", { method: "POST" });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setSyncMsg({ ok: false, text: d.error ?? "Sync failed" }); return; }
+      const parts = [`${d.added} user${d.added === 1 ? "" : "s"} added (${d.total} total).`];
+      if (d.note) parts.push(d.note);
+      setSyncMsg({ ok: !d.note, text: parts.join(" ") });
+      await load();
+    } catch {
+      setSyncMsg({ ok: false, text: "Network error — try again" });
+    } finally { setSyncing(false); }
+  }
+
+  async function saveNewUser() {
+    setAddSaving(true); setAddError("");
+    try {
+      const res = await authFetch("/api/admin/users", {
+        method: "POST",
+        body: JSON.stringify({
+          email: addEmail.trim(),
+          name: addName.trim() || null,
+          credits: addCredits ? parseFloat(addCredits) / 100 : 0,
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setAddError(d.error ?? "Failed to add user"); return; }
+      setAddOpen(false); setAddEmail(""); setAddName(""); setAddCredits("");
+      await load();
+    } catch {
+      setAddError("Network error — try again");
+    } finally { setAddSaving(false); }
+  }
+
+  async function sendMessage() {
+    if (!msgUser) return;
+    setMsgSending(true); setMsgResult(null);
+    try {
+      const res = await authFetch(`/api/admin/users/${encodeURIComponent(msgUser.email)}/message`, {
+        method: "POST",
+        body: JSON.stringify({ subject: msgSubject.trim(), body: msgBody.trim() }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setMsgResult({ ok: false, text: d.error ?? "Failed to send" }); return; }
+      setMsgResult({ ok: true, text: "Message sent to their inbox." });
+      setMsgSubject(""); setMsgBody("");
+    } catch {
+      setMsgResult({ ok: false, text: "Network error — try again" });
+    } finally { setMsgSending(false); }
+  }
+
   async function toggleMilestones(email: string) {
     if (expandedEmail === email) { setExpandedEmail(null); return; }
     setExpandedEmail(email);
@@ -183,17 +261,39 @@ export function AdminUsersPage() {
           <h1 className="text-xl font-black text-gray-900">Users</h1>
           <p className="text-sm text-gray-400 mt-0.5">{total} registered users</p>
         </div>
-        <button onClick={load} disabled={loading}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 font-medium disabled:opacity-40">
-          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={syncUsers} disabled={syncing}
+            title="Import everyone from Clerk and from past listings, purchases and tickets"
+            className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40">
+            {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Sync users
+          </button>
+          <button onClick={() => { setAddOpen(true); setAddError(""); }}
+            className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-[#4A5CE8] text-white hover:opacity-90">
+            <UserPlus className="w-3.5 h-3.5" /> Add user
+          </button>
+          <button onClick={load} disabled={loading}
+            className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 font-medium disabled:opacity-40 p-2">
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+        </div>
       </div>
+
+      {loadError && (
+        <div className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" /> {loadError}
+        </div>
+      )}
+      {syncMsg && (
+        <div className={`mb-4 text-sm rounded-xl px-4 py-3 border ${syncMsg.ok ? "bg-green-50 border-green-200 text-green-700" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+          {syncMsg.text}
+        </div>
+      )}
 
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
         <input
           value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by email…"
+          placeholder="Search by name or email…"
           className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]"
         />
       </div>
@@ -213,7 +313,9 @@ export function AdminUsersPage() {
                 <tr><td colSpan={5} className="text-center text-gray-400 py-10">Loading…</td></tr>
               )}
               {!loading && users.length === 0 && (
-                <tr><td colSpan={5} className="text-center text-gray-400 py-10">No users found</td></tr>
+                <tr><td colSpan={5} className="text-center text-gray-400 py-10">
+                  No users found{!search && " — press “Sync users” above to import your existing accounts."}
+                </td></tr>
               )}
               {users.map((u) => (
                 <>
@@ -222,7 +324,7 @@ export function AdminUsersPage() {
                     <td className="px-4 py-3">
                       <p className="font-semibold text-gray-800 text-xs">{u.email}</p>
                       <p className="text-gray-400 text-[11px] mt-0.5">{u.name ?? <span className="italic">No name</span>}</p>
-                      {u.banned && <span className="inline-block mt-1 text-[9px] font-bold text-red-500 bg-red-100 px-1.5 py-0.5 rounded-full">BANNED</span>}
+                      {u.banned && <span className="inline-block mt-1 text-[9px] font-bold text-red-500 bg-red-100 px-1.5 py-0.5 rounded-full">SUSPENDED</span>}
                     </td>
 
                     {/* Credits */}
@@ -291,7 +393,16 @@ export function AdminUsersPage() {
                           <Pencil className="w-3.5 h-3.5" /> Edit
                         </button>
 
-                        {/* Ban/Unban */}
+                        {/* Message */}
+                        <button
+                          onClick={() => { setMsgUser(u); setMsgSubject(""); setMsgBody(""); setMsgResult(null); }}
+                          className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors"
+                          title="Send a message to their inbox"
+                        >
+                          <Mail className="w-3.5 h-3.5" /> Message
+                        </button>
+
+                        {/* Suspend / unsuspend */}
                         <button
                           onClick={() => toggleBan(u.email, u.banned)}
                           disabled={banSaving === u.email}
@@ -304,7 +415,7 @@ export function AdminUsersPage() {
                           {banSaving === u.email
                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             : u.banned ? <CheckCircle className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
-                          {u.banned ? "Unban" : "Ban"}
+                          {u.banned ? "Unsuspend" : "Suspend"}
                         </button>
 
                         {/* Milestones */}
@@ -419,6 +530,56 @@ export function AdminUsersPage() {
           </table>
         </div>
       </div>
+
+      {/* ── Add User Modal ── */}
+      {addOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setAddOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-black text-gray-900">Add user</h3>
+              <button onClick={() => setAddOpen(false)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-3">
+              <input value={addEmail} onChange={e => setAddEmail(e.target.value)} placeholder="Email address *" type="email"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30" />
+              <input value={addName} onChange={e => setAddName(e.target.value)} placeholder="Name (optional)"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30" />
+              <input value={addCredits} onChange={e => setAddCredits(e.target.value)} placeholder="Starting credits (optional)" type="number" min="0"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30" />
+              <p className="text-[11px] text-gray-400">This creates their Bazunk account record. They still sign in with their own login on the site.</p>
+              {addError && <p className="text-sm text-red-600">{addError}</p>}
+              <button onClick={saveNewUser} disabled={addSaving || !addEmail.trim()}
+                className="w-full py-2.5 rounded-xl bg-[#4A5CE8] text-white text-sm font-bold disabled:opacity-40 flex items-center justify-center gap-2">
+                {addSaving && <Loader2 className="w-4 h-4 animate-spin" />} Add user
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Message Modal ── */}
+      {msgUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setMsgUser(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-black text-gray-900">Message {msgUser.name ?? msgUser.email}</h3>
+              <button onClick={() => setMsgUser(null)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">Appears in their inbox as “From Bazunk”.</p>
+            <div className="space-y-3">
+              <input value={msgSubject} onChange={e => setMsgSubject(e.target.value)} placeholder="Subject"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30" />
+              <textarea value={msgBody} onChange={e => setMsgBody(e.target.value)} placeholder="Write your message…" rows={5}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 resize-none" />
+              {msgResult && <p className={`text-sm ${msgResult.ok ? "text-green-600" : "text-red-600"}`}>{msgResult.text}</p>}
+              <button onClick={sendMessage} disabled={msgSending || !msgSubject.trim() || !msgBody.trim()}
+                className="w-full py-2.5 rounded-xl bg-[#4A5CE8] text-white text-sm font-bold disabled:opacity-40 flex items-center justify-center gap-2">
+                {msgSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Send message
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Edit User Modal ── */}
       {editUser && (

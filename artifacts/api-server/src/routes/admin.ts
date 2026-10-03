@@ -6,6 +6,8 @@ import { createAdminToken, requireAdmin } from "../middlewares/adminAuth.js";
 import { getUncachableStripeClient } from "../stripeClient.js";
 import { logger } from "../lib/logger.js";
 import { syncMilestonesFor } from "../lib/milestones.js";
+import { sendSystemMessage } from "../lib/systemMessages.js";
+import { clerkClient } from "@clerk/express";
 import { DEMO_PRODUCTS } from "../demoSeedData.js";
 import { fetchAmazonDetails, buildAmazonDescription } from "../lib/amazon.js";
 import { fetchEbayDetails, buildEbayDescription } from "../lib/ebay.js";
@@ -139,7 +141,7 @@ router.get("/admin/users", async (req, res) => {
     const rows = search
       ? await db.execute(sql`
           SELECT id, email, name, credits, stripe_customer_id, banned, created_at
-          FROM users WHERE email ILIKE ${"%" + search + "%"}
+          FROM users WHERE email ILIKE ${"%" + search + "%"} OR name ILIKE ${"%" + search + "%"}
           ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
         `).then(r => r.rows)
       : await db.execute(sql`
@@ -149,7 +151,7 @@ router.get("/admin/users", async (req, res) => {
 
     const [{ count }] = await db.execute(
       search
-        ? sql`SELECT COUNT(*)::int as count FROM users WHERE email ILIKE ${"%" + search + "%"}`
+        ? sql`SELECT COUNT(*)::int as count FROM users WHERE email ILIKE ${"%" + search + "%"} OR name ILIKE ${"%" + search + "%"}`
         : sql`SELECT COUNT(*)::int as count FROM users`
     ).then(r => r.rows as any[]);
 
@@ -157,6 +159,101 @@ router.get("/admin/users", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "Failed to list users");
     res.status(500).json({ error: "Failed to list users" });
+  }
+});
+
+// Add a user by hand
+
+router.post("/admin/users", async (req, res) => {
+  try {
+    const email = String(req.body?.email ?? "").trim().toLowerCase();
+    const name = req.body?.name ? String(req.body.name).trim() : null;
+    const credits = Math.max(0, Number(req.body?.credits ?? 0)) || 0; // pounds (100 credits = £1)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { res.status(400).json({ error: "Enter a valid email address" }); return; }
+    const inserted = await db.execute(sql`
+      INSERT INTO users (id, email, name, credits) VALUES (${email}, ${email}, ${name}, ${credits.toFixed(2)})
+      ON CONFLICT DO NOTHING RETURNING email
+    `).then(r => r.rows);
+    if (!inserted.length) { res.status(409).json({ error: "A user with that email already exists" }); return; }
+    logger.info({ email, credits }, "Admin added user");
+    res.json({ success: true, email });
+  } catch (err) {
+    logger.error({ err }, "Failed to add user");
+    res.status(500).json({ error: "Failed to add user" });
+  }
+});
+
+// Pull in people who exist elsewhere but aren't in the users table yet:
+// every Clerk account, plus emails already used on listings / credit purchases / support tickets.
+router.post("/admin/users/sync", async (_req, res) => {
+  try {
+    let fromClerk = 0;
+    let clerkNote: string | null = null;
+
+    if (process.env.CLERK_SECRET_KEY) {
+      try {
+        const pageSize = 100;
+        for (let offset = 0; offset < 5000; offset += pageSize) {
+          const resp: any = await (clerkClient as any).users.getUserList({ limit: pageSize, offset, orderBy: "-created_at" });
+          const list: any[] = Array.isArray(resp) ? resp : (resp?.data ?? []);
+          if (!list.length) break;
+          for (const u of list) {
+            const primary = u.emailAddresses?.find((e: any) => e.id === u.primaryEmailAddressId) ?? u.emailAddresses?.[0];
+            const email = String(primary?.emailAddress ?? "").trim().toLowerCase();
+            if (!email) continue;
+            const name = [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.username || null;
+            const created = u.createdAt ? new Date(u.createdAt) : new Date();
+            const r = await db.execute(sql`
+              INSERT INTO users (id, email, name, credits, created_at) VALUES (${email}, ${email}, ${name}, 0, ${created.toISOString()})
+              ON CONFLICT (email) DO NOTHING RETURNING email
+            `);
+            fromClerk += r.rows.length;
+          }
+          if (list.length < pageSize) break;
+        }
+      } catch (err) {
+        logger.error({ err }, "Clerk user import failed");
+        clerkNote = "Couldn't read your Clerk accounts — check CLERK_SECRET_KEY on the API service.";
+      }
+    } else {
+      clerkNote = "CLERK_SECRET_KEY isn't set on the API service, so Clerk accounts couldn't be imported.";
+    }
+
+    const other = await db.execute(sql`
+      INSERT INTO users (id, email, credits)
+      SELECT lower(e), lower(e), 0 FROM (
+        SELECT seller_email AS e FROM listings WHERE seller_email IS NOT NULL
+        UNION SELECT email FROM credit_transactions WHERE email IS NOT NULL
+        UNION SELECT email FROM support_tickets WHERE email IS NOT NULL
+      ) s
+      WHERE e LIKE '%@%'
+      ON CONFLICT (email) DO NOTHING RETURNING email
+    `);
+
+    const [{ count }] = await db.execute(sql`SELECT COUNT(*)::int AS count FROM users`).then(r => r.rows as any[]);
+    res.json({ added: fromClerk + other.rows.length, fromClerk, fromActivity: other.rows.length, total: count, note: clerkNote });
+  } catch (err) {
+    logger.error({ err }, "Failed to sync users");
+    res.status(500).json({ error: "Failed to sync users" });
+  }
+});
+
+// Send a message to a user's inbox ("From Bazunk")
+
+router.post("/admin/users/:email/message", async (req, res) => {
+  try {
+    const email = decodeURIComponent(req.params.email);
+    const subject = String(req.body?.subject ?? "").trim();
+    const body = String(req.body?.body ?? "").trim();
+    if (!subject || !body) { res.status(400).json({ error: "Subject and message are both required" }); return; }
+    const exists = await db.execute(sql`SELECT 1 FROM users WHERE email = ${email}`).then(r => r.rows.length > 0);
+    if (!exists) { res.status(404).json({ error: "User not found" }); return; }
+    await sendSystemMessage(email, { subject, body, category: "Message from Bazunk" });
+    logger.info({ email, subject }, "Admin sent message");
+    res.json({ success: true });
+  } catch (err) {
+    logger.error({ err }, "Failed to send message");
+    res.status(500).json({ error: "Failed to send message" });
   }
 });
 

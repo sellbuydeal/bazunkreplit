@@ -1,3 +1,4 @@
+import { isBanned } from "../lib/banned.js";
 import { Router } from "express";
 import { storage } from "../storage.js";
 import { getUncachableStripeClient, getStripePublishableKey } from "../stripeClient.js";
@@ -56,6 +57,7 @@ router.post("/stripe/sync-user", async (req, res) => {
   try {
     const { email, name } = req.body;
     if (!email) { res.status(400).json({ error: "email required" }); return; }
+    if (await isBanned(email)) { res.status(403).json({ error: "This account has been suspended.", banned: true }); return; }
     const user = await storage.upsertUser(email, name);
     const balance = parseFloat(user.credits as string);
     res.json({ balance });
@@ -94,6 +96,7 @@ router.post("/stripe/checkout", async (req, res) => {
 
     const totalCredits = basePrice + bonus;
 
+    if (await isBanned(email)) { res.status(403).json({ error: "This account has been suspended.", banned: true }); return; }
     await storage.upsertUser(email, name);
 
     const stripe = await getUncachableStripeClient();

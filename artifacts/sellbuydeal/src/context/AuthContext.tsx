@@ -28,13 +28,17 @@ const AuthContext = createContext<AuthContextValue>({
   refreshBalance: async () => {},
 });
 
-async function syncUserWithServer(email: string, name?: string): Promise<number | null> {
+async function syncUserWithServer(email: string, name?: string): Promise<number | null | "suspended"> {
   try {
     const res = await fetch("/api/stripe/sync-user", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, name }),
     });
+    if (res.status === 403) {
+      const d = await res.json().catch(() => ({}));
+      if (d?.banned) return "suspended";
+    }
     if (!res.ok) return null;
     const data = await res.json();
     return typeof data.balance === "number" ? data.balance : null;
@@ -69,6 +73,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const name = clerkUser?.fullName ?? undefined;
     syncUserWithServer(email, name).then((b) => {
+      if (b === "suspended") {
+        signOut();
+        window.alert("This account has been suspended. Please contact Bazunk support if you think this is a mistake.");
+        return;
+      }
       if (b !== null) setBalance(b);
     });
   }, [clerkId, email]); // eslint-disable-line react-hooks/exhaustive-deps
