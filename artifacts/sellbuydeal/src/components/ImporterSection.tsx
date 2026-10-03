@@ -80,7 +80,7 @@ interface ImportModalProps {
 
 const CONDITIONS = ["new", "like new", "good", "fair", "poor"];
 
-function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportModalProps) {
+export function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportModalProps) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [supplierPriceUsd, setSupplierPriceUsd] = useState("");

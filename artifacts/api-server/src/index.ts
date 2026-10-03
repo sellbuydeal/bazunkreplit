@@ -496,6 +496,27 @@ async function runAppMigrations() {
     ON CONFLICT DO NOTHING
   `, "product_categories.seed_digital_adult");
 
+  // One-off tidy: AliExpress imports made before the importer used the Quick Sell category list
+  // carry the old short names (fashion, home, gaming …). Map them onto the site's real category slugs.
+  // Safe to run on every start: once mapped, nothing matches again. "other" has no equivalent and is left alone.
+  await run(sql`
+    UPDATE listings l
+    SET category = CASE l.category
+      WHEN 'fashion' THEN 'clothing-shoes-jewelry'
+      WHEN 'home'    THEN 'home-kitchen'
+      WHEN 'gaming'  THEN 'video-games'
+      WHEN 'sports'  THEN 'sports-outdoors'
+      WHEN 'beauty'  THEN 'beauty-personal-care'
+      WHEN 'toys'    THEN 'toys-games'
+      ELSE l.category
+    END
+    WHERE l.category IN ('fashion', 'home', 'gaming', 'sports', 'beauty', 'toys')
+      AND EXISTS (
+        SELECT 1 FROM supplier_imports si
+        WHERE si.listing_id = l.id AND si.supplier_source = 'aliexpress'
+      )
+  `, "listings.map_aliexpress_old_categories");
+
   logger.info("App migrations complete");
 }
 

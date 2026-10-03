@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { AdminLayout } from "./AdminLayout";
 import { RapidApiPanel } from "./RapidApiPanel";
+import { ImportModal } from "@/components/ImporterSection";
 import { useAdmin } from "@/context/AdminContext";
 import { CATEGORIES as SITE_CATEGORIES } from "@/data/categories";
 import { CLASSIFIED_CATEGORIES } from "@/data/classifieds";
@@ -91,8 +92,8 @@ export function AdminImportsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [markup, setMarkup] = useState("35");
   const [shipping, setShipping] = useState("3.99");
-  const [importCategory, setImportCategory] = useState(SITE_CATEGORIES[0].slug);
-  const [importSubcategory, setImportSubcategory] = useState(SITE_CATEGORIES[0].subcategories[0]?.slug ?? "");
+  const [importCategory, setImportCategory] = useState("");
+  const [importSubcategory, setImportSubcategory] = useState("");
   const [sellerEmail, setSellerEmail] = useState("bazunkdeals@gmail.com");
   const [users, setUsers] = useState<UserOption[]>([]);
   const [importing, setImporting] = useState(false);
@@ -135,8 +136,8 @@ export function AdminImportsPage() {
   const [ebaySelected, setEbaySelected]     = useState<Set<string>>(new Set());
   const [ebayMarkup, setEbayMarkup]         = useState("35");
   const [ebayShipping, setEbayShipping]     = useState("3.99");
-  const [ebayCat, setEbayCat]               = useState(SITE_CATEGORIES[0].slug);
-  const [ebaySub, setEbaySub]               = useState(SITE_CATEGORIES[0].subcategories[0]?.slug ?? "");
+  const [ebayCat, setEbayCat]               = useState("");
+  const [ebaySub, setEbaySub]               = useState("");
   const [ebaySellerEmail, setEbaySellerEmail] = useState("bazunkdeals@gmail.com");
   const [ebayImporting, setEbayImporting]   = useState(false);
   const [ebayImportMsg, setEbayImportMsg]   = useState<{ ok: boolean; text: string } | null>(null);
@@ -171,6 +172,11 @@ export function AdminImportsPage() {
   const [gtImporting, setGtImporting] = useState(false);
   const [gtMsg, setGtMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // ── AliExpress manual importer state ──────────────────────────
+  const [aliSeller, setAliSeller] = useState("bazunkdeals@gmail.com");
+  const [aliModalOpen, setAliModalOpen] = useState(false);
+  const [aliDone, setAliDone] = useState(0);
+
   const PAGE_SIZE = 50;
 
   // ── Load users for seller picker ─────────────────────────────
@@ -189,8 +195,7 @@ export function AdminImportsPage() {
 
   // ── Subcategory reset when top-level category changes ────────
   useEffect(() => {
-    const cat = SITE_CATEGORIES.find(c => c.slug === importCategory);
-    setImportSubcategory(cat?.subcategories[0]?.slug ?? "");
+    setImportSubcategory("");
   }, [importCategory]);
 
   const loadListings = useCallback(async () => {
@@ -257,6 +262,7 @@ export function AdminImportsPage() {
   async function handleImportSelected() {
     const products = searchResults.filter(p => selected.has(p.asin));
     if (!products.length) return;
+    if (!importCategory) { setImportMsg({ ok: false, text: "Choose a category before importing." }); return; }
     setImporting(true);
     setImportMsg(null);
     try {
@@ -383,8 +389,7 @@ export function AdminImportsPage() {
 
   // ── eBay subcategory reset ────────────────────────────────────
   useEffect(() => {
-    const cat = SITE_CATEGORIES.find(c => c.slug === ebayCat);
-    setEbaySub(cat?.subcategories[0]?.slug ?? "");
+    setEbaySub("");
   }, [ebayCat]);
 
   // ── Load eBay listings ────────────────────────────────────────
@@ -441,6 +446,7 @@ export function AdminImportsPage() {
   async function handleEbayImport() {
     const products = ebayResults.filter(p => ebaySelected.has(p.item_id));
     if (!products.length) return;
+    if (!ebayCat) { setEbayImportMsg({ ok: false, text: "Choose a category before importing." }); return; }
     setEbayImporting(true);
     setEbayImportMsg(null);
     try {
@@ -719,6 +725,7 @@ export function AdminImportsPage() {
                       {/* Category → Subcategory cascade */}
                       <select value={importCategory} onChange={e => setImportCategory(e.target.value)}
                         className={inputCls + " py-1.5 text-xs max-w-[140px]"}>
+                        <option value="">Select category</option>
                         {SITE_CATEGORIES.map(c => (
                           <option key={c.slug} value={c.slug}>{c.name}</option>
                         ))}
@@ -743,7 +750,7 @@ export function AdminImportsPage() {
                         <input type="number" min="0" step="0.01" value={shipping} onChange={e => setShipping(e.target.value)}
                           className={inputCls + " w-20 py-1.5 text-xs"} placeholder="£3.99" />
                       </div>
-                      <button onClick={handleImportSelected} disabled={importing || selected.size === 0}
+                      <button onClick={handleImportSelected} disabled={importing || selected.size === 0 || !importCategory}
                         className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#F26B21] text-white text-sm font-bold hover:bg-[#e0601d] transition-colors disabled:opacity-50">
                         {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowDownToLine className="w-3.5 h-3.5" />}
                         {importing ? "Importing…" : `Import ${selected.size > 0 ? `(${selected.size})` : ""}`}
@@ -1124,6 +1131,7 @@ export function AdminImportsPage() {
                       </div>
                       <select value={ebayCat} onChange={e => setEbayCat(e.target.value)}
                         className={ebayInputCls + " py-1.5 text-xs max-w-[140px]"}>
+                        <option value="">Select category</option>
                         {SITE_CATEGORIES.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
                       </select>
                       {(() => {
@@ -1146,7 +1154,7 @@ export function AdminImportsPage() {
                         <input type="number" min="0" step="0.01" value={ebayShipping} onChange={e => setEbayShipping(e.target.value)}
                           className={ebayInputCls + " w-20 py-1.5 text-xs"} placeholder={`${ebaySymbol}3.99`} />
                       </div>
-                      <button onClick={handleEbayImport} disabled={ebayImporting || ebaySelected.size === 0}
+                      <button onClick={handleEbayImport} disabled={ebayImporting || ebaySelected.size === 0 || !ebayCat}
                         className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#4A5CE8] text-white text-sm font-bold hover:bg-[#3a4cd8] transition-colors disabled:opacity-50">
                         {ebayImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowDownToLine className="w-3.5 h-3.5" />}
                         {ebayImporting ? "Importing…" : `Import${ebaySelected.size > 0 ? ` (${ebaySelected.size})` : ""}`}
@@ -1389,20 +1397,38 @@ export function AdminImportsPage() {
 
         {tab === "aliexpress" && (
           <motion.div key="ali" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center max-w-lg mx-auto mt-8">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 max-w-lg mx-auto mt-8">
               <div className="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl">📦</span>
               </div>
-              <h2 className="font-black text-gray-900 text-lg mb-2">AliExpress Importer</h2>
-              <p className="text-sm text-gray-500 mb-6">
-                AliExpress importing is available from the seller dashboard. Log in as the seller and use the{" "}
-                <strong>Import</strong> section to add individual products with automatic markup and price syncing.
+              <h2 className="font-black text-gray-900 text-lg mb-2 text-center">AliExpress Importer</h2>
+              <p className="text-sm text-gray-500 mb-5 text-center">
+                Paste an AliExpress product link, choose the category (same list as Quick Sell), set your markup and import it
+                into the store of the seller below. Prices re-sync automatically.
               </p>
-              <a href="/sell" target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#F26B21] text-white font-bold text-sm hover:bg-[#e0601d] transition-colors">
-                Open Seller Dashboard <ExternalLink className="w-4 h-4" />
-              </a>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Import into this seller's store</label>
+              <select value={aliSeller} onChange={e => setAliSeller(e.target.value)}
+                className={inputCls + " w-full mb-4"}>
+                {users.length === 0
+                  ? <option value={aliSeller}>{aliSeller}</option>
+                  : users.map(u => <option key={u.email} value={u.email}>{u.name ? `${u.name} (${u.email})` : u.email}</option>)}
+              </select>
+              <button onClick={() => setAliModalOpen(true)}
+                className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#F26B21] text-white font-bold text-sm hover:bg-[#e0601d] transition-colors">
+                <Plus className="w-4 h-4" /> Import an AliExpress product
+              </button>
+              {aliDone > 0 && (
+                <p className="mt-3 text-sm text-green-600 text-center">{aliDone} product{aliDone === 1 ? "" : "s"} imported this session.</p>
+              )}
             </div>
+            {aliModalOpen && (
+              <ImportModal
+                onClose={() => setAliModalOpen(false)}
+                onSuccess={() => setAliDone(n => n + 1)}
+                userEmail={aliSeller}
+                userName={users.find(u => u.email === aliSeller)?.name ?? ""}
+              />
+            )}
           </motion.div>
         )}
 

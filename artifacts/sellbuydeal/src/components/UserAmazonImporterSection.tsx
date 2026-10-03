@@ -51,8 +51,8 @@ export function UserAmazonImporterSection() {
   const [selected, setSelected]           = useState<Set<string>>(new Set());
   const [markup, setMarkup]               = useState("35");
   const [shipping, setShipping]           = useState("3.99");
-  const [importCat, setImportCat]         = useState(SITE_CATEGORIES[0].slug);
-  const [importSub, setImportSub]         = useState(SITE_CATEGORIES[0].subcategories[0]?.slug ?? "");
+  const [importCat, setImportCat]         = useState("");
+  const [importSub, setImportSub]         = useState("");
   const [importing, setImporting]         = useState(false);
   const [importMsg, setImportMsg]         = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -62,8 +62,7 @@ export function UserAmazonImporterSection() {
 
   // Reset subcategory when top-level category changes
   useEffect(() => {
-    const cat = SITE_CATEGORIES.find(c => c.slug === importCat);
-    setImportSub(cat?.subcategories[0]?.slug ?? "");
+    setImportSub("");
   }, [importCat]);
 
   const loadMyImports = useCallback(async () => {
@@ -139,6 +138,7 @@ export function UserAmazonImporterSection() {
     if (!user?.email) return;
     const products = results.filter(p => selected.has(p.asin));
     if (!products.length) return;
+    if (!importCat) { setImportMsg({ ok: false, text: "Choose a category before importing." }); return; }
     setImporting(true);
     setImportMsg(null);
     try {
@@ -246,6 +246,7 @@ export function UserAmazonImporterSection() {
                 {/* Category cascade */}
                 <select value={importCat} onChange={e => setImportCat(e.target.value)}
                   className={inputCls + " py-1.5 text-xs max-w-[130px]"}>
+                  <option value="">Select category</option>
                   {SITE_CATEGORIES.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
                 </select>
                 {subs.length > 0 && (
@@ -265,7 +266,7 @@ export function UserAmazonImporterSection() {
                   <input type="number" min="0" step="0.01" value={shipping} onChange={e => setShipping(e.target.value)}
                     className={inputCls + " w-20 py-1.5 text-xs"} placeholder="£3.99" />
                 </div>
-                <button onClick={handleImport} disabled={importing || selected.size === 0}
+                <button onClick={handleImport} disabled={importing || selected.size === 0 || !importCat}
                   className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#F26B21] text-white text-sm font-bold hover:bg-[#e0601d] transition-colors disabled:opacity-50">
                   {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowDownToLine className="w-3.5 h-3.5" />}
                   {importing ? "Importing…" : `Import${selected.size > 0 ? ` (${selected.size})` : ""}`}
