@@ -65,6 +65,10 @@ async function runAppMigrations() {
   await run(sql`CREATE TABLE IF NOT EXISTS referral_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`, "referral_settings");
   for (const [k,v] of Object.entries({enabled:'1',join_referrer:'5',join_friend:'5',purchase_referrer:'10',purchase_friend:'10',seller_referrer:'15',seller_friend:'10'})) await run(sql`INSERT INTO referral_settings(key,value) VALUES(${k},${v}) ON CONFLICT(key) DO NOTHING`, `referral_settings.${k}`);
 
+  await run(sql`CREATE TABLE IF NOT EXISTS listing_watchers (id BIGSERIAL PRIMARY KEY, listing_id INTEGER NOT NULL, buyer_email TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(listing_id,buyer_email))`, "listing_watchers");
+  await run(sql`CREATE INDEX IF NOT EXISTS listing_watchers_listing_idx ON listing_watchers(listing_id)`, "listing_watchers.index");
+  await run(sql`CREATE TABLE IF NOT EXISTS watcher_offers (id BIGSERIAL PRIMARY KEY, listing_id INTEGER NOT NULL, seller_email TEXT NOT NULL, discount_percent INTEGER NOT NULL, original_price NUMERIC(10,2) NOT NULL, offer_price NUMERIC(10,2) NOT NULL, expires_at TIMESTAMPTZ NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`, "watcher_offers");
+
   await run(sql`
     CREATE TABLE IF NOT EXISTS listings (
       id SERIAL PRIMARY KEY,

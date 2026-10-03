@@ -396,6 +396,12 @@ function ListingActions({ listing, userEmail, onUpdated, onDeleted }: {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reviseOpen, setReviseOpen] = useState(false);
   const [promoteOpen, setPromoteOpen] = useState(false);
+  const [watcherOfferOpen, setWatcherOfferOpen] = useState(false);
+  const [watcherDiscount, setWatcherDiscount] = useState("10");
+  const [watcherHours, setWatcherHours] = useState("24");
+  const [watcherSending, setWatcherSending] = useState(false);
+  const [watcherResult, setWatcherResult] = useState("");
+  const { getToken } = useClerkAuth();
   const [draft, setDraft] = useState({ title: "", price: "", description: "", condition: "good", category: "", categoryTop: "", image: "", extraCategories: [] as ExtraCat[] });
   const [addingExtraCat, setAddingExtraCat] = useState(false);
   const [newExtraCatTop, setNewExtraCatTop] = useState("");
@@ -470,6 +476,17 @@ function ListingActions({ listing, userEmail, onUpdated, onDeleted }: {
     if (res.ok) onDeleted(listing.id);
   }
 
+  async function sendWatcherOffer() {
+    setWatcherSending(true); setWatcherResult("");
+    try {
+      const token = await getToken();
+      const r = await fetch(`/api/listings/${listing.id}/watcher-offer`, { method:"POST", headers:{"Content-Type":"application/json", Authorization:`Bearer ${token}`}, body:JSON.stringify({percent:Number(watcherDiscount),hours:Number(watcherHours)}) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Could not send offer");
+      setWatcherResult(`Offer sent to ${d.sent} watcher${d.sent===1?"":"s"} at £${Number(d.offerPrice).toFixed(2)}.`);
+    } catch(e:any) { setWatcherResult(e.message || "Could not send offer"); } finally { setWatcherSending(false); }
+  }
+
   async function handlePromote(type: string) {
     setPromoting(type);
     setPromoteResult(null);
@@ -521,6 +538,9 @@ function ListingActions({ listing, userEmail, onUpdated, onDeleted }: {
               <button onClick={() => { setMenuOpen(false); setPromoteOpen(true); }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                 <TrendingUp className="w-3.5 h-3.5 text-[#F26B21]" /> Promote Listing
               </button>
+              <button onClick={() => { setMenuOpen(false); setWatcherOfferOpen(true); setWatcherResult(""); }} disabled={listing.watchers < 1} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors">
+                <Users className="w-3.5 h-3.5 text-purple-500" /> Send offer to watchers ({listing.watchers})
+              </button>
               <button onClick={handleSuspend} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                 <PauseCircle className="w-3.5 h-3.5 text-amber-500" />
                 {listing.status === "active" ? "Suspend Listing" : "Re-activate"}
@@ -533,6 +553,24 @@ function ListingActions({ listing, userEmail, onUpdated, onDeleted }: {
           )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {watcherOfferOpen && (
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4" onClick={e=>{if(e.target===e.currentTarget)setWatcherOfferOpen(false)}}>
+            <motion.div initial={{scale:.96,y:12}} animate={{scale:1,y:0}} exit={{scale:.96,y:12}} className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-1"><h3 className="text-lg font-bold text-gray-900">Send offer to watchers</h3><button onClick={()=>setWatcherOfferOpen(false)}><X className="w-5 h-5 text-gray-400"/></button></div>
+              <p className="text-sm text-gray-500 mb-5"><strong>{listing.watchers}</strong> {listing.watchers===1?"person is":"people are"} watching this item. Send them a private limited-time discount.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-xs font-semibold text-gray-600">Discount %<input type="number" min="1" max="80" value={watcherDiscount} onChange={e=>setWatcherDiscount(e.target.value)} className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm"/></label>
+                <label className="text-xs font-semibold text-gray-600">Valid for hours<input type="number" min="1" max="168" value={watcherHours} onChange={e=>setWatcherHours(e.target.value)} className="mt-1 w-full border rounded-xl px-3 py-2.5 text-sm"/></label>
+              </div>
+              <div className="mt-4 rounded-xl bg-purple-50 p-3 text-sm text-purple-800">{watcherDiscount || 0}% off for watchers for the next {watcherHours || 0} hours.</div>
+              {watcherResult && <p className="mt-3 text-sm font-medium text-gray-700">{watcherResult}</p>}
+              <button disabled={watcherSending || listing.watchers<1} onClick={sendWatcherOffer} className="mt-5 w-full rounded-xl bg-[#F26B21] text-white font-bold py-3 disabled:opacity-50">{watcherSending?"Sending…":`Send offer to ${listing.watchers} watcher${listing.watchers===1?"":"s"}`}</button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Revise Modal ── */}
       <AnimatePresence>
@@ -942,7 +980,7 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
         </div>
         <div className="hidden lg:flex items-center gap-2">
           <Link href="/rewards" className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F26B21]/10 hover:bg-[#F26B21]/20 transition-colors text-[#F26B21] border border-[#F26B21]/20 text-sm font-semibold">
-            <Dices className="w-4 h-4" /> Rewards Arcade
+            <Gift className="w-4 h-4" /> Rewards
           </Link>
           <Link href="/promotions" className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#7C3AED]/10 hover:bg-[#7C3AED]/20 transition-colors text-[#7C3AED] border border-[#7C3AED]/20 text-sm font-semibold">
             <Megaphone className="w-4 h-4" /> Promotions
@@ -1017,23 +1055,6 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
           </div>
         </div>
       </div>
-
-      {/* Rewards Arcade — direct dashboard entry to daily games */}
-      <Link href="/rewards" className="block rounded-2xl bg-[#1A1D2E] border border-gray-800 p-5 text-white hover:-translate-y-0.5 hover:shadow-lg transition-all">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-[#F26B21]/15 flex items-center justify-center">
-              <Dices className="w-6 h-6 text-[#F26B21]" />
-            </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-wider text-[#F26B21]">Daily Rewards</p>
-              <h2 className="text-lg md:text-xl font-black">Bazunk Rewards Arcade</h2>
-              <p className="text-sm text-white/65 mt-0.5">Play daily games and earn free credits for promotions and perks.</p>
-            </div>
-          </div>
-          <div className="hidden sm:flex items-center gap-1 text-sm font-black text-[#F26B21]">Play now <ChevronRight className="w-4 h-4" /></div>
-        </div>
-      </Link>
 
       {/* Referral rewards — deliberately prominent on the dashboard */}
       <div className="overflow-hidden rounded-2xl bg-gradient-to-r from-[#F26B21] via-[#E85D2A] to-[#4A5CE8] text-white shadow-sm">

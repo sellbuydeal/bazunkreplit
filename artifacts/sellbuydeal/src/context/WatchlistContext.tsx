@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { type Product } from "@/data/products";
-import { useUser } from "@clerk/react";
+import { useUser, useAuth } from "@clerk/react";
 
 export interface WatchlistItem {
   product: Product;
@@ -31,6 +31,7 @@ export function getCurrentPrice(product: Product): number {
 
 export function WatchlistProvider({ children }: { children: ReactNode }) {
   const { user: clerkUser } = useUser();
+  const { getToken } = useAuth();
   const userId = clerkUser?.id ?? null;
   const storageKey = userId ? `sbd_watchlist_${userId}` : null;
 
@@ -58,6 +59,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   }, [items, loadedKey]);
 
   function addToWatchlist(product: Product) {
+    void getToken().then(token => token ? fetch(`/api/listings/${product.id}/watch`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }) : null).catch(() => null);
     setItems((prev) => {
       if (prev.some((i) => i.product.id === product.id)) return prev;
       return [
@@ -73,6 +75,7 @@ export function WatchlistProvider({ children }: { children: ReactNode }) {
   }
 
   function removeFromWatchlist(id: number) {
+    void getToken().then(token => token ? fetch(`/api/listings/${id}/watch`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }) : null).catch(() => null);
     setItems((prev) => prev.filter((i) => i.product.id !== id));
   }
 
