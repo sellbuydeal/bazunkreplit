@@ -17,9 +17,18 @@ import { useOffers, type Offer, type OfferStatus } from "@/context/OfferContext"
 import { useCart } from "@/context/CartContext";
 import { ALL_PRODUCTS } from "@/data/products";
 
-function timeAgo(timestamp: string): string {
+function normaliseTimestamp(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value;
+  if (value instanceof Date) return value.toISOString();
+  return null;
+}
+
+function timeAgo(timestamp: unknown): string {
+  const safe = normaliseTimestamp(timestamp);
+  if (!safe) return "";
   const now = new Date();
-  const then = new Date(timestamp);
+  const then = new Date(safe);
+  if (Number.isNaN(then.getTime())) return "";
   const diff = Math.floor((now.getTime() - then.getTime()) / 1000);
   if (diff < 60) return "just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
@@ -27,8 +36,12 @@ function timeAgo(timestamp: string): string {
   return then.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-function formatTime(timestamp: string): string {
-  return new Date(timestamp).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+function formatTime(timestamp: unknown): string {
+  const safe = normaliseTimestamp(timestamp);
+  if (!safe) return "";
+  const date = new Date(safe);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
 const AVATAR_COLORS: Record<string, string> = {
@@ -47,7 +60,7 @@ function Avatar({ initials, size = "md" }: { initials: string; size?: "sm" | "md
 }
 
 function ConversationRow({ convo, active, onClick }: { convo: Conversation; active: boolean; onClick: () => void }) {
-  const last = convo.messages[convo.messages.length - 1];
+  const last = convo.messages[convo.messages.length - 1] ?? null;
   return (
     <button
       onClick={onClick}
@@ -66,11 +79,11 @@ function ConversationRow({ convo, active, onClick }: { convo: Conversation; acti
           <p className={`text-sm ${convo.unread > 0 ? "font-bold text-gray-900" : "font-semibold text-gray-700"}`}>
             {convo.with.name}
           </p>
-          <span className="text-[10px] text-gray-400 flex-shrink-0 ml-1">{timeAgo(last.timestamp)}</span>
+          <span className="text-[10px] text-gray-400 flex-shrink-0 ml-1">{last ? timeAgo(last.timestamp) : ""}</span>
         </div>
         <p className="text-[11px] text-[#F26B21] font-medium truncate mb-0.5">{convo.listingTitle}</p>
         <p className={`text-xs truncate ${convo.unread > 0 ? "text-gray-700 font-medium" : "text-gray-400"}`}>
-          {last.senderId === "me" ? "You: " : ""}{last.text}
+          {last ? <>{last.senderId === "me" ? "You: " : ""}{last.text}</> : "No messages yet — start the conversation"}
         </p>
       </div>
     </button>
@@ -542,7 +555,7 @@ export function MessagesPage() {
     const r = await fetch(`/api/messages/conversations/${id}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!r.ok) return;
     const data = await r.json();
-    setConversations(prev => prev.map(c => c.id === id ? { ...c, messages: data.messages || [], unread: 0 } : c));
+    setConversations(prev => prev.map(c => c.id === id ? { ...c, messages: Array.isArray(data.messages) ? data.messages.map((m: any) => ({ ...m, timestamp: m.timestamp ?? m.createdAt ?? m.created_at ?? null })) : [], unread: 0 } : c));
   }
 
   async function sendMessage() {
@@ -553,7 +566,7 @@ export function MessagesPage() {
       const r = await fetch(`/api/messages/conversations/${activeId}/messages`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ text }) });
       const msg = await r.json();
       if (!r.ok) { setInputText(text); return; }
-      setConversations(prev => prev.map(c => c.id === activeId ? { ...c, messages: [...c.messages, msg] } : c));
+      setConversations(prev => prev.map(c => c.id === activeId ? { ...c, messages: [...c.messages, { ...msg, timestamp: msg.timestamp ?? msg.createdAt ?? msg.created_at ?? new Date().toISOString() }] } : c));
     } catch { setInputText(text); }
   }
 
@@ -565,7 +578,7 @@ export function MessagesPage() {
         const token=await session.getToken();
         const r=await fetch("/api/messages/conversations",{headers:{Authorization:`Bearer ${token}`}});
         if(!r.ok) return; const rows=await r.json();
-        const mapped: Conversation[] = rows.map((x:any)=>({...x,messages:[{id:-x.id,senderId:"them",text:x.lastText,timestamp:x.lastAt,read:x.unread===0}]}));
+        const mapped: Conversation[] = rows.map((x:any)=>({...x,messages:[{id:-x.id,senderId:"them",text:x.lastText,timestamp:x.lastAt ?? x.updatedAt ?? x.updated_at ?? null,read:x.unread===0}]}));
         if(cancelled) return; setConversations(mapped);
         const wanted=Number(new URLSearchParams(window.location.search).get("conversation"));
         const first=(wanted && mapped.some(c=>c.id===wanted))?wanted:(mapped[0]?.id ?? null);
