@@ -76,6 +76,7 @@ export function SellerProfileCard({ sellerEmail }: { sellerEmail: string }) {
   return (
     <div className="mt-4 pt-4 border-t border-gray-100">
       <p className="text-[11px] font-black uppercase tracking-wider text-gray-400 mb-2.5">Seller profile</p>
+      {sellerEmail.toLowerCase() === "cczslater@gmail.com" && <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-black text-[#4A5CE8]"><ShieldCheck className="w-3.5 h-3.5" /> Bazunk Official Store</div>}
       <ul className="space-y-1.5 text-[13px] text-gray-700">
         {rows.map((r, i) => (
           <li key={i} className="flex items-center gap-2">

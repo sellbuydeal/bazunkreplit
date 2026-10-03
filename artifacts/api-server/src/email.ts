@@ -180,3 +180,8 @@ export async function sendOrderConfirmation(opts: {
   `);
   await send(email, "Your Bazunk order is confirmed", html);
 }
+
+export async function sendSellerSaleNotification(opts:{email:string;items:string[]}):Promise<void>{
+  const html=base(`<h2>You made a sale on Bazunk</h2><p>The following item(s) have been purchased:</p><p><strong>${opts.items.join("<br>")}</strong></p><p>Open Admin / Sales to review and fulfil the order.</p><p><a class="btn" href="${SITE}/admin">Open Bazunk Admin</a></p>`);
+  await send(opts.email,"Bazunk sale — action required",html);
+}

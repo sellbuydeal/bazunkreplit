@@ -138,7 +138,8 @@ export function AdminImportsPage() {
   const [ebayShipping, setEbayShipping]     = useState("3.99");
   const [ebayCat, setEbayCat]               = useState("");
   const [ebaySub, setEbaySub]               = useState("");
-  const [ebaySellerEmail, setEbaySellerEmail] = useState("bazunkdeals@gmail.com");
+  const [ebaySellerEmail] = useState("cczslater@gmail.com");
+  const [ebayMinProfit, setEbayMinProfit] = useState("5");
   const [ebayImporting, setEbayImporting]   = useState(false);
   const [ebayImportMsg, setEbayImportMsg]   = useState<{ ok: boolean; text: string } | null>(null);
   const [ebaySyncing, setEbaySyncing]       = useState(false);
@@ -456,7 +457,8 @@ export function AdminImportsPage() {
         body: JSON.stringify({
           products, site: ebaySite,
           markup: parseFloat(ebayMarkup) || 35,
-          shipping: parseFloat(ebayShipping) || 3.99,
+          shipping: parseFloat(ebayShipping) || 0,
+          minProfit: parseFloat(ebayMinProfit) || 5,
           category: ebayCat, subcategory: ebaySub,
           sellerEmail: ebaySellerEmail,
         }),
@@ -508,7 +510,7 @@ export function AdminImportsPage() {
       const r = await authFetch("/api/admin/bulk-markup-ebay", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markup: parseFloat(ebayBulkMarkup) || 35, shipping: parseFloat(ebayBulkShipping) || 3.99 }),
+        body: JSON.stringify({ markup: parseFloat(ebayBulkMarkup) || 35, shipping: parseFloat(ebayBulkShipping) || 0, minProfit: parseFloat(ebayMinProfit) || 5 }),
       });
       const d = await r.json() as { updated?: number; message?: string; error?: string };
       setEbayBulkMsg(r.ok ? { ok: true, text: d.message ?? `Updated ${d.updated}` } : { ok: false, text: d.error ?? "Failed" });
@@ -620,27 +622,6 @@ export function AdminImportsPage() {
       <AnimatePresence mode="wait">
         {tab === "amazon" && (
           <motion.div key="amazon" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-5">
-
-            {/* Demo cleanup banner */}
-            <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-3 flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Trash2 className="w-4 h-4 text-red-400 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-bold text-red-800">Remove Demo Listings</p>
-                  <p className="text-xs text-red-500">Deletes all BZK-DEMO-* placeholder listings</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                {demoMsg && (
-                  <span className={`text-xs font-semibold ${demoMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{demoMsg.text}</span>
-                )}
-                <button onClick={handleClearDemo} disabled={clearingDemo}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors disabled:opacity-50">
-                  {clearingDemo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  {clearingDemo ? "Deleting…" : "Clear Demo Listings"}
-                </button>
-              </div>
-            </div>
 
             {/* ── Search & pick ─────────────────────────────────── */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
@@ -1118,17 +1099,7 @@ export function AdminImportsPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      {/* Seller picker */}
-                      <div className="flex items-center gap-1">
-                        <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                        <select value={ebaySellerEmail} onChange={e => setEbaySellerEmail(e.target.value)}
-                          className={ebayInputCls + " py-1.5 text-xs max-w-[160px]"}>
-                          {users.length === 0
-                            ? <option value="bazunkdeals@gmail.com">bazunkdeals@gmail.com</option>
-                            : users.map(u => <option key={u.email} value={u.email}>{u.name ? `${u.name} (${u.email})` : u.email}</option>)
-                          }
-                        </select>
-                      </div>
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 text-[#4A5CE8] text-xs font-bold"><CheckCircle2 className="w-3.5 h-3.5" /> Bazunk Official Store</div>
                       <select value={ebayCat} onChange={e => setEbayCat(e.target.value)}
                         className={ebayInputCls + " py-1.5 text-xs max-w-[140px]"}>
                         <option value="">Select category</option>
@@ -1152,8 +1123,9 @@ export function AdminImportsPage() {
                       <div className="flex items-center gap-1">
                         <Truck className="w-3.5 h-3.5 text-gray-400" />
                         <input type="number" min="0" step="0.01" value={ebayShipping} onChange={e => setEbayShipping(e.target.value)}
-                          className={ebayInputCls + " w-20 py-1.5 text-xs"} placeholder={`${ebaySymbol}3.99`} />
+                          className={ebayInputCls + " w-20 py-1.5 text-xs"} placeholder={`${ebaySymbol}0 source cost`} />
                       </div>
+                      <div className="flex items-center gap-1" title="Minimum profit per item after source/fulfilment cost"><span className="text-xs font-bold text-gray-400">Min £</span><input type="number" min="0" step="0.01" value={ebayMinProfit} onChange={e => setEbayMinProfit(e.target.value)} className={ebayInputCls + " w-20 py-1.5 text-xs"} placeholder="5.00" /></div>
                       <button onClick={handleEbayImport} disabled={ebayImporting || ebaySelected.size === 0 || !ebayCat}
                         className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#4A5CE8] text-white text-sm font-bold hover:bg-[#3a4cd8] transition-colors disabled:opacity-50">
                         {ebayImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowDownToLine className="w-3.5 h-3.5" />}
@@ -1174,8 +1146,8 @@ export function AdminImportsPage() {
                   <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {ebayResults.map(p => {
                       const isSel = ebaySelected.has(p.item_id);
-                      const preview = ebayMarkup && ebayShipping
-                        ? Math.round((p.price * (1 + parseFloat(ebayMarkup) / 100) + parseFloat(ebayShipping)) * 100) / 100
+                      const preview = ebayMarkup
+                        ? Math.round(Math.max((p.price + (parseFloat(ebayShipping) || 0)) * (1 + parseFloat(ebayMarkup) / 100), (p.price + (parseFloat(ebayShipping) || 0)) + (parseFloat(ebayMinProfit) || 0)) * 100) / 100
                         : null;
                       return (
                         <button key={p.item_id} onClick={() => toggleEbaySelect(p.item_id)}

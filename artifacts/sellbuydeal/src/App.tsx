@@ -258,6 +258,7 @@ function Router() {
       <Route path="/classifieds" component={ClassifiedsPage} />
       <Route path="/messages" component={MessagesPage} />
       <Route path="/seller/:id" component={SellerProfilePage} />
+      <Route path="/store/bazunk-official">{() => <Redirect to="/seller/cczslater%40gmail.com" />}</Route>
       <Route path="/credits" component={CreditsPage} />
       <Route path="/promotions" component={PromotionsPage} />
       <Route path="/support" component={SupportPage} />

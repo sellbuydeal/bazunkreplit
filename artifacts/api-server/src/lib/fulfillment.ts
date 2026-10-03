@@ -4,7 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { getUncachableStripeClient } from "../stripeClient.js";
 import { storage } from "../storage.js";
-import { sendOrderConfirmation } from "../email.js";
+import { sendOrderConfirmation, sendSellerSaleNotification } from "../email.js";
 import { refreshSellerMilestones } from "./milestones.js";
 import { sendSystemMessage } from "./systemMessages.js";
 import { logger } from "./logger.js";
@@ -94,6 +94,7 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
     if (creditsApplied > 0) await storage.addCredits(buyerEmail, -creditsApplied);
 
     for (const seller of sellers) {
+      void sendSellerSaleNotification({ email: seller, items: sellerItems.get(seller) ?? [] });
       void refreshSellerMilestones(seller);
       void sendSystemMessage(seller, {
         category: "Sales",
