@@ -1,5 +1,3 @@
-import { RapidApiSellerSetup } from "./RapidApiSellerSetup";
-import { useAuth as useClerkAuth } from "@clerk/react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -37,9 +35,7 @@ function parseSpecs(raw: string): { amazon_price_gbp?: number; markup_pct?: numb
 
 const inputCls = "px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#F26B21]/30 focus:border-[#F26B21] bg-white";
 
-function UserAmazonImporterSectionInner() {
-  const { getToken } = useClerkAuth();
-  const authFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => { const token = await getToken(); const headers = new Headers(init.headers || {}); if (token) headers.set("Authorization", `Bearer ${token}`); return fetch(input, { ...init, headers }); };
+export function UserAmazonImporterSection() {
   const { user } = useAuth();
 
   // ── Search state ──────────────────────────────────────────────
@@ -73,7 +69,7 @@ function UserAmazonImporterSectionInner() {
     if (!user?.email) return;
     setLoadingImports(true);
     try {
-      const r = await authFetch(
+      const r = await fetch(
         `/api/admin/listings?imported=1&limit=20&offset=0&sellerEmail=${encodeURIComponent(user.email)}`
       );
       if (r.ok) {
@@ -90,7 +86,7 @@ function UserAmazonImporterSectionInner() {
     if (!user?.email) return;
     setLoadingImports(true);
     try {
-      const r = await authFetch(
+      const r = await fetch(
         `/api/listings?seller_email=${encodeURIComponent(user.email)}&limit=20&offset=0`
       );
       if (r.ok) {
@@ -118,7 +114,7 @@ function UserAmazonImporterSectionInner() {
     setSelected(new Set());
     setImportMsg(null);
     try {
-      const r = await authFetch(`/api/user/search-amazon?q=${encodeURIComponent(q)}&page=${page}`);
+      const r = await fetch(`/api/user/search-amazon?q=${encodeURIComponent(q)}&page=${page}`);
       const d = await r.json() as { products?: SearchResult[]; error?: string };
       if (!r.ok) { setSearchErr(d.error ?? "Search failed"); setResults([]); }
       else { setResults(d.products ?? []); setHasSearched(true); }
@@ -146,7 +142,7 @@ function UserAmazonImporterSectionInner() {
     setImporting(true);
     setImportMsg(null);
     try {
-      const r = await authFetch("/api/user/import-amazon", {
+      const r = await fetch("/api/user/import-amazon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -401,6 +397,3 @@ function UserAmazonImporterSectionInner() {
     </div>
   );
 }
-
-
-export function UserAmazonImporterSection() { return <RapidApiSellerSetup><UserAmazonImporterSectionInner /></RapidApiSellerSetup>; }
