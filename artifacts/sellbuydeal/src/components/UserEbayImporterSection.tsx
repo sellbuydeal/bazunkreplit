@@ -1,4 +1,5 @@
 import { RapidApiSellerSetup } from "./RapidApiSellerSetup";
+import { useAuth as useClerkAuth } from "@clerk/react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -53,6 +54,8 @@ function parseSpecs(raw: string): { ebay_price?: number; markup_pct?: number; sh
 const inputCls = "px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8] bg-white";
 
 function UserEbayImporterSectionInner() {
+  const { getToken } = useClerkAuth();
+  const authFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => { const token = await getToken(); const headers = new Headers(init.headers || {}); if (token) headers.set("Authorization", `Bearer ${token}`); return fetch(input, { ...init, headers }); };
   const { user } = useAuth();
 
   const [site, setSite] = useState<EbaySite>("uk");
@@ -85,7 +88,7 @@ function UserEbayImporterSectionInner() {
     if (!user?.email) return;
     setLoadingImports(true);
     try {
-      const r = await fetch(`/api/listings?seller_email=${encodeURIComponent(user.email)}&limit=40&offset=0`);
+      const r = await authFetch(`/api/listings?seller_email=${encodeURIComponent(user.email)}&limit=40&offset=0`);
       if (r.ok) {
         const d = await r.json() as { listings?: MyImport[] } | MyImport[];
         const list = Array.isArray(d) ? d : (d.listings ?? []);
@@ -108,7 +111,7 @@ function UserEbayImporterSectionInner() {
     setSelected(new Set());
     setImportMsg(null);
     try {
-      const r = await fetch(`/api/user/search-ebay?q=${encodeURIComponent(q)}&site=${currentSite}&page=${currentPage}`);
+      const r = await authFetch(`/api/user/search-ebay?q=${encodeURIComponent(q)}&site=${currentSite}&page=${currentPage}`);
       const d = await r.json() as { products?: SearchResult[]; error?: string };
       if (!r.ok) { setSearchErr(d.error ?? "Search failed"); setResults([]); }
       else { setResults(d.products ?? []); setHasSearched(true); }
@@ -142,7 +145,7 @@ function UserEbayImporterSectionInner() {
     setImporting(true);
     setImportMsg(null);
     try {
-      const r = await fetch("/api/user/import-ebay", {
+      const r = await authFetch("/api/user/import-ebay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

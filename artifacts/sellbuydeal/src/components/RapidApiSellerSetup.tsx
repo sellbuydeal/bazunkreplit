@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/react";
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, Trash2, XCircle } from "lucide-react";
 
 type Status={admin:boolean;configured:boolean;hint:string|null};
@@ -9,12 +10,15 @@ const APIs=[
  {name:"AliExpress — AliExpress DataHub",url:"https://rapidapi.com/ecommdatahub/api/aliexpress-datahub"},
 ];
 export function RapidApiSellerSetup({children}:{children:React.ReactNode}){
+ const { getToken, isLoaded, isSignedIn } = useAuth();
+ const authFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => { const token = await getToken(); const headers = new Headers(init.headers || {}); if (token) headers.set("Authorization", `Bearer ${token}`); return fetch(input, { ...init, headers }); };
  const [status,setStatus]=useState<Status|null>(null),[key,setKey]=useState(""),[tests,setTests]=useState<Test[]>([]),[busy,setBusy]=useState(false),[msg,setMsg]=useState("");
- async function load(){const r=await fetch("/api/user/rapidapi"); if(r.ok)setStatus(await r.json());}
- useEffect(()=>{load()},[]);
- async function connect(){setBusy(true);setMsg("");const r=await fetch("/api/user/rapidapi",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({key})});const d=await r.json().catch(()=>({}));if(r.ok){setKey("");setMsg("Key saved securely.");await load();await test();}else setMsg(d.error||"Could not save key");setBusy(false)}
- async function test(){setBusy(true);const r=await fetch("/api/user/rapidapi/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(key?{key}:{})});const d=await r.json().catch(()=>({}));setTests(d.results||[]);if(!r.ok)setMsg(d.error||"Test failed");setBusy(false)}
- async function remove(){if(!confirm("Remove your RapidAPI key? Your live import searches and supplier syncing will stop."))return;await fetch("/api/user/rapidapi",{method:"DELETE"});setTests([]);await load()}
+ async function load(){const r=await authFetch("/api/user/rapidapi"); if(r.ok)setStatus(await r.json());}
+ useEffect(()=>{ if(isLoaded && isSignedIn) load(); },[isLoaded,isSignedIn]);
+ async function connect(){setBusy(true);setMsg("");const r=await authFetch("/api/user/rapidapi",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({key})});const d=await r.json().catch(()=>({}));if(r.ok){setKey("");setMsg("Key saved securely.");await load();await test();}else setMsg(d.error||"Could not save key");setBusy(false)}
+ async function test(){setBusy(true);const r=await authFetch("/api/user/rapidapi/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(key?{key}:{})});const d=await r.json().catch(()=>({}));setTests(d.results||[]);if(!r.ok)setMsg(d.error||"Test failed");setBusy(false)}
+ async function remove(){if(!confirm("Remove your RapidAPI key? Your live import searches and supplier syncing will stop."))return;await authFetch("/api/user/rapidapi",{method:"DELETE"});setTests([]);await load()}
+ if(isLoaded && !isSignedIn)return <div className="p-6 text-sm text-red-600">Sign in to use the importers.</div>;
  if(!status)return <div className="p-6 text-sm text-gray-500"><Loader2 className="inline w-4 h-4 animate-spin mr-2"/>Checking importer access…</div>;
  if(status.admin)return <>{!status.configured&&<div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Bazunk Admin uses the server RapidAPI key. Add it in <b>Admin → Importers</b>.</div>}{children}</>;
  if(!status.configured)return <div className="max-w-3xl mx-auto bg-white border border-gray-200 rounded-2xl p-6">

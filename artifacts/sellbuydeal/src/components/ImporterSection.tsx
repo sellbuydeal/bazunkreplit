@@ -1,4 +1,5 @@
 import { RapidApiSellerSetup } from "./RapidApiSellerSetup";
+import { useAuth as useClerkAuth } from "@clerk/react";
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -108,7 +109,7 @@ export function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportM
     setError("");
     setLoading(true);
     try {
-      const r = await fetch("/api/supplier/import", {
+      const r = await authFetch("/api/supplier/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -381,6 +382,8 @@ function MarkupEditModal({ item, onSave, onClose }: MarkupEditProps) {
 }
 
 function ImporterSectionInner() {
+  const { getToken } = useClerkAuth();
+  const authFetch = async (input: RequestInfo | URL, init: RequestInit = {}) => { const token = await getToken(); const headers = new Headers(init.headers || {}); if (token) headers.set("Authorization", `Bearer ${token}`); return fetch(input, { ...init, headers }); };
   const { user } = useAuth();
   const [imports, setImports] = useState<SupplierImport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -395,7 +398,7 @@ function ImporterSectionInner() {
   const fetchImports = useCallback(async () => {
     if (!user?.email) return;
     try {
-      const r = await fetch(`/api/supplier/imports?email=${encodeURIComponent(user.email)}`);
+      const r = await authFetch(`/api/supplier/imports?email=${encodeURIComponent(user.email)}`);
       const data = await r.json() as SupplierImport[];
       setImports(Array.isArray(data) ? data : []);
     } catch {
@@ -410,7 +413,7 @@ function ImporterSectionInner() {
   async function handleSync(id: number) {
     setSyncingIds(s => new Set(s).add(id));
     try {
-      const r = await fetch(`/api/supplier/imports/${id}/sync`, { method: "POST" });
+      const r = await authFetch(`/api/supplier/imports/${id}/sync`, { method: "POST" });
       const data = await r.json() as Record<string, unknown>;
       if (r.status === 503) setApiKeyMissing(true);
       if (r.ok) await fetchImports();
@@ -423,7 +426,7 @@ function ImporterSectionInner() {
   async function handleSyncAll() {
     setSyncingAll(true);
     try {
-      const r = await fetch("/api/supplier/sync", { method: "POST" });
+      const r = await authFetch("/api/supplier/sync", { method: "POST" });
       if (r.status === 503) setApiKeyMissing(true);
       setTimeout(fetchImports, 3000);
     } finally {
@@ -434,7 +437,7 @@ function ImporterSectionInner() {
   async function handleDelete(id: number, deleteListing: boolean) {
     setDeletingId(id);
     try {
-      await fetch(`/api/supplier/imports/${id}?sellerEmail=${encodeURIComponent(user?.email ?? "")}&deleteListing=${deleteListing}`, {
+      await authFetch(`/api/supplier/imports/${id}?sellerEmail=${encodeURIComponent(user?.email ?? "")}&deleteListing=${deleteListing}`, {
         method: "DELETE",
       });
       await fetchImports();
@@ -444,7 +447,7 @@ function ImporterSectionInner() {
   }
 
   async function handleMarkupSave(id: number, markupType: string, markupValue: number) {
-    await fetch(`/api/supplier/imports/${id}`, {
+    await authFetch(`/api/supplier/imports/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ markupType, markupValue, sellerEmail: user?.email }),
