@@ -191,13 +191,16 @@ export function Navbar() {
       <nav className="sticky top-0 z-50 w-full bg-white shadow-sm">
         <div className="container mx-auto px-4 h-20 md:h-24 flex items-center justify-between gap-3">
 
-          {/* Logo */}
-          <Link href="/" className="flex items-center flex-shrink-0" data-testid="link-logo">
+          {/* Theme + Logo */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <ThemeToggle className="hidden md:flex w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 items-center justify-center transition-colors flex-shrink-0" />
+            <Link href="/" className="flex items-center flex-shrink-0" data-testid="link-logo">
               <img src="/bazunk-logo-header.png" alt="Bazunk" className="h-11 md:h-12 xl:h-14 w-auto object-contain" />
-          </Link>
+            </Link>
+          </div>
 
           {/* Desktop nav */}
-          <div className="hidden xl:flex items-center gap-1 text-sm font-medium flex-shrink-0">
+          <div className="hidden xl:flex items-center gap-1.5 text-sm font-medium flex-shrink-0 mr-2">
 
             {/* Primary links */}
             {primaryLinks.map(({ href, label, live }) => {
@@ -323,10 +326,10 @@ export function Navbar() {
           </div>
 
           {/* Right section */}
-          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+          <div className="flex items-center gap-2.5 flex-1 min-w-0 justify-end">
 
             {/* Desktop search */}
-            <div ref={searchRef} className="relative flex-1 min-w-[120px] max-w-[240px] hidden lg:block">
+            <div ref={searchRef} className="relative flex-1 min-w-[220px] max-w-[360px] hidden lg:block ml-2">
               <form onSubmit={handleSubmit}>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <Input
@@ -334,8 +337,8 @@ export function Navbar() {
                   value={query}
                   onChange={(e) => { setQuery(e.target.value); setSearchOpen(true); }}
                   onFocus={() => query.trim() && setSearchOpen(true)}
-                  placeholder="Search for anything..."
-                  className="w-full pl-9 pr-8 rounded-full bg-gray-100 border-transparent focus-visible:ring-1 focus-visible:ring-[#4A5CE8] h-9 text-sm"
+                  placeholder="Search listings..."
+                  className="w-full pl-10 pr-9 rounded-full bg-gray-100 border border-transparent focus-visible:border-[#4A5CE8]/30 focus-visible:ring-2 focus-visible:ring-[#4A5CE8]/20 h-10 text-sm"
                   data-testid="input-search"
                 />
                 {query && (
@@ -376,7 +379,7 @@ export function Navbar() {
                         <div className={matchedProducts.length > 0 ? "border-t border-gray-100" : ""}>
                           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-4 pt-3 pb-1">Categories</p>
                           {matchedCategories.map((cat) => (
-                            <Link key={cat.slug} href="/categories" onClick={() => setSearchOpen(false)}
+                            <Link key={cat.slug} href={`/browse?category=${encodeURIComponent(cat.slug)}`} onClick={() => setSearchOpen(false)}
                               className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group" data-testid={`link-search-category-${cat.slug}`}>
                               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#4A5CE8] to-[#7C3AED] flex items-center justify-center flex-shrink-0">
                                 <span className="text-white text-xs font-bold">{cat.name.charAt(0)}</span>
@@ -400,9 +403,6 @@ export function Navbar() {
                 </div>
               )}
             </div>
-
-            {/* Dark mode toggle */}
-            <ThemeToggle className="hidden md:flex w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 items-center justify-center transition-colors flex-shrink-0" />
 
             {/* Currency selector */}
             <div ref={currencyRef} className="relative hidden md:block flex-shrink-0">
