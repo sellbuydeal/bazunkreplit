@@ -317,7 +317,7 @@ function MessageBubble({ msg }: { msg: Message }) {
       className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[78%] flex flex-col ${isMe ? "items-end" : "items-start"}`}>
         <div className={`px-3.5 py-2 rounded-2xl text-sm leading-relaxed ${
-          isMe ? "bg-[#4A5CE8] text-white rounded-br-sm" : "bg-white border border-gray-100 text-gray-800 rounded-bl-sm shadow-sm"
+          isMe ? "bg-[#4A5CE8] text-white rounded-br-sm" : "bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 text-gray-800 dark:text-slate-100 rounded-bl-sm shadow-sm"
         }`}>{msg.text}</div>
         <div className="flex items-center gap-1 mt-0.5 px-1">
           <span className="text-[10px] text-gray-400">{formatTime(msg.timestamp)}</span>
@@ -339,7 +339,7 @@ function SupportBubble({ msg }: { msg: SupportMessage }) {
       <div className={`max-w-[78%] flex flex-col ${isMe ? "items-end" : "items-start"}`}>
         {!isMe && <p className="text-[10px] font-bold text-[#F26B21] mb-1 px-1">Bazunk Support</p>}
         <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
-          isMe ? "bg-[#4A5CE8] text-white rounded-br-sm" : "bg-[#FFF7F2] border border-[#F26B21]/20 text-gray-800 rounded-bl-sm"
+          isMe ? "bg-[#4A5CE8] text-white rounded-br-sm" : "bg-[#FFF7F2] dark:bg-slate-800 border border-[#F26B21]/20 dark:border-[#F26B21]/40 text-gray-800 dark:text-slate-100 rounded-bl-sm"
         }`}>{msg.text}</div>
         <span className="text-[10px] text-gray-400 mt-0.5 px-1">{formatTime(msg.timestamp)}</span>
       </div>
