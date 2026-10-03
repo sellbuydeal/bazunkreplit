@@ -46,6 +46,8 @@ interface EbaySearchResult {
   rating: string;
   condition: string;
   ebay_url: string;
+  country?: string;
+  item_location?: string | null;
 }
 
 interface AmazonListing {
@@ -1070,7 +1072,7 @@ export function AdminImportsPage() {
                   </div>
                   <div>
                     <p className="font-bold text-gray-900">Search {ebaySite === "uk" ? "eBay.co.uk" : "eBay.com"}</p>
-                    <p className="text-xs text-gray-400">Find listings, tick the ones you want, set your markup and import</p>
+                    <p className="text-xs text-gray-400">{ebaySite === "uk" ? "UK-located items deliverable to the UK only" : "US-located items deliverable to the USA only"} · tick items, set markup and import</p>
                   </div>
                 </div>
                 <form onSubmit={handleEbaySearch} className="flex gap-2">

@@ -933,9 +933,20 @@ router.get("/admin/search-ebay", async (req, res) => {
 
   try {
     const marketplaceId = site === "uk" ? "EBAY_GB" : "EBAY_US";
+    const targetCountry = site === "uk" ? "GB" : "US";
     const offset        = (page - 1) * 50;
+    // Marketplace alone is not a location filter: eBay UK can return stock
+    // physically located overseas. Ask RapidAPI for stock located in AND
+    // deliverable to the selected country.
+    const searchParams = new URLSearchParams({
+      q: query,
+      marketplace_id: marketplaceId,
+      offset: String(offset),
+      item_location_country: targetCountry,
+      delivery_country: targetCountry,
+    });
     const resp = await fetch(
-      `https://real-time-ebay-data.p.rapidapi.com/ebay_search?q=${encodeURIComponent(query)}&marketplace_id=${marketplaceId}&offset=${offset}`,
+      `https://real-time-ebay-data.p.rapidapi.com/ebay_search?${searchParams.toString()}`,
       { headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": "real-time-ebay-data.p.rapidapi.com" } }
     );
     if (!resp.ok) { res.status(502).json({ error: rapidApiErrorMessage("eBay", resp.status) }); return; }
@@ -988,9 +999,12 @@ router.get("/admin/search-ebay", async (req, res) => {
           item_location:   country ? `${country}${location.postalCode ? ` (${String(location.postalCode).replace(/\*+$/, "***")})` : ""}` : null,
         };
       })
-      .filter(p => p.price > 0);
+      .filter(p => p.price > 0)
+      // Defence in depth: never show a cross-region item even if the upstream
+      // provider ignores/loosens the requested location filter.
+      .filter(p => p.country.toUpperCase() === targetCountry);
 
-    res.json({ products, total: (data.total as number) ?? products.length });
+    res.json({ products, total: products.length, region: targetCountry });
   } catch (err) {
     logger.error({ err }, "eBay search failed");
     res.status(500).json({ error: "eBay search failed" });
@@ -1009,6 +1023,7 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
     categories?: string[]; shipping_label?: string | null; shipping_type?: string;
     original_price?: string | null; discount_pct?: string | null;
     buying_options?: string[]; item_location?: string | null;
+    country?: string;
   }
 
   const products: SelectedEbay[] = req.body.products ?? [];
@@ -1021,6 +1036,17 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
   const sellerEmail = (req.body.sellerEmail as string) || "bazunkdeals@gmail.com";
 
   if (!products.length) { res.status(400).json({ error: "products array required" }); return; }
+
+  const targetCountry = site === "uk" ? "GB" : "US";
+  const wrongRegion = products.filter(p => (p.country ?? "").toUpperCase() !== targetCountry);
+  if (wrongRegion.length) {
+    const sample = wrongRegion.slice(0, 3).map(p => `${p.title} (${p.country || "unknown location"})`).join("; ");
+    res.status(400).json({
+      error: `Cannot import ${wrongRegion.length} item${wrongRegion.length === 1 ? "" : "s"}: ${site === "uk" ? "eBay UK" : "eBay USA"} imports must be located in ${targetCountry} and deliverable there. ${sample}`,
+      code: "EBAY_REGION_MISMATCH",
+    });
+    return;
+  }
 
   const sellerRow = await db.execute(
     sql`SELECT name FROM users WHERE email = ${sellerEmail} LIMIT 1`
@@ -1043,6 +1069,7 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
     const specs       = JSON.stringify({
       source, item_id: p.item_id, ebay_url: p.ebay_url,
       ebay_price: p.price, ebay_currency: currency, ebay_site: site,
+      source_country: targetCountry, delivery_country: targetCountry, item_location: p.item_location ?? null,
       shipping: shippingAmt, markup_pct: markupPct,
     });
 
