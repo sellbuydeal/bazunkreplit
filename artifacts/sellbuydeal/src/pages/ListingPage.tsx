@@ -248,14 +248,14 @@ export function ListingPage() {
 
   async function handleMessageSeller() {
     if (!viewer || !session) { navigate(`/sign-in?redirect=${encodeURIComponent(`/listing/${id}`)}`); return; }
-    if (!apiProduct?.id) { navigate("/messages"); return; }
+    if (!apiProduct?.id) { window.dispatchEvent(new CustomEvent("bazunk:open-message-center")); return; }
     try {
       setStartingMessage(true);
       const token = await session.getToken();
       const r = await fetch("/api/messages/conversations", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ listingId: apiProduct.id }) });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) { window.alert(data.error || "Could not start conversation"); return; }
-      navigate(`/messages?conversation=${data.id}`);
+      window.dispatchEvent(new CustomEvent("bazunk:open-message-center", { detail: { conversationId: data.id } }));
     } catch { window.alert("Could not start conversation. Please try again."); } finally { setStartingMessage(false); }
   }
 

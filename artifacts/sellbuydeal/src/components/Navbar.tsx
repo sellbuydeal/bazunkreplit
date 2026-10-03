@@ -91,7 +91,6 @@ const MOBILE_NAV_LINKS = [
   { href: "/sell/quick",  label: "Quick List",  icon: Tag },
   { href: "/bundle",      label: "Bundle Deal", icon: Package },
   { href: "/offers",      label: "My Offers",   icon: Handshake },
-  { href: "/messages",    label: "Messages",    icon: MessageSquare },
   { href: "/dashboard",   label: "Dashboard",   icon: LayoutDashboard },
   { href: "/buyer-protection", label: "Buyer Protection", icon: ShieldCheck },
   { href: "/dashboard",        label: "Importers",        icon: ArrowDownToLine },
@@ -112,6 +111,14 @@ export function Navbar() {
   const [rewardsPopover, setRewardsPopover] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [messageCenterOpen, setMessageCenterOpen] = useState(false);
+
+  // Let listing/order actions open the one real Message Center instead of routing
+  // users to the retired standalone /messages inbox.
+  useEffect(() => {
+    const openMessageCenter = () => setMessageCenterOpen(true);
+    window.addEventListener("bazunk:open-message-center", openMessageCenter);
+    return () => window.removeEventListener("bazunk:open-message-center", openMessageCenter);
+  }, []);
   const [location, setLocation] = useLocation();
   const searchRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);

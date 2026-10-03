@@ -38,7 +38,6 @@ import { ListingPage } from "@/pages/ListingPage";
 import { CheckoutPage } from "@/pages/CheckoutPage";
 import { BundlePage } from "@/pages/BundlePage";
 import { ClassifiedsPage } from "@/pages/ClassifiedsPage";
-import { MessagesPage } from "@/pages/MessagesPage";
 import { SellerProfilePage } from "@/pages/SellerProfilePage";
 import { CreditsPage } from "@/pages/CreditsPage";
 import { PromotionsPage } from "@/pages/PromotionsPage";
@@ -256,9 +255,7 @@ function Router() {
       <Route path="/checkout" component={CheckoutPage} />
       <Route path="/bundle" component={BundlePage} />
       <Route path="/classifieds" component={ClassifiedsPage} />
-      <Route path="/messages" component={MessagesPage} />
       <Route path="/seller/:id" component={SellerProfilePage} />
-      <Route path="/store/bazunk-official">{() => <Redirect to="/seller/cczslater%40gmail.com" />}</Route>
       <Route path="/credits" component={CreditsPage} />
       <Route path="/promotions" component={PromotionsPage} />
       <Route path="/support" component={SupportPage} />
