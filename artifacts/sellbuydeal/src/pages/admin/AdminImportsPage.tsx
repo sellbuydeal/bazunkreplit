@@ -138,8 +138,7 @@ export function AdminImportsPage() {
   const [ebayShipping, setEbayShipping]     = useState("3.99");
   const [ebayCat, setEbayCat]               = useState("");
   const [ebaySub, setEbaySub]               = useState("");
-  const ebaySellerEmail = "cczslater@gmail.com";
-  const [ebayMinProfit, setEbayMinProfit] = useState("5");
+  const [ebaySellerEmail, setEbaySellerEmail] = useState("bazunkdeals@gmail.com");
   const [ebayImporting, setEbayImporting]   = useState(false);
   const [ebayImportMsg, setEbayImportMsg]   = useState<{ ok: boolean; text: string } | null>(null);
   const [ebaySyncing, setEbaySyncing]       = useState(false);
@@ -397,15 +396,11 @@ export function AdminImportsPage() {
   const loadEbayListings = useCallback(async () => {
     setEbayLoadingList(true);
     try {
-      const r = await authFetch(`/api/admin/listings?imported=1&limit=${PAGE_SIZE}&offset=${ebayListPage * PAGE_SIZE}${ebayTableSearch ? `&search=${encodeURIComponent(ebayTableSearch)}` : ""}`);
+      const r = await authFetch(`/api/admin/listings?source=ebay&limit=${PAGE_SIZE}&offset=${ebayListPage * PAGE_SIZE}${ebayTableSearch ? `&search=${encodeURIComponent(ebayTableSearch)}` : ""}`);
       if (r.ok) {
         const d = await r.json() as { listings: AmazonListing[]; total: number };
-        const ebayOnly = (d.listings ?? []).filter(l => {
-          try { const s = JSON.parse(l.specifications ?? "{}"); return s.source === "eBay UK" || s.source === "eBay US"; }
-          catch { return false; }
-        });
-        setEbayListings(ebayOnly);
-        setEbayTotal(ebayOnly.length);
+        setEbayListings(d.listings ?? []);
+        setEbayTotal(d.total ?? 0);
       }
     } finally {
       setEbayLoadingList(false);
@@ -459,7 +454,7 @@ export function AdminImportsPage() {
           markup: parseFloat(ebayMarkup) || 35,
           shipping: parseFloat(ebayShipping) || 3.99,
           category: ebayCat, subcategory: ebaySub,
-          sellerEmail: ebaySellerEmail, minProfit: parseFloat(ebayMinProfit) || 0,
+          sellerEmail: ebaySellerEmail,
         }),
       });
       const d = await r.json() as { imported?: number; message?: string; error?: string };
@@ -1050,10 +1045,6 @@ export function AdminImportsPage() {
 
         {tab === "ebay" && (
           <motion.div key="ebay" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-5">
-            <div className="rounded-2xl border border-indigo-100 bg-indigo-50 px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
-              <div><p className="font-bold text-gray-900">Bazunk Official Store ✓</p><p className="text-sm text-gray-600">All selected eBay products publish under the official store. Sales notifications: cczslater@gmail.com</p></div>
-              <span className="text-xs font-semibold text-[#4A5CE8] bg-white px-3 py-1.5 rounded-full">Automatic price sync keeps your markup</span>
-            </div>
 
             {/* Site toggle */}
             <div className="flex items-center gap-3">
@@ -1123,11 +1114,16 @@ export function AdminImportsPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-100 text-xs font-bold text-[#4A5CE8]">
-                        <User className="w-3.5 h-3.5" /> Bazunk Official Store ✓
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        Min profit £<input value={ebayMinProfit} onChange={e => setEbayMinProfit(e.target.value)} type="number" min="0" step="0.01" className={ebayInputCls + " py-1.5 w-20"} />
+                      {/* Seller picker */}
+                      <div className="flex items-center gap-1">
+                        <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <select value={ebaySellerEmail} onChange={e => setEbaySellerEmail(e.target.value)}
+                          className={ebayInputCls + " py-1.5 text-xs max-w-[160px]"}>
+                          {users.length === 0
+                            ? <option value="bazunkdeals@gmail.com">bazunkdeals@gmail.com</option>
+                            : users.map(u => <option key={u.email} value={u.email}>{u.name ? `${u.name} (${u.email})` : u.email}</option>)
+                          }
+                        </select>
                       </div>
                       <select value={ebayCat} onChange={e => setEbayCat(e.target.value)}
                         className={ebayInputCls + " py-1.5 text-xs max-w-[140px]"}>

@@ -24,6 +24,8 @@ interface Specs {
   amazon_url?: string;
   asin?: string;
   source?: string;
+  ebay_url?: string;
+  item_id?: string;
 }
 
 function parseSpecs(raw: string | null): Specs {
@@ -117,7 +119,7 @@ export function AdminListingsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50">
-                {["ID", "Title", "Category", "Price", "Seller", "Status", "Amazon URL"].map(h => (
+                {["ID", "Title", "Category", "Price", "Seller", "Status", "Source listing"].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -184,13 +186,15 @@ export function AdminListingsPage() {
 
                     {/* Amazon URL */}
                     <td className="px-4 py-3">
-                      {specs.amazon_url ? (
-                        <a
-                          href={specs.amazon_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FF9900]/10 hover:bg-[#FF9900]/20 text-[#c45d00] rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
-                        >
+                      {specs.ebay_url ? (
+                        <a href={specs.ebay_url} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap">
+                          <ExternalLink className="w-3 h-3" />
+                          {specs.item_id ? `eBay ${specs.item_id}` : "View on eBay"}
+                        </a>
+                      ) : specs.amazon_url ? (
+                        <a href={specs.amazon_url} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FF9900]/10 hover:bg-[#FF9900]/20 text-[#c45d00] rounded-lg text-xs font-semibold transition-colors whitespace-nowrap">
                           <ExternalLink className="w-3 h-3" />
                           {specs.asin ?? "View on Amazon"}
                         </a>

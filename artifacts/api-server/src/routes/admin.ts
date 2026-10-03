@@ -591,11 +591,18 @@ router.get("/admin/listings", async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
     const search = (req.query.search as string) ?? "";
     const imported = req.query.imported as string;
-    // imported=1 → superdeals account (all imports), imported=0 → user listings
+    const source = (req.query.source as string ?? "").toLowerCase();
+    // Legacy imported filter is retained for Amazon. Source-specific filters work
+    // regardless of which seller account owns an imported listing.
     const importedFilter = imported === "1"
       ? sql`seller_email = 'bazunkdeals@gmail.com'`
       : imported === "0"
         ? sql`seller_email != 'bazunkdeals@gmail.com'`
+        : sql`TRUE`;
+    const sourceFilter = source === "ebay"
+      ? sql`(specifications LIKE '%"source":"eBay UK"%' OR specifications LIKE '%"source":"eBay US"%')`
+      : source === "amazon"
+        ? sql`(specifications LIKE '%"amazon_url"%' OR specifications LIKE '%"source":"Amazon%')`
         : sql`TRUE`;
 
     const rows = await db.execute(sql`
@@ -605,6 +612,7 @@ router.get("/admin/listings", async (req, res) => {
       FROM listings
       WHERE (${search ? sql`(title ILIKE ${'%' + search + '%'} OR public_id ILIKE ${'%' + search + '%'} OR seller_email ILIKE ${'%' + search + '%'})` : sql`TRUE`})
       AND (${importedFilter})
+      AND (${sourceFilter})
       ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `).then(r => r.rows);
@@ -613,6 +621,7 @@ router.get("/admin/listings", async (req, res) => {
       SELECT COUNT(*) AS cnt FROM listings
       WHERE (${search ? sql`(title ILIKE ${'%' + search + '%'} OR public_id ILIKE ${'%' + search + '%'} OR seller_email ILIKE ${'%' + search + '%'})` : sql`TRUE`})
       AND (${importedFilter})
+      AND (${sourceFilter})
     `).then(r => r.rows as { cnt: string }[]);
 
     res.json({ listings: rows, total: parseInt(cnt) });
@@ -1007,22 +1016,16 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
   const currency: "GBP" | "USD" = site === "uk" ? "GBP" : "USD";
   const markupPct   = Math.max(0, parseFloat(String(req.body.markup   ?? 35))   || 35);
   const shippingAmt = Math.max(0, parseFloat(String(req.body.shipping ?? 3.99)) || 3.99);
-  const minProfit = Math.max(0, parseFloat(String(req.body.minProfit ?? 0)) || 0);
   const category    = (req.body.category    as string) || "other";
   const subcategory = (req.body.subcategory as string) || null;
-  const sellerEmail = "cczslater@gmail.com";
+  const sellerEmail = (req.body.sellerEmail as string) || "bazunkdeals@gmail.com";
 
   if (!products.length) { res.status(400).json({ error: "products array required" }); return; }
 
   const sellerRow = await db.execute(
-    sql`SELECT id, name FROM users WHERE LOWER(email) = LOWER(${sellerEmail}) LIMIT 1`
-  ).then(r => r.rows[0] as { id: string; name: string | null } | undefined);
-  if (!sellerRow) {
-    res.status(400).json({ error: "Create/sign in to cczslater@gmail.com once before importing to Bazunk Official Store." });
-    return;
-  }
-  await db.execute(sql`UPDATE users SET name = 'Bazunk Official Store', verification_status = 'verified', verification_date = COALESCE(verification_date, NOW()) WHERE id = ${sellerRow.id}`);
-  const SELLER_NAME = "Bazunk Official Store";
+    sql`SELECT name FROM users WHERE email = ${sellerEmail} LIMIT 1`
+  ).then(r => r.rows[0] as { name: string | null } | undefined);
+  const SELLER_NAME = sellerRow?.name ?? sellerEmail.split("@")[0];
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   let inserted = 0;
 
@@ -1033,40 +1036,21 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
     ).then(r => r.rows.length > 0);
     if (exists) continue;
 
-    const landedCost = p.price + shippingAmt;
-    const bazunkPrice = Math.round(Math.max(landedCost * (1 + markupPct / 100), landedCost + minProfit) * 100) / 100;
+    const bazunkPrice = Math.round((p.price * (1 + markupPct / 100) + shippingAmt) * 100) / 100;
     const prefix      = site === "uk" ? "BZK-EBY-UK" : "BZK-EBY-US";
     const publicId    = `${prefix}-${date}-${String(Date.now()).slice(-6)}-${String(inserted + 1).padStart(3, "0")}`;
     const source      = site === "uk" ? "eBay UK" : "eBay US";
     const specs       = JSON.stringify({
       source, item_id: p.item_id, ebay_url: p.ebay_url,
       ebay_price: p.price, ebay_currency: currency, ebay_site: site,
-      shipping: shippingAmt, markup_pct: markupPct, min_profit: minProfit, official_store: true,
+      shipping: shippingAmt, markup_pct: markupPct,
     });
 
-    const sym = p.currency === "GBP" ? "£" : "$";
-    const descParts: string[] = [p.title, ""];
+    // Keep sourcing/seller/price/link metadata private in specifications. The
+    // public description must describe the product, not advertise the source.
+    const descParts: string[] = [p.title];
     if (p.condition) descParts.push(`Condition: ${p.condition}`);
-    if (p.categories?.length) descParts.push(`Category: ${p.categories.join(" › ")}`);
-    const sellerLine = [
-      p.seller_username ? `Sold by: ${p.seller_username}` : null,
-      p.seller_feedback ? `(${p.seller_feedback}% positive feedback)` : null,
-    ].filter(Boolean).join(" ");
-    if (sellerLine) descParts.push(sellerLine);
-    if (p.shipping_label) {
-      const shipType = p.shipping_type === "FIXED" ? "Standard" : p.shipping_type === "FREE" ? "Free" : p.shipping_type ?? "";
-      descParts.push(`Shipping: ${p.shipping_label}${shipType && shipType !== "Free" ? ` (${shipType})` : ""}`);
-    }
-    if (p.item_location) descParts.push(`Item location: ${p.item_location}`);
-    if (p.buying_options?.length) {
-      descParts.push(`Listing type: ${p.buying_options.map(o => o.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase())).join(", ")}`);
-    }
-    descParts.push("");
-    if (p.original_price) descParts.push(`Original eBay retail price: ${sym}${p.original_price}${p.discount_pct ? ` (${p.discount_pct})` : ""}`);
-    descParts.push(`eBay price: ${sym}${p.price.toFixed(2)}`);
-    descParts.push(`View original listing: ${p.ebay_url}`);
-    while (descParts.length && descParts[descParts.length - 1] === "") descParts.pop();
-    const description = descParts.join("\n");
+    const description = descParts.join("\n\n");
     const image       = p.image ?? null;
     const condition   = p.condition ?? "used";
     const condNorm  = ["new", "used", "refurbished", "for-parts"].includes(condition.toLowerCase())
@@ -1112,7 +1096,6 @@ router.post("/admin/sync-ebay-prices", async (req, res) => {
         const site      = (specs.ebay_site as string ?? "uk") === "us" ? "us" : "uk";
         const markupPct = parseFloat(String(specs.markup_pct ?? 35)) || 35;
         const shipping  = parseFloat(String(specs.shipping   ?? 3.99)) || 3.99;
-        const minProfit = parseFloat(String(specs.min_profit ?? 0)) || 0;
         const oldPrice  = parseFloat(String(specs.ebay_price ?? 0));
         if (!itemId) return;
 
@@ -1133,8 +1116,7 @@ router.post("/admin/sync-ebay-prices", async (req, res) => {
         if (!newEbayPrice || newEbayPrice <= 0) { errors++; return; }
         if (Math.abs(newEbayPrice - oldPrice) < 0.01) { unchanged++; return; }
 
-        const landedCost = newEbayPrice + shipping;
-        const newBazunkPrice = Math.round(Math.max(landedCost * (1 + markupPct / 100), landedCost + minProfit) * 100) / 100;
+        const newBazunkPrice = Math.round((newEbayPrice * (1 + markupPct / 100) + shipping) * 100) / 100;
         const newSpecs       = JSON.stringify({ ...specs, ebay_price: newEbayPrice });
         await db.execute(sql`
           UPDATE listings SET price = ${newBazunkPrice}, price_gbp = ${newBazunkPrice},
