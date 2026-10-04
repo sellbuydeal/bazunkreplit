@@ -4,7 +4,7 @@ const PERKS = [
   {
     icon: Tag,
     title: "Free to List",
-    sub: "No upfront selling fees, ever",
+    sub: "0% seller fees for private sellers",
     color: "text-[#F26B21]",
     bg: "bg-[#F26B21]/10",
   },

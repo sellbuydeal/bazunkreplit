@@ -23,11 +23,11 @@ const SECTIONS = [
   },
   {
     title: "5. Fees and Payments",
-    body: `Listing is free. A final value fee of 5–8% (depending on category) applies when an item sells. Fees are deducted automatically from the sale proceeds. Credit purchases are non-refundable. All fees are displayed transparently before you confirm a transaction.`,
+    body: `Private sellers can list and sell without a Bazunk seller commission and keep the item price. Buyers pay a mandatory Buyer Protection fee on eligible marketplace checkout orders; the current rate is displayed before payment. Registered businesses and sole traders may be charged separate seller fees, which are disclosed by Bazunk. Credit purchases are non-refundable.`,
   },
   {
     title: "6. Buyer Protection",
-    body: `We offer Buyer Protection on eligible transactions. If an item doesn't arrive or significantly differs from its description, buyers may open a dispute within 30 days of the estimated delivery date. Refunds are issued at our discretion after reviewing evidence from both parties.`,
+    body: `Buyer Protection applies to eligible purchases completed through Bazunk checkout and is funded by a mandatory buyer fee. It may cover an item that doesn't arrive, arrives damaged, or is significantly not as described. Buyers should report problems promptly through the dispute process. Bazunk reviews order information and evidence from both parties before deciding the appropriate resolution.`,
   },
   {
     title: "7. Prohibited Conduct",

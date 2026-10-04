@@ -79,7 +79,7 @@ const WHY_FEATURES = [
   {
     icon: Tag,
     title: "Free to List",
-    desc: "No upfront costs — listing is always free. You only pay a small fee when you sell.",
+    desc: "No listing fee and no seller commission for private sellers — keep your item price.",
   },
   {
     icon: Globe,
@@ -118,9 +118,9 @@ function buildFeeRows(mktRatePct: number) {
       iconColor: "text-emerald-500",
     },
     {
-      label: "Bazunk marketplace fee",
-      value: `${mktRatePct}%`,
-      sub: "Deducted from sale price at payout",
+      label: "Private seller commission",
+      value: "0%",
+      sub: "Private sellers keep 100% of the item price",
       color: "text-[#F26B21]",
       bg: "bg-orange-50",
       icon: Percent,
@@ -128,8 +128,8 @@ function buildFeeRows(mktRatePct: number) {
     },
     {
       label: "Stripe card processing",
-      value: "2.9% + £0.30",
-      sub: "Secure card processing via Stripe",
+      value: "Covered by Bazunk",
+      sub: "Not shown as a private-seller commission",
       color: "text-[#4A5CE8]",
       bg: "bg-blue-50",
       icon: CreditCard,
@@ -137,8 +137,8 @@ function buildFeeRows(mktRatePct: number) {
     },
     {
       label: "Seller receives",
-      value: `~${sellerPct}%`,
-      sub: "Paid directly to your bank via Stripe",
+      value: "100%",
+      sub: "Of the item price for private sellers",
       color: "text-emerald-700",
       bg: "bg-emerald-50",
       icon: Banknote,
@@ -153,8 +153,8 @@ function FeeCalculator() {
   const mktRatePct = Math.round(mktRate * 100);
   const [amount, setAmount] = useState("50");
   const val = parseFloat(amount) || 0;
-  const mktFee = val * mktRate;
-  const stripeFee = val * STRIPE_RATE + STRIPE_FIXED;
+  const mktFee = 0;
+  const stripeFee = 0;
   const net = Math.max(0, val - mktFee - stripeFee);
 
   return (
@@ -191,16 +191,16 @@ function FeeCalculator() {
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-500 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#F26B21] inline-block" />
-              Marketplace fee ({mktRatePct}%)
+              Private seller fee (0%)
             </span>
-            <span className="font-semibold text-[#F26B21]">−£{mktFee.toFixed(2)}</span>
+            <span className="font-semibold text-[#F26B21]">£0.00</span>
           </div>
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-500 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#4A5CE8] inline-block" />
-              Stripe fee (2.9% + £0.30)
+              Bazunk seller commission
             </span>
-            <span className="font-semibold text-[#4A5CE8]">−£{stripeFee.toFixed(2)}</span>
+            <span className="font-semibold text-[#4A5CE8]">£0.00</span>
           </div>
           <div className="flex justify-between items-center text-sm font-bold border-t border-gray-100 pt-3 mt-1">
             <span className="text-gray-900">You receive</span>
@@ -352,14 +352,14 @@ export function SellPage() {
               <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-start gap-2">
                 <Info className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-gray-500">
-                  Bazunk credits can be used for listing fees and boosts — but <strong>not</strong> for marketplace or Stripe processing fees. Those are always cash.
+                  Private sellers list and sell free. Bazunk Credits are for optional promotions and premium tools.
                 </p>
               </div>
 
               {/* Per-category rates */}
               <div className="border-t border-gray-100">
                 <div className="px-6 py-3 bg-gray-50/60">
-                  <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">Marketplace fee by category</p>
+                  <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">Business / sole-trader seller fee by category</p>
                 </div>
                 <div className="divide-y divide-gray-50">
                   {[

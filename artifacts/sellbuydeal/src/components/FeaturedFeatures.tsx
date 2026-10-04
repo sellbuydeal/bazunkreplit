@@ -49,7 +49,7 @@ const FEATURE_BLOCKS = [
 
 const TRUST_ITEMS = [
   { icon: Shield,  label: "Buyer Protection",      sub: "30-day dispute window"       },
-  { icon: Tag,     label: "Free to List",           sub: "No upfront fees for sellers" },
+  { icon: Tag,     label: "Free to List & Sell",    sub: "0% seller fees for private sellers" },
   { icon: Radio,   label: "Live Selling",           sub: "Stream and sell in real time"},
 ];
 

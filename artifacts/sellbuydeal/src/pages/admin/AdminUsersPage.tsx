@@ -10,7 +10,7 @@ import { useAdmin } from "@/context/AdminContext";
 
 interface User {
   id: string; email: string; name: string | null;
-  credits: string; banned: boolean; created_at: string;
+  credits: string; banned: boolean; seller_type?: "private" | "sole_trader" | "business"; created_at: string;
 }
 
 const MILESTONE_DEFS = [
@@ -49,6 +49,7 @@ export function AdminUsersPage() {
   // Edit user modal
   const [editUser, setEditUser] = useState<User | null>(null);
   const [editName, setEditName] = useState("");
+  const [editSellerType, setEditSellerType] = useState<"private" | "sole_trader" | "business">("private");
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
@@ -148,7 +149,7 @@ export function AdminUsersPage() {
     setEditSaving(true);
     setEditError("");
     const res = await authFetch(`/api/admin/users/${encodeURIComponent(editUser.email)}`, {
-      method: "PATCH", body: JSON.stringify({ name: editName.trim() || null }),
+      method: "PATCH", body: JSON.stringify({ name: editName.trim() || null, sellerType: editSellerType }),
     });
     if (res.ok) {
       setEditUser(null);
@@ -386,7 +387,7 @@ export function AdminUsersPage() {
                       <div className="flex flex-wrap items-center gap-1.5">
                         {/* Edit */}
                         <button
-                          onClick={() => { setEditUser(u); setEditName(u.name ?? ""); setEditError(""); }}
+                          onClick={() => { setEditUser(u); setEditName(u.name ?? ""); setEditSellerType(u.seller_type ?? "private"); setEditError(""); }}
                           className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                           title="Edit user"
                         >
@@ -607,6 +608,15 @@ export function AdminUsersPage() {
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]"
                   autoFocus
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Seller type</label>
+                <select value={editSellerType} onChange={e => setEditSellerType(e.target.value as any)} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                  <option value="private">Private seller — 0% seller fee</option>
+                  <option value="sole_trader">Sole trader — business seller fees apply</option>
+                  <option value="business">Registered business — business seller fees apply</option>
+                </select>
               </div>
 
               {editError && (

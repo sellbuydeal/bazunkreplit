@@ -37,7 +37,7 @@ function gbpToCredits(gbp: number) { return Math.round(gbp * CREDITS_PER_GBP); }
 function fmtCredits(n: number) { return n.toLocaleString(); }
 
 const FEATURES = [
-  { icon: Tag,  iconBg: "bg-blue-50",   iconColor: "text-blue-500",   title: "Pay Listing Fees",    description: "Use credits instead of cash for listing fees", rate: "100 credits = £1 fee" },
+  { icon: Tag,  iconBg: "bg-blue-50",   iconColor: "text-blue-500",   title: "Promote Listings",    description: "Use credits for boosts and premium selling tools", rate: "Earn credits free or buy more" },
   { icon: Bell, iconBg: "bg-purple-50", iconColor: "text-purple-500", title: "Boost Listings",      description: "Get visibility boosts for your listings", rate: "500 credits = 3-day boost" },
   { icon: Star, iconBg: "bg-amber-50",  iconColor: "text-amber-500",  title: "Featured Badge",      description: "Stand out with a featured badge on your listings", rate: "300 credits = featured badge" },
   { icon: Home, iconBg: "bg-emerald-50",iconColor: "text-emerald-500",title: "Homepage Spotlight",  description: "Get featured on the Bazunk homepage", rate: "1,000 credits = 24hr spotlight" },
@@ -163,7 +163,7 @@ export function CreditsPage() {
           <div className="relative z-10">
             <h1 className="text-2xl md:text-3xl font-black text-white mb-2">Buy Marketplace Credits</h1>
             <p className="text-blue-200 text-sm md:text-base max-w-md">
-              Use credits to pay listing fees, boost visibility, and unlock promotions.
+              Use credits to boost visibility and unlock promotions — listing and selling are free for private sellers.
             </p>
             <div className="mt-3 inline-flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5">
               <Coins className="w-3.5 h-3.5 text-yellow-300" />

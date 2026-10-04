@@ -67,6 +67,16 @@ export function CheckoutPage() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [guestEmail, setGuestEmail] = useState("");
+  const [protection, setProtection] = useState({ percent: 6, gbp: 0.70, usd: 1, eur: 1 });
+
+  useEffect(() => {
+    fetch("/api/settings/public").then(r => r.json()).then((d: Record<string,string>) => setProtection({
+      percent: Number(d.buyer_protection_percent ?? 6),
+      gbp: Number(d.buyer_protection_fixed_gbp ?? 0.70),
+      usd: Number(d.buyer_protection_fixed_usd ?? 1),
+      eur: Number(d.buyer_protection_fixed_eur ?? 1),
+    })).catch(() => {});
+  }, []);
 
   const userCredits = user?.balance ?? 0;
   const appliedPromo = promoCode ? PROMO_CODES[promoCode] : null;
@@ -78,12 +88,13 @@ export function CheckoutPage() {
   }, [appliedPromo, subtotal]);
 
   const delivery = subtotal >= 50 ? 0 : 3.99;
+  const buyerProtectionFee = subtotal > 0 ? subtotal * (protection.percent / 100) + protection.gbp : 0;
   // Credits apply to item subtotal only — a minimum of £0.50 must always be charged
   // via card to cover Stripe processing fees. Credits cannot pay marketplace or card fees.
   const MIN_CARD_CHARGE = 0.50;
   const rawCredits = useCredits ? Math.min(userCredits, Math.max(0, subtotal - promoDiscount)) : 0;
-  const creditsApplied = Math.min(rawCredits, Math.max(0, subtotal - promoDiscount + delivery - MIN_CARD_CHARGE));
-  const total = Math.max(MIN_CARD_CHARGE, subtotal - promoDiscount - creditsApplied + delivery);
+  const creditsApplied = Math.min(rawCredits, Math.max(0, subtotal - promoDiscount + delivery + buyerProtectionFee - MIN_CARD_CHARGE));
+  const total = Math.max(MIN_CARD_CHARGE, subtotal - promoDiscount - creditsApplied + delivery + buyerProtectionFee);
 
   // Detect return from Stripe checkout
   useEffect(() => {
@@ -333,7 +344,7 @@ export function CheckoutPage() {
                     )}
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
-                    Credits apply to item price only. Delivery charges, marketplace fees, and card processing fees must always be paid in full.
+                    Credits apply to the item price only. Delivery and Buyer Protection are paid separately at checkout.
                   </p>
                   {useCredits && creditsApplied > 0 && (
                     <div className="mt-2 px-3 py-2 bg-amber-50 rounded-xl text-xs text-amber-700 font-medium flex items-center gap-2">
@@ -477,6 +488,10 @@ export function CheckoutPage() {
                   </div>
                 )}
                 <div className="flex justify-between text-gray-600">
+                  <span className="flex items-center gap-1">Buyer Protection <Link href="/buyer-protection" className="text-[#4A5CE8] underline text-xs">Learn more</Link></span>
+                  <span className="font-semibold text-gray-900">£{buyerProtectionFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-gray-600">
                   <span>Delivery</span>
                   <span className={`font-semibold ${delivery === 0 ? "text-emerald-600" : "text-gray-900"}`}>
                     {delivery === 0 ? "FREE" : `£${delivery.toFixed(2)}`}
@@ -497,7 +512,7 @@ export function CheckoutPage() {
 
               <div className="mt-4 space-y-2">
                 {[
-                  { icon: Shield,  text: "30-day buyer protection" },
+                  { icon: Shield,  text: `Buyer Protection (${protection.percent}% + 70p)` },
                   { icon: Truck,   text: "Shipping arranged by seller" },
                   { icon: Package, text: "Track orders from your Dashboard" },
                 ].map(({ icon: Icon, text }) => (

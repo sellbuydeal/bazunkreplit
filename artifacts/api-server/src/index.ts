@@ -49,6 +49,7 @@ async function runAppMigrations() {
   `, "users");
 
   await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`, "users.banned");
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_type TEXT NOT NULL DEFAULT 'private'`, "users.seller_type");
   await run(sql`CREATE TABLE IF NOT EXISTS user_rapidapi_keys (email TEXT PRIMARY KEY, encrypted_key TEXT NOT NULL, key_last4 TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`, "user_rapidapi_keys");
 
   await run(sql`
@@ -203,6 +204,8 @@ async function runAppMigrations() {
 
   await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_session_id TEXT`, "orders.stripe_session_id");
   await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS line_no INTEGER`, "orders.line_no");
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS buyer_protection_fee NUMERIC(10,2) NOT NULL DEFAULT 0`, "orders.buyer_protection_fee");
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_fee NUMERIC(10,2) NOT NULL DEFAULT 0`, "orders.seller_fee");
   await run(
     sql`CREATE UNIQUE INDEX IF NOT EXISTS orders_session_line_uniq ON orders (stripe_session_id, line_no)`,
     "orders_session_line_uniq",
@@ -480,6 +483,10 @@ async function runAppMigrations() {
     INSERT INTO site_settings (key, value, updated_at) VALUES
       ('fee_rate_default',              '5', NOW()),
       ('fee_listing_free',           'true', NOW()),
+      ('buyer_protection_percent',      '6', NOW()),
+      ('buyer_protection_fixed_gbp',   '0.70', NOW()),
+      ('buyer_protection_fixed_usd',   '1.00', NOW()),
+      ('buyer_protection_fixed_eur',   '1.00', NOW()),
       ('fee_rate_electronics',           '5', NOW()),
       ('fee_rate_cell-phones',           '5', NOW()),
       ('fee_rate_clothing-shoes-jewelry','5', NOW()),

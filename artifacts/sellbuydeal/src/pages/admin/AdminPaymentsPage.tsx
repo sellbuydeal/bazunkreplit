@@ -69,7 +69,7 @@ export function AdminPaymentsPage() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-black text-gray-900">Payments & Fees</h1>
+          <h1 className="text-xl font-black text-gray-900">Payments & Buyer Protection</h1>
           <p className="text-sm text-gray-400 mt-0.5">
             {payments.length} credit transactions · £{totalRevenue.toFixed(2)} revenue
           </p>
@@ -85,7 +85,7 @@ export function AdminPaymentsPage() {
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5 max-w-xs">
         {([
           { id: "credits" as PayTab, label: "Credit Purchases", icon: CreditCard },
-          { id: "fees" as PayTab, label: "Fee Rates", icon: Percent },
+          { id: "fees" as PayTab, label: "Buyer Protection & Fees", icon: Percent },
         ]).map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setPayTab(id)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
@@ -147,9 +147,9 @@ export function AdminPaymentsPage() {
           <div className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3 text-sm text-blue-700 flex items-start gap-2">
             <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="font-bold">Platform (Final Value) Fees</p>
+              <p className="font-bold">Buyer Protection & Business Seller Fees</p>
               <p className="text-xs text-blue-500 mt-0.5">
-                Fees are deducted from the seller's payout when a sale completes. Listings are free to post.
+                Private sellers list and sell free. Buyer Protection is charged to buyers; configured seller fees apply only to business/sole-trader accounts.
                 Change rates in <button onClick={() => setLocation("/admin/settings")} className="underline font-semibold">Site Settings → Fees</button>.
               </p>
             </div>
@@ -157,9 +157,9 @@ export function AdminPaymentsPage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-1">Default Rate</p>
+              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-1">Business Default</p>
               <p className="text-3xl font-black text-gray-900">{feeRates["fee_rate_default"] ?? "10"}%</p>
-              <p className="text-xs text-gray-400 mt-1">Applied to unconfigured categories</p>
+              <p className="text-xs text-gray-400 mt-1">Private sellers are always 0%</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-1">Listing Fee</p>
@@ -175,8 +175,8 @@ export function AdminPaymentsPage() {
 
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100">
-              <h2 className="font-bold text-gray-900">Current Fee Rates by Category</h2>
-              <p className="text-xs text-gray-400 mt-0.5">These rates are shown to sellers in their dashboard</p>
+              <h2 className="font-bold text-gray-900">Business Seller Fees by Category</h2>
+              <p className="text-xs text-gray-400 mt-0.5">These rates apply only to business and sole-trader sellers</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -199,7 +199,7 @@ export function AdminPaymentsPage() {
                           <span className="font-black text-gray-900">{rate}%</span>
                         </td>
                         <td className="px-6 py-3 font-mono text-xs text-gray-500">
-                          £{rate.toFixed(2)} fee · £{(100 - rate).toFixed(2)} to seller
+                          £{rate.toFixed(2)} fee · £{(100 - rate).toFixed(2)} to business seller
                         </td>
                         <td className="px-6 py-3">
                           {hasOverride ? (

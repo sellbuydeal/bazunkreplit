@@ -140,12 +140,12 @@ router.get("/admin/users", async (req, res) => {
 
     const rows = search
       ? await db.execute(sql`
-          SELECT id, email, name, credits, stripe_customer_id, banned, created_at
+          SELECT id, email, name, credits, stripe_customer_id, banned, seller_type, created_at
           FROM users WHERE email ILIKE ${"%" + search + "%"} OR name ILIKE ${"%" + search + "%"}
           ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
         `).then(r => r.rows)
       : await db.execute(sql`
-          SELECT id, email, name, credits, stripe_customer_id, banned, created_at
+          SELECT id, email, name, credits, stripe_customer_id, banned, seller_type, created_at
           FROM users ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
         `).then(r => r.rows);
 
@@ -285,12 +285,13 @@ router.patch("/admin/users/:email", async (req, res) => {
   try {
     const email = decodeURIComponent(req.params.email);
     const { name } = req.body;
+    const sellerType = ["private", "sole_trader", "business"].includes(String(req.body?.sellerType)) ? String(req.body.sellerType) : undefined;
     const [updated] = await db.execute(
-      sql`UPDATE users SET name = ${name ?? null} WHERE email = ${email} RETURNING email, name`
+      sql`UPDATE users SET name = ${name ?? null}, seller_type = COALESCE(${sellerType ?? null}, seller_type) WHERE email = ${email} RETURNING email, name, seller_type`
     ).then(r => r.rows as any[]);
     if (!updated) { res.status(404).json({ error: "User not found" }); return; }
     logger.info({ email, name }, "Admin edited user");
-    res.json({ email: updated.email, name: updated.name });
+    res.json({ email: updated.email, name: updated.name, sellerType: updated.seller_type });
   } catch (err) {
     logger.error({ err }, "Failed to edit user");
     res.status(500).json({ error: "Failed to edit user" });
@@ -416,7 +417,7 @@ router.put("/admin/settings", async (req, res) => {
 router.get("/admin/fee-settings", async (_req, res) => {
   try {
     const rows = await db.execute(
-      sql`SELECT key, value FROM site_settings WHERE key LIKE 'fee_%' ORDER BY key`
+      sql`SELECT key, value FROM site_settings WHERE key LIKE 'fee_%' OR key LIKE 'buyer_protection_%' ORDER BY key`
     ).then(r => r.rows as any[]);
     const fees: Record<string, string> = {};
     for (const row of rows) fees[String(row.key)] = String(row.value ?? "");
@@ -432,13 +433,13 @@ router.put("/admin/fee-settings", async (req, res) => {
   try {
     const incoming = req.body as Record<string, unknown>;
     const entries = Object.entries(incoming).filter(([key]) =>
-      key === "fee_listing_free" || key === "fee_rate_default" || key.startsWith("fee_rate_")
+      key === "fee_listing_free" || key === "fee_rate_default" || key.startsWith("fee_rate_") || key.startsWith("buyer_protection_")
     );
     if (!entries.length) return res.status(400).json({ error: "No fee settings supplied" });
 
     for (const [key, raw] of entries) {
       let value = String(raw ?? "").trim();
-      if (key.startsWith("fee_rate_")) {
+      if (key.startsWith("fee_rate_") || key === "buyer_protection_percent" || key.startsWith("buyer_protection_fixed_")) {
         const rate = Number(value);
         if (!Number.isFinite(rate) || rate < 0 || rate > 30) {
           return res.status(400).json({ error: `Invalid fee rate for ${key}` });
@@ -453,7 +454,7 @@ router.put("/admin/fee-settings", async (req, res) => {
     }
 
     const rows = await db.execute(
-      sql`SELECT key, value FROM site_settings WHERE key LIKE 'fee_%' ORDER BY key`
+      sql`SELECT key, value FROM site_settings WHERE key LIKE 'fee_%' OR key LIKE 'buyer_protection_%' ORDER BY key`
     ).then(r => r.rows as any[]);
     const fees: Record<string, string> = {};
     for (const row of rows) fees[String(row.key)] = String(row.value ?? "");

@@ -26,6 +26,7 @@ import { Hero } from "@/components/Hero";
 import { CategorySection } from "@/components/CategorySection";
 import { FeaturedListings } from "@/components/FeaturedListings";
 import { FeaturedFeatures } from "@/components/FeaturedFeatures";
+import { FreeSellingBuyerProtection } from "@/components/FreeSellingBuyerProtection";
 import { Footer } from "@/components/Footer";
 import { RewardsTeaser } from "@/components/RewardsTeaser";
 import { AdSlot } from "@/components/AdSlot";
@@ -225,6 +226,7 @@ function Home() {
         <LiveNowStrip />
         <RewardsTeaser />
         <FeaturedListings />
+        <FreeSellingBuyerProtection />
         <FeaturedFeatures />
         <AdSlot slotKey="home_bottom" />
       </main>

@@ -21,7 +21,7 @@ const CATEGORIES = [
       { q: "Can I track my order?", a: "Once an item ships you'll receive a tracking number by email and inside Dashboard → Orders. Click the order to see live tracking steps from dispatch to delivery." },
       { q: "What payment methods are accepted?", a: "We accept all major credit and debit cards (Visa, Mastercard, Amex), PayPal, and Apple Pay. All transactions are processed over encrypted, PCI-compliant connections." },
       { q: "Can I buy from multiple sellers at once?", a: "Yes — add items from different sellers to your cart and check out together. Each seller's items are grouped and shipped separately, and fees are calculated per seller." },
-      { q: "What is Buyer Protection?", a: "Buyer Protection means if an item doesn't arrive, arrives significantly different from the listing, or is damaged, we'll refund you in full. Open a dispute within 30 days of the estimated delivery date." },
+      { q: "What is Buyer Protection?", a: "Buyer Protection is added automatically to purchases made through Bazunk. It helps protect eligible purchases if an item doesn't arrive, arrives damaged, or is significantly not as described. In the UK the fee is 6% of the item price + 70p; in the US it is 6% + $1; in the EU it is 6% + €1. See the Buyer Protection page for claim and dispute details." },
     ],
   },
   {
@@ -30,7 +30,7 @@ const CATEGORIES = [
     color: "bg-orange-100 text-orange-600",
     faqs: [
       { q: "How do I list an item for sale?", a: "Click Sell in the top navigation and choose Quick Sell. Fill in the title, description, price, photos, and condition, then publish. Your listing goes live immediately and is visible to all buyers." },
-      { q: "What are the selling fees?", a: "Listing is free. We charge a final value fee of 5–8% (depending on category) when your item sells. There are no monthly fees or hidden charges." },
+      { q: "What are the selling fees?", a: "For private sellers: none. It is free to list and free to sell, so you keep 100% of your item price. Registered businesses and sole traders can have separate business seller fees; buyers also pay the mandatory Buyer Protection fee at checkout." },
       { q: "How do I get paid?", a: "Funds are released to your Bazunk balance 2 business days after the buyer confirms receipt. You can withdraw to your UK bank account or spend your balance on future purchases and promotions." },
       { q: "Can I pause or end a listing early?", a: "Yes. Go to Dashboard → My Listings, find the item, and click the menu icon. You can pause, edit, relist, or permanently remove any listing at any time." },
       { q: "How do I set auto-accept on offers?", a: "Go to Dashboard → Auto-Accept Offers and set a minimum threshold per listing or store-wide. Any offer at or above that price accepts automatically — no manual action needed." },
@@ -71,7 +71,7 @@ const CATEGORIES = [
       { q: "What is Live Shopping on Bazunk?", a: "Live Shopping lets sellers broadcast live video while showcasing items for sale. Viewers can buy directly from the stream. Live streams appear on the Live tab and can also be shared to external platforms." },
       { q: "How do I start a live stream?", a: "Go to Dashboard → Go Live and connect a streaming platform (Twitch, YouTube, or use Bazunk's built-in broadcaster). Set up your listing carousel, then go live. Viewers can tap items to purchase instantly." },
       { q: "Can viewers make offers during a live stream?", a: "Yes. Viewers can click any pinned listing and make an offer. You can accept, decline, or counter in real time while continuing to broadcast." },
-      { q: "Is there a fee for going live?", a: "Going live is free. Normal selling fees apply to any items sold during a stream. Boosting your stream for extra homepage visibility uses Bazunk Credits." },
+      { q: "Is there a fee for going live?", a: "Going live is free. Private sellers pay no selling commission on items sold during a stream. Business seller fees may apply to registered businesses and sole traders. Boosting your stream for extra homepage visibility uses Bazunk Credits." },
       { q: "How long can I stream for?", a: "There's no hard limit on stream duration. We recommend sessions of 30–90 minutes for the best engagement. Streams are automatically saved as replays after they end." },
       { q: "What equipment do I need?", a: "A smartphone with a stable internet connection is enough to get started. For better quality, use a ring light and external microphone. The Bazunk broadcaster works in any modern browser." },
     ],

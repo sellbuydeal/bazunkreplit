@@ -79,7 +79,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "homepage", label: "Homepage", icon: Layout },
   { id: "footer", label: "Footer & Contact", icon: Globe },
   { id: "advertising", label: "Advertising", icon: Megaphone },
-  { id: "fees", label: "Fees", icon: Percent },
+  { id: "fees", label: "Buyer Protection & Fees", icon: Percent },
   { id: "access", label: "Access", icon: ShieldAlert },
 ];
 
@@ -153,7 +153,7 @@ export function AdminSettingsPage() {
   const defaultFeeRates = Object.fromEntries(
     FEE_CATEGORIES.map(c => [`fee_rate_${c.slug}`, c.defaultRate])
   );
-  const [feeRates, setFeeRates] = useState<Record<string, string>>({ ...defaultFeeRates, fee_rate_default: "5", fee_listing_free: "true" });
+  const [feeRates, setFeeRates] = useState<Record<string, string>>({ ...defaultFeeRates, fee_rate_default: "5", fee_listing_free: "true", buyer_protection_percent: "6", buyer_protection_fixed_gbp: "0.70", buyer_protection_fixed_usd: "1.00", buyer_protection_fixed_eur: "1.00" });
   const [feesSaving, setFeesSaving] = useState(false);
   const [feesSaved, setFeesSaved] = useState(false);
   const [feesError, setFeesError] = useState<string | null>(null);
@@ -168,7 +168,7 @@ export function AdminSettingsPage() {
       if (res.ok) {
         const d = await res.json();
         setSettings({ ...DEFAULTS, ...d });
-        const loaded: Record<string, string> = { ...defaultFeeRates, fee_rate_default: "5", fee_listing_free: "true" };
+        const loaded: Record<string, string> = { ...defaultFeeRates, fee_rate_default: "5", fee_listing_free: "true", buyer_protection_percent: "6", buyer_protection_fixed_gbp: "0.70", buyer_protection_fixed_usd: "1.00", buyer_protection_fixed_eur: "1.00" };
         Object.entries(d as Record<string, string>).forEach(([k, v]) => {
           if (k.startsWith("fee_")) loaded[k] = v;
         });
@@ -578,18 +578,30 @@ export function AdminSettingsPage() {
               <div className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3 text-sm text-blue-700 flex items-start gap-2">
                 <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div>
-                  <p className="font-bold">Platform (Final Value) Fees</p>
+                  <p className="font-bold">Buyer Protection & Business Seller Fees</p>
                   <p className="text-xs text-blue-500 mt-0.5">
-                    Fees are charged on the final sale price when a transaction completes. Listings are <strong>free to post</strong>.
-                    The fee is deducted from the seller's payout automatically. Any category without a specific rate uses the default rate.
+                    Private sellers pay <strong>no listing fee and no selling commission</strong>. Buyers pay Buyer Protection at checkout.
+                    Registered businesses and sole traders can also have a seller fee, configured by category below.
                   </p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-emerald-100 bg-emerald-50">
+                  <h2 className="font-bold text-gray-900">Buyer Protection Fee</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Mandatory buyer fee added automatically at checkout. Private sellers keep 100% of their item price.</p>
+                </div>
+                <div className="p-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[["buyer_protection_percent","Percentage","%"],["buyer_protection_fixed_gbp","UK fixed","£"],["buyer_protection_fixed_usd","US fixed","$"],["buyer_protection_fixed_eur","EU fixed","€"]].map(([key,label,unit]) => (
+                    <label key={key} className="text-xs font-bold text-gray-500">{label}<div className="flex items-center gap-2 mt-1"><span>{unit}</span><input type="number" min="0" step="0.01" value={feeRates[key] ?? (key === "buyer_protection_percent" ? "6" : key === "buyer_protection_fixed_gbp" ? "0.70" : "1.00")} onChange={e => setFeeRate(key,e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" /></div></label>
+                  ))}
                 </div>
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100">
-                  <h2 className="font-bold text-gray-900">Default Rate (all unlisted categories)</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Applied when a listing's category has no specific rate set below</p>
+                  <h2 className="font-bold text-gray-900">Business seller default fee</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Only for registered business / sole-trader sellers when no category override exists</p>
                 </div>
                 <div className="px-6 py-5">
                   <div className="flex items-center gap-3 max-w-xs">
@@ -599,15 +611,15 @@ export function AdminSettingsPage() {
                       onChange={e => setFeeRate("fee_rate_default", e.target.value)}
                       className="w-28 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]"
                     />
-                    <span className="text-sm font-semibold text-gray-500">% of final sale price</span>
+                    <span className="text-sm font-semibold text-gray-500">% business seller fee</span>
                   </div>
                 </div>
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100">
-                  <h2 className="font-bold text-gray-900">Per-Category Rates</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Override the default rate for specific categories. These rates are shown to sellers in their dashboard.</p>
+                  <h2 className="font-bold text-gray-900">Business / Sole-Trader Category Fees</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">Private sellers remain at 0%. These category rates apply only to business and sole-trader sellers.</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -636,7 +648,7 @@ export function AdminSettingsPage() {
                               </div>
                             </td>
                             <td className="px-6 py-3 text-gray-500 text-xs font-mono">
-                              £{rate.toFixed(2)} fee · £{(100 - rate).toFixed(2)} to seller
+                              £{rate.toFixed(2)} business fee · £{(100 - rate).toFixed(2)} to business seller
                             </td>
                           </tr>
                         );
@@ -651,7 +663,7 @@ export function AdminSettingsPage() {
                   <button type="submit" disabled={feesSaving}
                     className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#4A5CE8] hover:bg-[#3B4FD8] text-white font-bold text-sm transition-colors disabled:opacity-50">
                     {feesSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                    {feesSaving ? "Saving…" : feesSaved ? "Saved!" : "Save Fee Rates"}
+                    {feesSaving ? "Saving…" : feesSaved ? "Saved!" : "Save Buyer Protection & Fees"}
                   </button>
                   {feesSaved && (
                     <span className="text-sm text-emerald-600 font-medium flex items-center gap-1">

@@ -1,5 +1,7 @@
 import { isBanned } from "../lib/banned.js";
 import { Router } from "express";
+import { sql } from "drizzle-orm";
+import { db } from "@workspace/db";
 import { storage } from "../storage.js";
 import { getUncachableStripeClient, getStripePublishableKey } from "../stripeClient.js";
 import { convertAmount, smallestUnit } from "../fxRates.js";
@@ -192,6 +194,42 @@ router.post("/stripe/checkout-cart", async (req, res) => {
       })
     );
 
+
+    // Buyer Protection is calculated server-side so clients cannot remove or alter it.
+    const bpRows = (await db.execute(sql`SELECT key, value FROM site_settings WHERE key LIKE 'buyer_protection_%'`)).rows as Array<Record<string, unknown>>;
+    const bpSettings = Object.fromEntries(bpRows.map((r) => [String(r.key), Number(r.value)]));
+    const bpPercent = Number.isFinite(bpSettings.buyer_protection_percent) ? bpSettings.buyer_protection_percent : 6;
+    const fixedByCurrency: Record<string, number> = {
+      GBP: Number.isFinite(bpSettings.buyer_protection_fixed_gbp) ? bpSettings.buyer_protection_fixed_gbp : 0.70,
+      USD: Number.isFinite(bpSettings.buyer_protection_fixed_usd) ? bpSettings.buyer_protection_fixed_usd : 1.00,
+      EUR: Number.isFinite(bpSettings.buyer_protection_fixed_eur) ? bpSettings.buyer_protection_fixed_eur : 1.00,
+    };
+    let protectedSubtotal = 0;
+    for (const item of items) {
+      const itemCurrency = (item.currency ?? "GBP").toUpperCase();
+      let unit = item.price;
+      if (itemCurrency !== chargeCurrency) {
+        const gbp = item.priceGbp ?? await convertAmount(item.price, itemCurrency, "GBP");
+        unit = chargeCurrency === "GBP" ? gbp : await convertAmount(gbp, "GBP", chargeCurrency);
+      }
+      protectedSubtotal += unit * item.quantity;
+    }
+    let fixedProtection = fixedByCurrency[chargeCurrency];
+    if (fixedProtection == null) {
+      fixedProtection = await convertAmount(fixedByCurrency.GBP, "GBP", chargeCurrency);
+    }
+    const buyerProtectionFee = Math.max(0, protectedSubtotal * (bpPercent / 100) + fixedProtection);
+    if (buyerProtectionFee > 0) {
+      lineItems.push({
+        price_data: {
+          currency: chargeCurrency.toLowerCase(),
+          unit_amount: smallestUnit(buyerProtectionFee, chargeCurrency),
+          product_data: { name: "Bazunk Buyer Protection" },
+        },
+        quantity: 1,
+      });
+    }
+
     // Delivery — always provided in GBP, convert if needed
     if (deliveryGbp > 0) {
       const deliveryCharge = chargeCurrency === "GBP"
@@ -235,6 +273,8 @@ router.post("/stripe/checkout-cart", async (req, res) => {
           .slice(0, 500),
         creditsApplied: creditsApplied.toFixed(2),
         chargeCurrency,
+        buyerProtectionFee: buyerProtectionFee.toFixed(2),
+        buyerProtectionPercent: bpPercent.toFixed(2),
       },
       success_url: `${origin}/checkout?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/checkout`,

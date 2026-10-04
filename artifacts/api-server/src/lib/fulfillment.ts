@@ -54,12 +54,16 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
     const ids = lines.map((l) => l.id);
     const rows = ids.length
       ? (await db.execute(sql`
-          SELECT id, title, image, price, price_gbp, seller_email FROM listings WHERE id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})
+          SELECT id, title, image, price, price_gbp, seller_email, category FROM listings WHERE id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})
         `)).rows as Array<Record<string, unknown>>
       : [];
     const byId = new Map(rows.map((r) => [Number(r.id), r]));
 
     let lineNo = 0;
+    const buyerProtectionTotal = parseFloat(session.metadata?.buyerProtectionFee ?? "0") || 0;
+    const totalItemValue = rows.reduce((sum, r) => sum + Number(r.price_gbp ?? r.price ?? 0) * (lines.find(l => l.id === Number(r.id))?.qty ?? 0), 0);
+    const feeRows = (await db.execute(sql`SELECT key, value FROM site_settings WHERE key LIKE 'fee_rate_%'`)).rows as Array<Record<string, unknown>>;
+    const feeSettings = Object.fromEntries(feeRows.map(r => [String(r.key), Number(r.value)]));
     const sellers = new Set<string>();
     const sellerItems = new Map<string, string[]>();
     const sellerEmailItems = new Map<string, Array<{ title: string; price: number; quantity: number }>>();
@@ -76,11 +80,17 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
       for (let u = 0; u < l.qty; u++) {
         lineNo++;
         const orderId = `ORD-${randomUUID().slice(0, 8).toUpperCase()}`;
+        const sellerTypeRow = seller ? (await db.execute(sql`SELECT seller_type FROM users WHERE LOWER(email)=LOWER(${seller}) LIMIT 1`)).rows[0] as any : null;
+        const sellerType = String(sellerTypeRow?.seller_type ?? "private");
+        const categorySlug = String(row.category ?? "").toLowerCase();
+        const businessRate = sellerType === "private" ? 0 : (feeSettings[`fee_rate_${categorySlug}`] ?? feeSettings.fee_rate_default ?? 5);
+        const sellerFee = price * (businessRate / 100);
+        const protectionShare = totalItemValue > 0 ? buyerProtectionTotal * (price / totalItemValue) : 0;
         await db.execute(sql`
           INSERT INTO orders (id, buyer_email, seller_email, item_title, item_image, price, status,
-                              stripe_session_id, line_no, created_at, updated_at)
+                              stripe_session_id, line_no, buyer_protection_fee, seller_fee, created_at, updated_at)
           VALUES (${orderId}, ${buyerEmail}, ${seller}, ${row.title as string}, ${(row.image as string | null) ?? null},
-                  ${price}, 'confirmed', ${sessionId}, ${lineNo}, NOW(), NOW())
+                  ${price}, 'confirmed', ${sessionId}, ${lineNo}, ${protectionShare}, ${sellerFee}, NOW(), NOW())
           ON CONFLICT (stripe_session_id, line_no) DO NOTHING
         `);
       }
