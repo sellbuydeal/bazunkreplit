@@ -62,6 +62,7 @@ import { AdminDashboardPage } from "@/pages/admin/AdminDashboardPage";
 import { AdminCreditsEconomyPage } from "@/pages/admin/AdminCreditsEconomyPage";
 import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
 import { AdminPaymentsPage } from "@/pages/admin/AdminPaymentsPage";
+import { AdminOrdersPage } from "@/pages/admin/AdminOrdersPage";
 import { AdminSettingsPage } from "@/pages/admin/AdminSettingsPage";
 import { AdminProductsPage } from "@/pages/admin/AdminProductsPage";
 import { AdminListingsPage } from "@/pages/admin/AdminListingsPage";
@@ -278,6 +279,7 @@ function Router() {
       <Route path="/admin/importer-control" component={AdminImporterControlPage} />
       <Route path="/admin/classifieds" component={AdminClassifiedsPage} />
       <Route path="/admin/payments" component={AdminPaymentsPage} />
+      <Route path="/admin/orders" component={AdminOrdersPage} />
       <Route path="/admin/disputes" component={AdminDisputesPage} />
       <Route path="/admin/returns" component={AdminReturnsPage} />
       <Route path="/admin/auctions" component={AdminAuctionsPage} />

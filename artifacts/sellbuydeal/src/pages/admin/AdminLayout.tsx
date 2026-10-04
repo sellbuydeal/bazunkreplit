@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { CircleDollarSign, LayoutDashboard, Users, Settings, CreditCard, LogOut, ShieldCheck, Package, Shield, RotateCcw, Gavel, Zap, LifeBuoy, Gift, Megaphone, List, ArrowDownToLine, FileText, Star, Activity } from "lucide-react";
+import { CircleDollarSign, LayoutDashboard, Users, Settings, CreditCard, ShoppingCart, LogOut, ShieldCheck, Package, Shield, RotateCcw, Gavel, Zap, LifeBuoy, Gift, Megaphone, List, ArrowDownToLine, FileText, Star, Activity } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
 
 const NAV = [
@@ -10,6 +10,7 @@ const NAV = [
   { label: "Imports",      href: "/admin/imports",      icon: ArrowDownToLine },
   { label: "Importer Control", href: "/admin/importer-control", icon: Activity },
   { label: "Classifieds",  href: "/admin/classifieds",  icon: FileText        },
+  { label: "Orders",       href: "/admin/orders",       icon: ShoppingCart     },
   { label: "Payments",   href: "/admin/payments",   icon: CreditCard      },
   { label: "Auctions",   href: "/admin/auctions",   icon: Gavel           },
   { label: "Flash Sales",href: "/admin/flash-sales",icon: Zap             },
