@@ -2105,17 +2105,17 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
           </div>
           <div className="flex items-center justify-between px-5 py-3 text-sm">
             <div>
-              <p className="font-semibold text-[#F26B21]">Private seller commission</p>
-              <p className="text-xs text-gray-400">Private sellers pay no Bazunk commission</p>
+              <p className="font-semibold text-[#F26B21]">Bazunk marketplace fee</p>
+              <p className="text-xs text-gray-400">Deducted from payout</p>
             </div>
-            <span className="font-bold text-emerald-600">0%</span>
+            <span className="font-bold text-[#F26B21]">{mktRatePct}%</span>
           </div>
           <div className="flex items-center justify-between px-5 py-3 text-sm">
             <div>
-              <p className="font-semibold text-[#4A5CE8]">Payment processing</p>
+              <p className="font-semibold text-[#4A5CE8]">Stripe processing fee</p>
               <p className="text-xs text-gray-400">Card processing cost</p>
             </div>
-            <span className="font-bold text-[#4A5CE8]">Covered by Bazunk</span>
+            <span className="font-bold text-[#4A5CE8]">2.9% + £0.30</span>
           </div>
           {isCrossCurrency && (
             <div className="flex items-center justify-between px-5 py-3 text-sm bg-amber-50/60">
@@ -2128,15 +2128,15 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
           )}
           <div className="flex items-center justify-between px-5 py-3 text-sm bg-emerald-50/50">
             <div>
-              <p className="font-bold text-emerald-700">Private seller receives</p>
+              <p className="font-bold text-emerald-700">Seller receives (net payout)</p>
               <p className="text-xs text-emerald-500">Paid automatically to your bank in GBP</p>
             </div>
-            <span className="font-black text-emerald-700">100% item price</span>
+            <span className="font-black text-emerald-700">~{sellerPct}%</span>
           </div>
         </div>
         <div className="px-5 py-3 border-t border-amber-50 bg-amber-50/30 flex items-start gap-2">
           <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-700">Private sellers have no listing fee or Bazunk selling commission. Credits are for optional promotions and premium tools.</p>
+          <p className="text-xs text-amber-700">Bazunk credits <strong>cannot</strong> be used to offset marketplace fees or Stripe processing fees. These are always deducted in cash from your payout.</p>
         </div>
 
         {/* Fee calculator */}
@@ -2157,11 +2157,11 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
           {amount > 0 && (
             <div className="mt-3 space-y-1.5 text-xs">
               <div className="flex justify-between text-gray-500">
-                <span>Private seller fee (0%)</span>
+                <span>Marketplace fee ({mktRatePct}%)</span>
                 <span className="text-[#F26B21] font-semibold">−£{mktFee.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-gray-500">
-                <span>Bazunk seller commission</span>
+                <span>Stripe fee (2.9% + £0.30)</span>
                 <span className="text-[#4A5CE8] font-semibold">−£{stripeFee.toFixed(2)}</span>
               </div>
               {isCrossCurrency && (
@@ -4193,7 +4193,7 @@ function DisputesSection() {
   );
 }
 
-const PLATFORMS: LivePlatform[] = ["youtube", "twitch", "tiktok", "zoom", "instagram", "facebook", "livekit"];
+const PLATFORMS: LivePlatform[] = ["youtube", "twitch"];
 
 type GoLiveListing = { id: number; title: string; price: number | string; images: string[] };
 
