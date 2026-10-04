@@ -112,6 +112,8 @@ const AD_SLOTS = [
   { key: "categories_top", label: "Categories — Top Banner",     desc: "Leaderboard (728×90) below the category header, above the grid" },
   { key: "classifieds_mid",label: "Classifieds — Mid Banner",    desc: "Leaderboard (728×90) between the hero and search filters" },
   { key: "support_mid",    label: "Support — Mid Banner",        desc: "Leaderboard (728×90) between the hero and FAQ tabs" },
+  { key: "live_left",      label: "Live Page — Left Vertical",    desc: "Vertical advert beside the Live Now content on desktop; moves below the content on smaller screens" },
+  { key: "live_bottom",    label: "Live Page — Bottom Banner",    desc: "Leaderboard (728×90) below the Live Now content" },
 ] as const;
 
 
@@ -129,6 +131,15 @@ function SettingsField({ value, label, type = "text", placeholder, onChange }: {
       ) : (
         <input type={type === "url" ? "url" : "text"} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]" />
       )}
+    </div>
+  );
+}
+
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+      <h2 className="font-bold text-gray-900 text-base">{title}</h2>
+      {children}
     </div>
   );
 }
@@ -270,14 +281,6 @@ export function AdminSettingsPage() {
     );
   }
 
-  function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-        <h2 className="font-bold text-gray-900 text-base">{title}</h2>
-        {children}
-      </div>
-    );
-  }
 
   return (
     <AdminLayout>
