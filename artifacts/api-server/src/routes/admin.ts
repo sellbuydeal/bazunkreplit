@@ -410,6 +410,61 @@ router.put("/admin/settings", async (req, res) => {
   }
 });
 
+// Dedicated final-value fee settings endpoint. Keeping fees separate from the
+// generic site-settings form prevents unrelated settings saves from overwriting
+// category fee rates and lets the admin UI verify what PostgreSQL actually saved.
+router.get("/admin/fee-settings", async (_req, res) => {
+  try {
+    const rows = await db.execute(
+      sql`SELECT key, value FROM site_settings WHERE key LIKE 'fee_%' ORDER BY key`
+    ).then(r => r.rows as any[]);
+    const fees: Record<string, string> = {};
+    for (const row of rows) fees[String(row.key)] = String(row.value ?? "");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.json(fees);
+  } catch (err) {
+    logger.error({ err }, "Failed to get fee settings");
+    res.status(500).json({ error: "Failed to get fee settings" });
+  }
+});
+
+router.put("/admin/fee-settings", async (req, res) => {
+  try {
+    const incoming = req.body as Record<string, unknown>;
+    const entries = Object.entries(incoming).filter(([key]) =>
+      key === "fee_listing_free" || key === "fee_rate_default" || key.startsWith("fee_rate_")
+    );
+    if (!entries.length) return res.status(400).json({ error: "No fee settings supplied" });
+
+    for (const [key, raw] of entries) {
+      let value = String(raw ?? "").trim();
+      if (key.startsWith("fee_rate_")) {
+        const rate = Number(value);
+        if (!Number.isFinite(rate) || rate < 0 || rate > 30) {
+          return res.status(400).json({ error: `Invalid fee rate for ${key}` });
+        }
+        value = String(rate);
+      }
+      await db.execute(sql`
+        INSERT INTO site_settings (key, value, updated_at)
+        VALUES (${key}, ${value}, NOW())
+        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+      `);
+    }
+
+    const rows = await db.execute(
+      sql`SELECT key, value FROM site_settings WHERE key LIKE 'fee_%' ORDER BY key`
+    ).then(r => r.rows as any[]);
+    const fees: Record<string, string> = {};
+    for (const row of rows) fees[String(row.key)] = String(row.value ?? "");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.json({ success: true, fees });
+  } catch (err) {
+    logger.error({ err }, "Failed to update fee settings");
+    res.status(500).json({ error: "Failed to update fee settings" });
+  }
+});
+
 // Update admin credentials
 
 router.patch("/admin/credentials", async (req, res) => {
@@ -591,18 +646,11 @@ router.get("/admin/listings", async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
     const search = (req.query.search as string) ?? "";
     const imported = req.query.imported as string;
-    const source = (req.query.source as string ?? "").toLowerCase();
-    // Legacy imported filter is retained for Amazon. Source-specific filters work
-    // regardless of which seller account owns an imported listing.
+    // imported=1 → superdeals account (all imports), imported=0 → user listings
     const importedFilter = imported === "1"
       ? sql`seller_email = 'bazunkdeals@gmail.com'`
       : imported === "0"
         ? sql`seller_email != 'bazunkdeals@gmail.com'`
-        : sql`TRUE`;
-    const sourceFilter = source === "ebay"
-      ? sql`(specifications LIKE '%"source":"eBay UK"%' OR specifications LIKE '%"source":"eBay US"%')`
-      : source === "amazon"
-        ? sql`(specifications LIKE '%"amazon_url"%' OR specifications LIKE '%"source":"Amazon%')`
         : sql`TRUE`;
 
     const rows = await db.execute(sql`
@@ -612,7 +660,6 @@ router.get("/admin/listings", async (req, res) => {
       FROM listings
       WHERE (${search ? sql`(title ILIKE ${'%' + search + '%'} OR public_id ILIKE ${'%' + search + '%'} OR seller_email ILIKE ${'%' + search + '%'})` : sql`TRUE`})
       AND (${importedFilter})
-      AND (${sourceFilter})
       ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `).then(r => r.rows);
@@ -621,7 +668,6 @@ router.get("/admin/listings", async (req, res) => {
       SELECT COUNT(*) AS cnt FROM listings
       WHERE (${search ? sql`(title ILIKE ${'%' + search + '%'} OR public_id ILIKE ${'%' + search + '%'} OR seller_email ILIKE ${'%' + search + '%'})` : sql`TRUE`})
       AND (${importedFilter})
-      AND (${sourceFilter})
     `).then(r => r.rows as { cnt: string }[]);
 
     res.json({ listings: rows, total: parseInt(cnt) });
@@ -933,20 +979,9 @@ router.get("/admin/search-ebay", async (req, res) => {
 
   try {
     const marketplaceId = site === "uk" ? "EBAY_GB" : "EBAY_US";
-    const targetCountry = site === "uk" ? "GB" : "US";
     const offset        = (page - 1) * 50;
-    // Marketplace alone is not a location filter: eBay UK can return stock
-    // physically located overseas. Ask RapidAPI for stock located in AND
-    // deliverable to the selected country.
-    const searchParams = new URLSearchParams({
-      q: query,
-      marketplace_id: marketplaceId,
-      offset: String(offset),
-      item_location_country: targetCountry,
-      delivery_country: targetCountry,
-    });
     const resp = await fetch(
-      `https://real-time-ebay-data.p.rapidapi.com/ebay_search?${searchParams.toString()}`,
+      `https://real-time-ebay-data.p.rapidapi.com/ebay_search?q=${encodeURIComponent(query)}&marketplace_id=${marketplaceId}&offset=${offset}`,
       { headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": "real-time-ebay-data.p.rapidapi.com" } }
     );
     if (!resp.ok) { res.status(502).json({ error: rapidApiErrorMessage("eBay", resp.status) }); return; }
@@ -999,12 +1034,9 @@ router.get("/admin/search-ebay", async (req, res) => {
           item_location:   country ? `${country}${location.postalCode ? ` (${String(location.postalCode).replace(/\*+$/, "***")})` : ""}` : null,
         };
       })
-      .filter(p => p.price > 0)
-      // Defence in depth: never show a cross-region item even if the upstream
-      // provider ignores/loosens the requested location filter.
-      .filter(p => p.country.toUpperCase() === targetCountry);
+      .filter(p => p.price > 0);
 
-    res.json({ products, total: products.length, region: targetCountry });
+    res.json({ products, total: (data.total as number) ?? products.length });
   } catch (err) {
     logger.error({ err }, "eBay search failed");
     res.status(500).json({ error: "eBay search failed" });
@@ -1023,35 +1055,25 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
     categories?: string[]; shipping_label?: string | null; shipping_type?: string;
     original_price?: string | null; discount_pct?: string | null;
     buying_options?: string[]; item_location?: string | null;
-    country?: string;
   }
 
   const products: SelectedEbay[] = req.body.products ?? [];
   const site        = (req.body.site as string ?? "uk") === "us" ? "us" : "uk";
   const currency: "GBP" | "USD" = site === "uk" ? "GBP" : "USD";
-  const markupPct   = Math.max(0, parseFloat(String(req.body.markup   ?? 35))   || 35);
-  const shippingAmt = Math.max(0, parseFloat(String(req.body.shipping ?? 3.99)) || 3.99);
+  const markupPct   = Math.max(0, parseFloat(String(req.body.markup ?? 35)) || 35);
+  const shippingAmt = Math.max(0, parseFloat(String(req.body.shipping ?? 0)) || 0);
+  const minProfit = Math.max(0, parseFloat(String(req.body.minProfit ?? 5)) || 5);
   const category    = (req.body.category    as string) || "other";
   const subcategory = (req.body.subcategory as string) || null;
-  const sellerEmail = (req.body.sellerEmail as string) || "bazunkdeals@gmail.com";
+  const sellerEmail = "cczslater@gmail.com";
 
   if (!products.length) { res.status(400).json({ error: "products array required" }); return; }
-
-  const targetCountry = site === "uk" ? "GB" : "US";
-  const wrongRegion = products.filter(p => (p.country ?? "").toUpperCase() !== targetCountry);
-  if (wrongRegion.length) {
-    const sample = wrongRegion.slice(0, 3).map(p => `${p.title} (${p.country || "unknown location"})`).join("; ");
-    res.status(400).json({
-      error: `Cannot import ${wrongRegion.length} item${wrongRegion.length === 1 ? "" : "s"}: ${site === "uk" ? "eBay UK" : "eBay USA"} imports must be located in ${targetCountry} and deliverable there. ${sample}`,
-      code: "EBAY_REGION_MISMATCH",
-    });
-    return;
-  }
 
   const sellerRow = await db.execute(
     sql`SELECT name FROM users WHERE email = ${sellerEmail} LIMIT 1`
   ).then(r => r.rows[0] as { name: string | null } | undefined);
-  const SELLER_NAME = sellerRow?.name ?? sellerEmail.split("@")[0];
+  const SELLER_NAME = "Bazunk Official Store";
+  await db.execute(sql`INSERT INTO users (id,email,name,verification_status,created_at) VALUES ('bazunk-official-store',${sellerEmail},${SELLER_NAME},'verified',NOW()) ON CONFLICT (email) DO UPDATE SET name=${SELLER_NAME}, verification_status='verified'`);
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   let inserted = 0;
 
@@ -1062,22 +1084,33 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
     ).then(r => r.rows.length > 0);
     if (exists) continue;
 
-    const bazunkPrice = Math.round((p.price * (1 + markupPct / 100) + shippingAmt) * 100) / 100;
+    const landedCost = p.price + shippingAmt;
+    const bazunkPrice = Math.round(Math.max(landedCost * (1 + markupPct / 100), landedCost + minProfit) * 100) / 100;
     const prefix      = site === "uk" ? "BZK-EBY-UK" : "BZK-EBY-US";
     const publicId    = `${prefix}-${date}-${String(Date.now()).slice(-6)}-${String(inserted + 1).padStart(3, "0")}`;
     const source      = site === "uk" ? "eBay UK" : "eBay US";
     const specs       = JSON.stringify({
       source, item_id: p.item_id, ebay_url: p.ebay_url,
       ebay_price: p.price, ebay_currency: currency, ebay_site: site,
-      source_country: targetCountry, delivery_country: targetCountry, item_location: p.item_location ?? null,
-      shipping: shippingAmt, markup_pct: markupPct,
+      shipping: shippingAmt, markup_pct: markupPct, min_profit: minProfit, official_store: true,
+      official_store_name: "Bazunk Official Store", source_last_checked: new Date().toISOString(),
     });
 
-    // Keep sourcing/seller/price/link metadata private in specifications. The
-    // public description must describe the product, not advertise the source.
-    const descParts: string[] = [p.title];
+    const sym = p.currency === "GBP" ? "£" : "$";
+    const descParts: string[] = [p.title, ""];
     if (p.condition) descParts.push(`Condition: ${p.condition}`);
-    const description = descParts.join("\n\n");
+    if (p.categories?.length) descParts.push(`Category: ${p.categories.join(" › ")}`);
+    if (p.shipping_label) {
+      const shipType = p.shipping_type === "FIXED" ? "Standard" : p.shipping_type === "FREE" ? "Free" : p.shipping_type ?? "";
+      descParts.push(`Shipping: ${p.shipping_label}${shipType && shipType !== "Free" ? ` (${shipType})` : ""}`);
+    }
+    if (p.item_location) descParts.push(`Item location: ${p.item_location}`);
+    if (p.buying_options?.length) {
+      descParts.push(`Listing type: ${p.buying_options.map(o => o.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase())).join(", ")}`);
+    }
+    descParts.push("");
+    while (descParts.length && descParts[descParts.length - 1] === "") descParts.pop();
+    const description = descParts.join("\n");
     const image       = p.image ?? null;
     const condition   = p.condition ?? "used";
     const condNorm  = ["new", "used", "refurbished", "for-parts"].includes(condition.toLowerCase())
@@ -1092,10 +1125,11 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
         ${image}, ${sellerEmail}, ${SELLER_NAME}, ${specs}, 'active', NOW(), NOW()
       )
     `);
+    await db.execute(sql`UPDATE listings SET seller_username = 'Bazunk Official Store' WHERE public_id = ${publicId}`);
     inserted++;
   }
 
-  logger.info({ inserted, site, markupPct, shippingAmt }, "eBay admin import complete");
+  logger.info({ inserted, site, markupPct, shippingAmt, minProfit }, "eBay Official Store import complete");
   res.json({ imported: inserted, message: `Imported ${inserted} product${inserted !== 1 ? "s" : ""}` });
 });
 
@@ -1122,7 +1156,8 @@ router.post("/admin/sync-ebay-prices", async (req, res) => {
         const itemId    = specs.item_id as string;
         const site      = (specs.ebay_site as string ?? "uk") === "us" ? "us" : "uk";
         const markupPct = parseFloat(String(specs.markup_pct ?? 35)) || 35;
-        const shipping  = parseFloat(String(specs.shipping   ?? 3.99)) || 3.99;
+        const shipping  = parseFloat(String(specs.shipping ?? 0)) || 0;
+        const minProfit = parseFloat(String(specs.min_profit ?? 5)) || 5;
         const oldPrice  = parseFloat(String(specs.ebay_price ?? 0));
         if (!itemId) return;
 
@@ -1143,8 +1178,14 @@ router.post("/admin/sync-ebay-prices", async (req, res) => {
         if (!newEbayPrice || newEbayPrice <= 0) { errors++; return; }
         if (Math.abs(newEbayPrice - oldPrice) < 0.01) { unchanged++; return; }
 
-        const newBazunkPrice = Math.round((newEbayPrice * (1 + markupPct / 100) + shipping) * 100) / 100;
-        const newSpecs       = JSON.stringify({ ...specs, ebay_price: newEbayPrice });
+        const landedCost = newEbayPrice + shipping;
+        const newBazunkPrice = Math.round(Math.max(landedCost * (1 + markupPct / 100), landedCost + minProfit) * 100) / 100;
+        const changeRatio = oldPrice > 0 ? newEbayPrice / oldPrice : 1;
+        if (changeRatio > 2.5 || changeRatio < 0.4) {
+          const pausedSpecs = JSON.stringify({ ...specs, source_price_anomaly: true, source_last_checked: new Date().toISOString(), proposed_source_price: newEbayPrice });
+          await db.execute(sql`UPDATE listings SET status='paused', specifications=${pausedSpecs}, updated_at=NOW() WHERE id=${row.id}`); errors++; return;
+        }
+        const newSpecs = JSON.stringify({ ...specs, ebay_price: newEbayPrice, source_price_anomaly: false, source_last_checked: new Date().toISOString() });
         await db.execute(sql`
           UPDATE listings SET price = ${newBazunkPrice}, price_gbp = ${newBazunkPrice},
             specifications = ${newSpecs}, updated_at = NOW() WHERE id = ${row.id}
@@ -1195,7 +1236,8 @@ router.post("/admin/sync-ebay-details", async (req, res) => {
 router.patch("/admin/bulk-markup-ebay", async (req, res) => {
   try {
     const markupPct = Math.max(0, parseFloat(String(req.body.markup  ?? 35))  || 35);
-    const shipping  = Math.max(0, parseFloat(String(req.body.shipping ?? 3.99)) || 3.99);
+    const shipping  = Math.max(0, parseFloat(String(req.body.shipping ?? 0)) || 0);
+    const minProfit = Math.max(0, parseFloat(String(req.body.minProfit ?? 5)) || 5);
 
     const rows = await db.execute(sql`
       SELECT id, specifications FROM listings
@@ -1208,8 +1250,9 @@ router.patch("/admin/bulk-markup-ebay", async (req, res) => {
         const specs    = JSON.parse(row.specifications) as Record<string, unknown>;
         const ebayPrice = parseFloat(String(specs.ebay_price ?? 0));
         if (!ebayPrice) continue;
-        const newPrice  = Math.round((ebayPrice * (1 + markupPct / 100) + shipping) * 100) / 100;
-        const newSpecs  = JSON.stringify({ ...specs, shipping, markup_pct: markupPct });
+        const landedCost = ebayPrice + shipping;
+        const newPrice = Math.round(Math.max(landedCost * (1 + markupPct / 100), landedCost + minProfit) * 100) / 100;
+        const newSpecs = JSON.stringify({ ...specs, shipping, markup_pct: markupPct, min_profit: minProfit });
         await db.execute(sql`
           UPDATE listings SET price = ${newPrice}, price_gbp = ${newPrice},
             specifications = ${newSpecs}, updated_at = NOW() WHERE id = ${row.id}

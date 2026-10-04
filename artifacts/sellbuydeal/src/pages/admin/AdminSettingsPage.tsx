@@ -174,6 +174,11 @@ export function AdminSettingsPage() {
         });
         setFeeRates(loaded);
       }
+      const feeRes = await authFetch("/api/admin/fee-settings");
+      if (feeRes.ok) {
+        const persisted = await feeRes.json() as Record<string, string>;
+        setFeeRates(prev => ({ ...prev, ...persisted }));
+      }
     } finally { setLoading(false); }
   }
 
@@ -194,13 +199,14 @@ export function AdminSettingsPage() {
     setFeesSaving(true);
     setFeesError(null);
     try {
-      const res = await authFetch("/api/admin/settings", { method: "PUT", body: JSON.stringify(feeRates) });
+      const res = await authFetch("/api/admin/fee-settings", { method: "PUT", body: JSON.stringify(feeRates) });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         setFeesError((body as any).error ?? `Save failed (${res.status})`);
         return;
       }
-      await load();
+      // Use the values read back from PostgreSQL, so Saved means they really persisted.
+      if ((body as any).fees) setFeeRates((body as any).fees);
       window.dispatchEvent(new Event("bazunk-settings-updated"));
       setFeesSaved(true);
       setTimeout(() => setFeesSaved(false), 2500);
