@@ -94,39 +94,66 @@ router.use("/admin", requireAdmin);
 
 router.get("/admin/stats", async (_req, res) => {
   try {
-    const [userCount] = await db.execute(sql`SELECT COUNT(*)::int as count FROM users`).then(r => r.rows as any[]);
-    const [creditSum] = await db.execute(sql`SELECT COALESCE(SUM(credits),0)::float as total FROM users`).then(r => r.rows as any[]);
-    const [txCount] = await db.execute(sql`SELECT COUNT(*)::int as count, COALESCE(SUM(credits_added),0)::float as total FROM credit_transactions`).then(r => r.rows as any[]);
+    await ensureCreditEconomyTable();
+    const q = async (query: any, fallback: any = {}) => {
+      try { return (await db.execute(query)).rows[0] ?? fallback; } catch { return fallback; }
+    };
+    const qa = async (query: any) => { try { return (await db.execute(query)).rows as any[]; } catch { return []; } };
 
-    let stripeRevenue = 0;
+    const [users, listings, orders, disputes, returnsSummary, live, credits, salesTrend, userTrend] = await Promise.all([
+      q(sql`SELECT COUNT(*)::int AS total, COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE)::int AS today,
+            COUNT(*) FILTER (WHERE created_at >= now()-interval '7 days')::int AS week FROM users`, {total:0,today:0,week:0}),
+      q(sql`SELECT COUNT(*) FILTER (WHERE status='active')::int AS active FROM listings`, {active:0}),
+      q(sql`SELECT COUNT(*)::int AS total,
+            COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE AND LOWER(status) NOT IN ('cancelled','canceled','refunded'))::int AS sales_today,
+            COALESCE(SUM(price) FILTER (WHERE LOWER(status) NOT IN ('cancelled','canceled','refunded')),0)::float AS gmv,
+            COALESCE(SUM(price) FILTER (WHERE created_at >= CURRENT_DATE AND LOWER(status) NOT IN ('cancelled','canceled','refunded')),0)::float AS gmv_today,
+            COALESCE(SUM(buyer_protection_fee),0)::float AS buyer_protection,
+            COALESCE(SUM(seller_fee),0)::float AS business_fees
+          FROM orders`, {total:0,sales_today:0,gmv:0,gmv_today:0,buyer_protection:0,business_fees:0}),
+      q(sql`SELECT COUNT(*) FILTER (WHERE LOWER(status) NOT IN ('resolved','closed','rejected'))::int AS open,
+            COUNT(*)::int AS total,
+            COALESCE(SUM(CASE WHEN refund_amount ~ '^[0-9]+(\\.[0-9]+)?$' THEN refund_amount::numeric ELSE 0 END),0)::float AS refunds
+          FROM disputes`, {open:0,total:0,refunds:0}),
+      q(sql`SELECT COUNT(*) FILTER (WHERE LOWER(status) NOT IN ('completed','closed','rejected','cancelled'))::int AS open,
+            COALESCE(SUM(CASE WHEN refund_amount ~ '^[0-9]+(\\.[0-9]+)?$' THEN refund_amount::numeric ELSE 0 END),0)::float AS refunds
+          FROM returns`, {open:0,refunds:0}),
+      q(sql`SELECT COUNT(*) FILTER (WHERE is_live=true)::int AS active,
+            COALESCE(SUM(viewer_count) FILTER (WHERE is_live=true),0)::int AS viewers FROM live_stream_sessions`, {active:0,viewers:0}),
+      q(sql`SELECT
+            COALESCE(SUM(CASE WHEN credits>0 THEN credits ELSE 0 END),0)::float AS issued,
+            COALESCE(ABS(SUM(CASE WHEN kind='spent' AND credits<0 THEN credits ELSE 0 END)),0)::float AS spent
+          FROM credit_economy_ledger`, {issued:0,spent:0}),
+      qa(sql`WITH days AS (SELECT generate_series(CURRENT_DATE-interval '6 days', CURRENT_DATE, interval '1 day')::date d),
+          agg AS (SELECT created_at::date d, COUNT(*) FILTER (WHERE LOWER(status) NOT IN ('cancelled','canceled','refunded'))::int orders,
+          COALESCE(SUM(price) FILTER (WHERE LOWER(status) NOT IN ('cancelled','canceled','refunded')),0)::float gmv FROM orders
+          WHERE created_at >= CURRENT_DATE-interval '6 days' GROUP BY created_at::date)
+          SELECT to_char(days.d,'Dy') label, days.d::text date, COALESCE(agg.orders,0)::int orders, COALESCE(agg.gmv,0)::float gmv
+          FROM days LEFT JOIN agg USING(d) ORDER BY days.d`),
+      qa(sql`WITH days AS (SELECT generate_series(CURRENT_DATE-interval '29 days', CURRENT_DATE, interval '1 day')::date d),
+          agg AS (SELECT created_at::date d, COUNT(*)::int users FROM users WHERE created_at >= CURRENT_DATE-interval '29 days' GROUP BY created_at::date)
+          SELECT to_char(days.d,'DD Mon') label, COALESCE(agg.users,0)::int users FROM days LEFT JOIN agg USING(d) ORDER BY days.d`),
+    ]);
+
     let recentPayments: any[] = [];
     try {
       const stripe = await getUncachableStripeClient();
-      const sessions = await stripe.checkout.sessions.list({ limit: 10, status: "complete" });
-      recentPayments = sessions.data.map((s) => ({
-        id: s.id,
-        email: s.customer_details?.email ?? s.client_reference_id ?? "—",
-        amount: (s.amount_total ?? 0) / 100,
-        currency: s.currency?.toUpperCase() ?? "GBP",
-        date: new Date((s.created) * 1000).toISOString(),
-        status: s.payment_status,
-      }));
-      const balance = await stripe.balance.retrieve();
-      stripeRevenue = (balance.available[0]?.amount ?? 0) / 100;
-    } catch {
-      // Stripe not available — skip
-    }
+      const sessions = await stripe.checkout.sessions.list({ limit: 8, status: "complete" });
+      recentPayments = sessions.data.map(s => ({ id:s.id, email:s.customer_details?.email ?? s.client_reference_id ?? "—",
+        amount:(s.amount_total ?? 0)/100, currency:s.currency?.toUpperCase() ?? "GBP", date:new Date(s.created*1000).toISOString(), status:s.payment_status }));
+    } catch {}
 
     res.json({
-      userCount: userCount.count,
-      creditsInCirculation: creditSum.total,
-      totalTransactions: txCount.count,
-      totalRevenue: txCount.total,
-      stripeBalance: stripeRevenue,
-      recentPayments,
+      userCount:Number(users.total||0), newUsersToday:Number(users.today||0), newUsersWeek:Number(users.week||0),
+      activeListings:Number(listings.active||0), orderCount:Number(orders.total||0), salesToday:Number(orders.sales_today||0),
+      gmv:Number(orders.gmv||0), gmvToday:Number(orders.gmv_today||0), buyerProtection:Number(orders.buyer_protection||0),
+      businessFees:Number(orders.business_fees||0), openDisputes:Number(disputes.open||0), totalDisputes:Number(disputes.total||0),
+      openReturns:Number(returnsSummary.open||0), refunds:Number(disputes.refunds||0)+Number(returnsSummary.refunds||0),
+      activeLiveStreams:Number(live.active||0), liveViewers:Number(live.viewers||0),
+      creditsIssued:Number(credits.issued||0), creditsSpent:Number(credits.spent||0), salesTrend, userTrend, recentPayments,
     });
   } catch (err) {
-    logger.error({ err }, "Failed to get stats");
+    logger.error({ err }, "Failed to get admin overview stats");
     res.status(500).json({ error: "Failed to get stats" });
   }
 });
