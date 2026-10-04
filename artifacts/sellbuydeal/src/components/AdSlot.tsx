@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { ExternalLink, Megaphone } from "lucide-react";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
 
-type SlotKey = "home_bottom" | "browse_top" | "browse_bottom" | "auctions_mid" | "flash_sales_mid" | "categories_top" | "classifieds_mid" | "support_mid";
+type SlotKey = "home_bottom" | "browse_top" | "browse_bottom" | "auctions_mid" | "flash_sales_mid" | "categories_top" | "classifieds_mid" | "support_mid" | "live_left" | "live_bottom";
 
 interface AdSlotProps {
   slotKey: SlotKey;
@@ -87,6 +87,27 @@ export function AdSlot({ slotKey, className = "" }: AdSlotProps) {
         </div>
       </div>
     );
+  }
+
+  if (slotKey === "live_left") {
+    if (type === "text") {
+      if (!textTitle && !textBody) return null;
+      return (
+        <div className={`w-full h-full min-h-[280px] bg-gray-900 border border-gray-800 rounded-2xl p-4 flex flex-col ${className}`}>
+          <span className="text-[9px] text-gray-500 font-semibold tracking-widest uppercase mb-4">Advertisement</span>
+          <div className="flex-1 flex flex-col items-center justify-center text-center gap-3">
+            <Megaphone className="w-8 h-8 text-[#4A5CE8]" />
+            {textTitle && <p className="font-bold text-white text-sm">{textTitle}</p>}
+            {textBody && <p className="text-xs text-gray-400">{textBody}</p>}
+            {textUrl && (
+              <a href={textUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 bg-[#F26B21] hover:opacity-90 text-white text-xs font-bold px-4 py-2 rounded-xl">
+                {textCta} <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+        </div>
+      );
+    }
   }
 
   if (!textTitle && !textBody) return null;

@@ -13,6 +13,7 @@ import { PLATFORM_META, extractEmbedSrc } from "@/data/livestreams";
 import { LiveKitViewer } from "@/components/LiveKitViewer";
 import { useCart } from "@/context/CartContext";
 import { LiveChat } from "@/components/LiveChat";
+import { AdSlot } from "@/components/AdSlot";
 
 function timeOnAir(startedAt: string): string {
   const mins = Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000);
@@ -58,6 +59,12 @@ export function LiveHubPage() {
           <span className="text-sm font-bold text-gray-500">{live.length} stream{live.length !== 1 ? "s" : ""} active</span>
         </div>
 
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <aside className="w-full lg:w-[180px] xl:w-[220px] lg:sticky lg:top-24 order-2 lg:order-1 empty:hidden">
+            <AdSlot slotKey="live_left" />
+          </aside>
+          <div className="flex-1 min-w-0 order-1 lg:order-2">
+
         {/* Live streams */}
         {live.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -66,9 +73,14 @@ export function LiveHubPage() {
             </div>
             <h2 className="text-xl font-bold text-white mb-2">No streams live right now</h2>
             <p className="text-gray-500 text-sm max-w-sm">Check back soon — sellers go live every day. You can also watch past streams or browse listings.</p>
-            <Link href="/browse" className="mt-6 flex items-center gap-2 px-6 py-3 rounded-xl bg-[#4A5CE8] text-white font-bold text-sm hover:opacity-90 transition-opacity">
-              Browse Listings <ArrowRight className="w-4 h-4" />
-            </Link>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Link href="/browse" className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#4A5CE8] text-white font-bold text-sm hover:opacity-90 transition-opacity">
+                Browse Listings <ArrowRight className="w-4 h-4" />
+              </Link>
+              <Link href="/dashboard?section=go-live" className="flex items-center gap-2 px-6 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors">
+                <Radio className="w-4 h-4" /> Go Live
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
@@ -142,6 +154,10 @@ export function LiveHubPage() {
             </div>
           </>
         )}
+          </div>
+        </div>
+
+        <AdSlot slotKey="live_bottom" className="mt-8" />
       </main>
     </div>
   );
