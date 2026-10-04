@@ -398,8 +398,8 @@ router.put("/admin/settings", async (req, res) => {
     const updates = req.body as Record<string, string>;
     const blocked = new Set(["admin_password_hash", "_admin_email", "rapidapi_key"]);
     for (const [key, value] of Object.entries(updates)) {
-      // Fee settings have their own endpoint. Never let a stale general-settings
-      // form overwrite business/category rates or Buyer Protection values.
+      // Fee settings have their own persistence endpoint. Never let a stale copy
+      // in the general settings form overwrite the saved business/BP rates.
       if (blocked.has(key) || key.startsWith("fee_") || key.startsWith("buyer_protection_")) continue;
       await db.execute(
         sql`INSERT INTO site_settings (key, value, updated_at) VALUES (${key}, ${value}, NOW())
@@ -984,7 +984,7 @@ router.get("/admin/search-ebay", async (req, res) => {
     const marketplaceId = site === "uk" ? "EBAY_GB" : "EBAY_US";
     const offset        = (page - 1) * 50;
     const resp = await fetch(
-      `https://real-time-ebay-data.p.rapidapi.com/ebay_search?q=${encodeURIComponent(query)}&marketplace_id=${marketplaceId}&offset=${offset}`,
+      `https://real-time-ebay-data.p.rapidapi.com/ebay_search?q=${encodeURIComponent(query)}&marketplace_id=${marketplaceId}&item_location_country=${site === "uk" ? "GB" : "US"}&delivery_country=${site === "uk" ? "GB" : "US"}&offset=${offset}`,
       { headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": "real-time-ebay-data.p.rapidapi.com" } }
     );
     if (!resp.ok) { res.status(502).json({ error: rapidApiErrorMessage("eBay", resp.status) }); return; }
@@ -994,8 +994,17 @@ router.get("/admin/search-ebay", async (req, res) => {
     const currency: "GBP" | "USD" = site === "uk" ? "GBP" : "USD";
     const ebayBase = site === "uk" ? "https://www.ebay.co.uk" : "https://www.ebay.com";
 
+    const expectedCountries = site === "uk"
+      ? new Set(["GB", "GBR", "UK", "UNITED KINGDOM"])
+      : new Set(["US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA"]);
     const products = raw
-      .filter(p => p.legacyItemId && (p.price as Record<string, unknown>)?.value)
+      .filter(p => {
+        if (!p.legacyItemId || !(p.price as Record<string, unknown>)?.value) return false;
+        const loc = (p.itemLocation as Record<string, unknown>) ?? {};
+        const country = String(loc.country ?? "").trim().toUpperCase();
+        const cur = String(((p.price as Record<string, unknown>)?.currency ?? "")).toUpperCase();
+        return expectedCountries.has(country) && cur === (site === "uk" ? "GBP" : "USD");
+      })
       .map(p => {
         const priceObj      = (p.price as Record<string, unknown>) ?? {};
         const price         = parseFloat(String(priceObj.value ?? "").replace(/[^0-9.]/g, "")) || 0;
