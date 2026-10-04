@@ -103,7 +103,7 @@ export function Scene10() {
           initial={{ opacity: 0, y: 20 }}
           animate={phase >= 5 ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.5 }}>
-          {['Flash Sales', 'Auctions', 'Live Shopping', 'Locker Shipping', 'CashBack', 'Treasure Hunt'].map(f => (
+          {['Flash Sales', 'Auctions', 'Live Shopping', 'Buyer Protection', 'CashBack', 'Treasure Hunt'].map(f => (
             <span key={f} className="bg-white/20 backdrop-blur-sm text-white font-bold rounded-full px-4 py-2"
               style={{ fontSize: 'clamp(9px, 1.2vw, 15px)' }}>
               {f}

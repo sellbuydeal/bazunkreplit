@@ -26,7 +26,6 @@ import { Hero } from "@/components/Hero";
 import { CategorySection } from "@/components/CategorySection";
 import { FeaturedListings } from "@/components/FeaturedListings";
 import { FeaturedFeatures } from "@/components/FeaturedFeatures";
-import { FreeSellingBuyerProtection } from "@/components/FreeSellingBuyerProtection";
 import { Footer } from "@/components/Footer";
 import { RewardsTeaser } from "@/components/RewardsTeaser";
 import { AdSlot } from "@/components/AdSlot";
@@ -85,8 +84,6 @@ import { AdminRewardsPage } from "@/pages/admin/AdminRewardsPage";
 import { AdminPromotionsPage } from "@/pages/admin/AdminPromotionsPage";
 import { AdminReviewsPage } from "@/pages/admin/AdminReviewsPage";
 import { AdminVerificationPage } from "@/pages/admin/AdminVerificationPage";
-import { LockerShippingPage } from "@/pages/LockerShippingPage";
-import { ShippingLabelsPage } from "@/pages/ShippingLabelsPage";
 import BuyerProtectionPage from "@/pages/BuyerProtectionPage";
 import CashbackPage from "@/pages/CashbackPage";
 import { ReferralsPage } from "@/pages/ReferralsPage";
@@ -226,7 +223,6 @@ function Home() {
         <LiveNowStrip />
         <RewardsTeaser />
         <FeaturedListings />
-        <FreeSellingBuyerProtection />
         <FeaturedFeatures />
         <AdSlot slotKey="home_bottom" />
       </main>
@@ -301,8 +297,6 @@ function Router() {
       <Route path="/rewards/referrals" component={ReferralsPage} />
       <Route path="/rewards" component={RewardsPage} />
       <Route path="/treasure-hunt">{() => { window.location.replace("/rewards"); return null; }}</Route>
-      <Route path="/shipping/lockers" component={LockerShippingPage} />
-      <Route path="/shipping/labels" component={ShippingLabelsPage} />
       <Route path="/buyer-protection" component={BuyerProtectionPage} />
       <Route path="/cashback" component={CashbackPage} />
       <Route component={NotFound} />

@@ -67,7 +67,7 @@ export function Scene5() {
         animate={phase >= 1 ? { y: 0, opacity: 1 } : {}}
         transition={{ type: 'spring', damping: 18 }}>
         <div className="inline-flex items-center gap-2 bg-emerald-500 text-white font-black px-5 py-2 rounded-full text-[1.5vw] mb-3">
-          📦 Locker Shipping Network
+          📦 Flexible Shipping Options
         </div>
         <h2 className="text-[#1A1D2E] font-black leading-tight"
           style={{ fontSize: 'clamp(18px, 4.5vw, 56px)' }}>

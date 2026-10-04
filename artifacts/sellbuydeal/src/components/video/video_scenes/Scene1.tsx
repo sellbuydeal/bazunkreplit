@@ -96,7 +96,7 @@ export function Scene1() {
           animate={phase >= 4 ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
           transition={{ duration: 0.8 }}>
           The UK's most complete peer-to-peer marketplace.
-          Auctions · Flash Sales · Live Shopping · Locker Shipping.
+          Auctions · Flash Sales · Live Shopping · Buyer Protection.
         </motion.p>
 
       </div>

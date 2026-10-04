@@ -5,7 +5,7 @@ import {
   Search, User, HelpCircle, X, Eye, CheckCircle2, ChevronRight,
   Heart, ShoppingCart, Tag, ChevronDown, LogOut,
   LayoutDashboard, Menu, Home, Grid3X3, List, Newspaper, MessageSquare,
-  Gavel, Zap, Gift, Package, Radio, Handshake, MapPin, Info,
+  Gavel, Zap, Gift, Package, Radio, Handshake, Info,
   Trophy, MoreHorizontal, Flame, ArrowDownToLine, ShieldCheck,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -59,15 +59,6 @@ const SELL_OPTIONS: Array<{
     href: "/classifieds?post=1",
     color: "text-purple-600",
     bg: "bg-purple-50",
-  },
-  {
-    id: "locker",
-    label: "Locker Shipping",
-    desc: "InPost, Evri & Royal Mail drop-off",
-    icon: MapPin,
-    href: "/shipping/lockers",
-    color: "text-emerald-600",
-    bg: "bg-emerald-50",
   },
 ];
 

@@ -82,7 +82,6 @@ const CARRIERS: Record<string, { id: string; label: string; desc: string; color:
     { id: "dpd",         label: "DPD",            desc: "Next-day · real-time tracking",          color: "#DC0032", eta: "Next day" },
     { id: "parcelforce", label: "Parcelforce",    desc: "Express UK-wide delivery",               color: "#E7600E", eta: "1–2 days" },
     { id: "dhl",         label: "DHL",            desc: "International express",                  color: "#D4A017", eta: "1–3 days" },
-    { id: "inpost",      label: "InPost Locker",  desc: "4,500+ 24/7 smart lockers · QR drop-off", color: "#FFD100", eta: "Next day" },
   ],
   US: [
     { id: "usps",         label: "USPS",               desc: "United States Postal Service",           color: "#004B87", eta: "1–5 days" },
