@@ -12,6 +12,7 @@ import { useLiveStream } from "@/context/LiveStreamContext";
 import { PLATFORM_META, extractEmbedSrc } from "@/data/livestreams";
 import { LiveKitViewer } from "@/components/LiveKitViewer";
 import { useCart } from "@/context/CartContext";
+import { LiveChat } from "@/components/LiveChat";
 
 function timeOnAir(startedAt: string): string {
   const mins = Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000);
@@ -164,18 +165,21 @@ export function LivePage() {
   const [spotlightKey, setSpotlightKey] = useState(0);
   const [liveListings, setLiveListings] = useState<LiveProduct[]>([]);
 
-  const session = sessions.find((s) => s.id === id);
-
-  const [viewerCount, setViewerCount] = useState(
-    () => (session?.viewerCount ?? 0) + Math.floor(Math.random() * 40) + 15
-  );
-
+  const localSession = sessions.find((s) => s.id === id);
+  const [remoteSession, setRemoteSession] = useState<typeof localSession>(undefined);
+  const [remoteLoading, setRemoteLoading] = useState(!localSession);
   useEffect(() => {
-    const t = setInterval(() => {
-      setViewerCount((c) => Math.max(1, c + Math.floor(Math.random() * 5) - 2));
-    }, 4000);
-    return () => clearInterval(t);
-  }, []);
+    if (localSession) { setRemoteLoading(false); return; }
+    fetch(`/api/live/session/${encodeURIComponent(id)}`)
+      .then(async r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(setRemoteSession).catch(() => {}).finally(() => setRemoteLoading(false));
+  }, [id, localSession]);
+  const session = localSession ?? remoteSession;
+
+  const [viewerCount, setViewerCount] = useState(1);
+  useEffect(() => { if (session) setViewerCount(Math.max(1, session.viewerCount ?? 0)); }, [session?.id]);
+
+
 
   useEffect(() => {
     if (!session || session.productIds.length === 0) return;
@@ -199,6 +203,10 @@ export function LivePage() {
       setSpotlightKey((k) => k + 1);
     }
   }, [featuredItem?.featuredAt]);
+
+  if (!session && remoteLoading) {
+    return <div className="min-h-screen bg-gray-950 flex items-center justify-center text-gray-400">Loading live room…</div>;
+  }
 
   if (!session) {
     return (
@@ -392,17 +400,10 @@ export function LivePage() {
                 </span>
               </div>
             </div>
-            {session.platform !== "livekit" && (
-              <a
-                href={session.streamUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800 text-gray-300 text-sm font-semibold hover:bg-gray-700 transition-colors whitespace-nowrap flex-shrink-0"
-              >
-                <MessageSquare className="w-4 h-4" /> Chat on {meta.label}
-              </a>
-            )}
+            <span className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-800 text-gray-300 text-sm font-semibold whitespace-nowrap flex-shrink-0"><MessageSquare className="w-4 h-4" /> Chat on Bazunk</span>
           </div>
+
+          <LiveChat sessionId={session.id} />
         </div>
 
         {/* ── Right column: featured spotlight + products ── */}

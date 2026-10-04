@@ -16,6 +16,8 @@ export interface LiveSession {
   title: string;
   platform: LivePlatform;
   streamUrl: string;
+  /** LiveKit room used for Bazunk browser capture/relay (YouTube encoder mode). */
+  broadcastRoom?: string;
   isLive: boolean;
   scheduledAt?: string;
   productIds: number[];

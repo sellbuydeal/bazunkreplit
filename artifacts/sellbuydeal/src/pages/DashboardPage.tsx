@@ -27,6 +27,7 @@ import { Footer } from "@/components/Footer";
 import { useLiveStream } from "@/context/LiveStreamContext";
 import { PLATFORM_META, type LivePlatform } from "@/data/livestreams";
 import { LiveKitBroadcaster } from "@/components/LiveKitBroadcaster";
+import { LiveChat } from "@/components/LiveChat";
 import { ALL_PRODUCTS } from "@/data/products";
 
 import { SellerSales } from "@/components/SellerSales";
@@ -4202,7 +4203,10 @@ function GoLiveSection() {
   const { mySession, goLive, endSession, featureProduct, clearFeatured, getFeatured } = useLiveStream();
   const [platform, setPlatform] = useState<LivePlatform>("youtube");
   const [streamUrl, setStreamUrl] = useState("");
+  const [youtubeStreamKey, setYoutubeStreamKey] = useState("");
+  const [youtubeRtmpsUrl, setYoutubeRtmpsUrl] = useState("");
   const [title, setTitle] = useState("");
+  const { getToken } = useClerkAuth();
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [error, setError] = useState("");
   const [, navigate] = useLocation();
@@ -4231,23 +4235,46 @@ function GoLiveSection() {
 
   function handleGoLive() {
     if (!title.trim()) { setError("Please add a session title."); return; }
-    const isNative = platform === "livekit";
-    if (!isNative && !streamUrl.trim()) { setError("Please add your stream URL."); return; }
+    if (platform === "youtube") {
+      if (!streamUrl.trim()) { setError("Paste the YouTube watch/live URL buyers will see."); return; }
+      if (!youtubeRtmpsUrl.trim().toLowerCase().startsWith("rtmps://")) { setError("Paste the secure RTMPS Stream URL from YouTube Live Control Room."); return; }
+      if (!youtubeStreamKey.trim()) { setError("Paste your YouTube stream key."); return; }
+    } else if (!streamUrl.trim()) {
+      setError("Please add your Twitch channel URL."); return;
+    }
     setError("");
     const name = user?.name ?? user?.email ?? "Seller";
     const initials = name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
-    const roomName = isNative ? `bazunk-${Date.now()}` : streamUrl.trim();
+    const broadcastRoom = platform === "youtube" ? `bazunk-youtube-${Date.now()}` : undefined;
     const session = goLive({
       sellerId: user?.email ?? "me",
       sellerName: name,
       sellerInitials: initials,
       title: title.trim(),
       platform,
-      streamUrl: roomName,
+      streamUrl: streamUrl.trim(),
+      broadcastRoom,
       isLive: true,
       productIds: selectedIds,
     });
-    if (!isNative) navigate(`/live/${session.id}`);
+    // YouTube sellers stay in the Bazunk control room. Their browser camera/mic
+    // publishes to LiveKit, which relays the encoded stream to YouTube.
+    if (platform !== "youtube") navigate(`/live/${session.id}`);
+  }
+
+  async function handleEndLive() {
+    if (!mySession) return;
+    if (mySession.platform === "youtube" && mySession.broadcastRoom) {
+      try {
+        const token = await getToken();
+        await fetch("/api/livekit/youtube/stop", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ roomName: mySession.broadcastRoom }),
+        });
+      } catch {}
+    }
+    endSession(mySession.id);
   }
 
   if (mySession) {
@@ -4295,42 +4322,45 @@ function GoLiveSection() {
                   <Link2 className="w-3.5 h-3.5" /> My Stream
                 </a>
               )}
-              <button onClick={() => endSession(mySession.id)}
+              <button onClick={() => { void handleEndLive(); }}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-black/25 text-white font-bold text-xs hover:bg-black/35 transition-colors">
                 <X className="w-3.5 h-3.5" /> End
               </button>
             </div>
           </div>
           <p className="text-white/60 text-xs">
-            {mySession.platform === "livekit"
-              ? "You're broadcasting natively via LiveKit. Buyers watching your Live Page see your video in real time."
+            {mySession.platform === "youtube"
+              ? "Keep this control room open while broadcasting. Buyers stay on Bazunk to watch the embedded YouTube stream and shop your products."
               : "Open your Live Page in another tab — buyers watching your stream will see featured products in real time."}
           </p>
         </div>
 
-        {/* LiveKit broadcaster panel */}
-        {mySession.platform === "livekit" && (
+        {/* Bazunk browser broadcaster: YouTube uses LiveKit Egress as the encoder/relay. */}
+        {mySession.platform === "youtube" && mySession.broadcastRoom && (
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <p className="font-black text-gray-900 text-sm flex items-center gap-2">
                   <span className="inline-flex items-center gap-1 text-[10px] font-black text-white bg-orange-500 px-2 py-0.5 rounded-full">
-                    <Radio className="w-3 h-3" /> NATIVE
+                    <Radio className="w-3 h-3" /> YOUTUBE ENCODER
                   </span>
-                  Your Broadcast
+                  Your YouTube Broadcast
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">Camera &amp; mic controls for your LiveKit stream</p>
+                <p className="text-xs text-gray-400 mt-0.5">Stay on Bazunk: camera &amp; mic are relayed securely to YouTube while you manage products and sales here.</p>
               </div>
             </div>
             <div className="p-4">
               <LiveKitBroadcaster
-                roomName={mySession.streamUrl}
+                roomName={mySession.broadcastRoom}
                 publisherIdentity={mySession.sellerId}
-                onEnd={() => endSession(mySession.id)}
+                youtube={{ streamKey: youtubeStreamKey, rtmpsUrl: youtubeRtmpsUrl }}
+                onEnd={() => { void handleEndLive(); }}
               />
             </div>
           </div>
         )}
+
+        {mySession.platform === "youtube" && <LiveChat sessionId={mySession.id} compact />}
 
         {/* Currently featured */}
         {currentFeatured && (() => {
@@ -4546,7 +4576,7 @@ function GoLiveSection() {
             return (
               <button
                 key={p}
-                onClick={() => { setPlatform(p); setStreamUrl(""); }}
+                onClick={() => { setPlatform(p); setStreamUrl(""); setYoutubeStreamKey(""); setYoutubeRtmpsUrl(""); }}
                 className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl border-2 text-xs font-bold transition-all ${
                   active
                     ? `border-current ${meta.text} bg-gray-50`
@@ -4577,39 +4607,32 @@ function GoLiveSection() {
         />
       </div>
 
-      {/* Stream URL — hidden for native LiveKit (room auto-generated) */}
-      {platform !== "livekit" ? (
-        <div className="mb-5">
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">
-            Your Stream URL *
-            {!PLATFORM_META[platform].canEmbed && (
-              <span className="ml-2 text-[10px] text-amber-500 font-semibold normal-case">— opens in new tab for buyers</span>
-            )}
-            {PLATFORM_META[platform].canEmbed && (
-              <span className="ml-2 text-[10px] text-emerald-500 font-semibold normal-case">— embeds directly on your live page</span>
-            )}
-          </label>
-          <div className="relative">
-            <Link2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              value={streamUrl}
-              onChange={(e) => setStreamUrl(e.target.value)}
-              placeholder={PLATFORM_META[platform].placeholder}
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-800 focus:outline-none focus:border-[#F26B21] focus:ring-2 focus:ring-[#F26B21]/10"
-            />
+      {/* Platform connection */}
+      {platform === "youtube" ? (
+        <div className="mb-5 space-y-4 rounded-2xl border border-red-100 bg-red-50/40 p-4">
+          <div>
+            <p className="text-sm font-black text-gray-900">YouTube encoder connection</p>
+            <p className="text-xs text-gray-500 mt-1">Bazunk captures your camera and microphone in this browser, relays them through LiveKit, and sends the encoded stream to YouTube. Keep this Bazunk control room open.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">YouTube Watch / Live URL *</label>
+            <input value={streamUrl} onChange={(e) => setStreamUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-800 focus:outline-none focus:border-red-400" />
+            <p className="text-[10px] text-gray-400 mt-1">This is the public YouTube video URL embedded for buyers on Bazunk.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">YouTube RTMPS Stream URL *</label>
+            <input value={youtubeRtmpsUrl} onChange={(e) => setYoutubeRtmpsUrl(e.target.value)} placeholder="rtmps://… (copy the locked RTMPS URL from YouTube Studio)" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-800 focus:outline-none focus:border-red-400" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">YouTube Stream Key *</label>
+            <input type="password" autoComplete="off" value={youtubeStreamKey} onChange={(e) => setYoutubeStreamKey(e.target.value)} placeholder="••••••••••••••••" className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-800 focus:outline-none focus:border-red-400" />
+            <p className="text-[10px] text-gray-400 mt-1">Secret. Bazunk sends it to the backend only when starting the relay; it is not saved in the live session or browser storage.</p>
           </div>
         </div>
       ) : (
-        <div className="mb-5 p-4 rounded-xl bg-orange-50 border border-orange-100">
-          <div className="flex items-start gap-3">
-            <Radio className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-bold text-gray-800 mb-1">Native WebRTC broadcasting</p>
-              <p className="text-xs text-gray-500">
-                A private room is created automatically. Your camera and microphone will broadcast directly to viewers — no external platform needed.
-              </p>
-            </div>
-          </div>
+        <div className="mb-5">
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Your Twitch Channel URL *</label>
+          <input value={streamUrl} onChange={(e) => setStreamUrl(e.target.value)} placeholder={PLATFORM_META[platform].placeholder} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-800 focus:outline-none focus:border-[#F26B21]" />
         </div>
       )}
 

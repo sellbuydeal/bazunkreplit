@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useAuth } from "@clerk/react";
 import {
   LiveKitRoom, VideoTrack, useTracks, useLocalParticipant, RoomAudioRenderer, isTrackReference,
 } from "@livekit/components-react";
@@ -102,9 +103,14 @@ interface LiveKitBroadcasterProps {
   roomName: string;
   publisherIdentity: string;
   onEnd?: () => void;
+  youtube?: { streamKey: string; rtmpsUrl: string };
 }
 
-export function LiveKitBroadcaster({ roomName, publisherIdentity, onEnd }: LiveKitBroadcasterProps) {
+export function LiveKitBroadcaster({ roomName, publisherIdentity, onEnd, youtube }: LiveKitBroadcasterProps) {
+  const { getToken } = useAuth();
+  const egressStarted = useRef(false);
+  const [relayStatus, setRelayStatus] = useState<"idle" | "starting" | "live" | "error">("idle");
+  const [relayError, setRelayError] = useState<string | null>(null);
   const [token, setToken]     = useState<string | null>(null);
   const [wsUrl, setWsUrl]     = useState<string | null>(null);
   const [error, setError]     = useState<string | null>(null);
@@ -113,9 +119,10 @@ export function LiveKitBroadcaster({ roomName, publisherIdentity, onEnd }: LiveK
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(
-      `/api/livekit/token?room=${encodeURIComponent(roomName)}&identity=${encodeURIComponent(publisherIdentity)}&canPublish=true`
-    )
+    getToken().then((authToken) => fetch(
+      `/api/livekit/token?room=${encodeURIComponent(roomName)}&identity=${encodeURIComponent(publisherIdentity)}&canPublish=true`,
+      { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} }
+    ))
       .then((r) => r.json())
       .then((data) => {
         if (data.error) { setError(data.error); return; }
@@ -124,7 +131,33 @@ export function LiveKitBroadcaster({ roomName, publisherIdentity, onEnd }: LiveK
       })
       .catch(() => setError("Could not connect to LiveKit. Check your server credentials."))
       .finally(() => setLoading(false));
-  }, [roomName, publisherIdentity]);
+  }, [roomName, publisherIdentity, getToken]);
+
+
+  async function startYouTubeRelay() {
+    if (!youtube || egressStarted.current) return;
+    egressStarted.current = true;
+    setRelayStatus("starting");
+    setRelayError(null);
+    try {
+      const authToken = await getToken();
+      const response = await fetch("/api/livekit/youtube/start", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({ roomName, streamKey: youtube.streamKey, rtmpsUrl: youtube.rtmpsUrl }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not start YouTube relay.");
+      setRelayStatus("live");
+    } catch (err) {
+      egressStarted.current = false;
+      setRelayStatus("error");
+      setRelayError(err instanceof Error ? err.message : "Could not start YouTube relay.");
+    }
+  }
 
   if (loading) {
     return (
@@ -160,8 +193,22 @@ export function LiveKitBroadcaster({ roomName, publisherIdentity, onEnd }: LiveK
       video={true}
       audio={true}
       style={{ height: "100%" }}
+      onConnected={() => { void startYouTubeRelay(); }}
     >
-      <BroadcasterControls onEnd={onEnd} />
+      <div className="space-y-3">
+        {youtube && (
+          <div className={`rounded-xl px-3 py-2 text-xs font-semibold ${
+            relayStatus === "live" ? "bg-emerald-50 text-emerald-700" :
+            relayStatus === "error" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-700"
+          }`}>
+            {relayStatus === "live" ? "YouTube relay connected — your Bazunk camera and microphone are being sent to YouTube." :
+             relayStatus === "error" ? `YouTube relay failed: ${relayError}` :
+             "Connecting your Bazunk camera and microphone to YouTube…"}
+            {relayStatus === "error" && <button onClick={() => { void startYouTubeRelay(); }} className="ml-2 underline font-black">Retry</button>}
+          </div>
+        )}
+        <BroadcasterControls onEnd={onEnd} />
+      </div>
       <RoomAudioRenderer />
     </LiveKitRoom>
   );

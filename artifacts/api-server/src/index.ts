@@ -521,6 +521,20 @@ async function runAppMigrations() {
   await run(sql`CREATE INDEX IF NOT EXISTS marketplace_conversations_seller_idx ON marketplace_conversations (LOWER(seller_email), updated_at DESC)`, "marketplace_conversations_seller_idx");
   await run(sql`CREATE INDEX IF NOT EXISTS marketplace_messages_conversation_idx ON marketplace_messages (conversation_id, created_at)`, "marketplace_messages_conversation_idx");
 
+  // ── Bazunk live sessions and live-room chat ──
+  await run(sql`CREATE TABLE IF NOT EXISTS live_stream_sessions (
+    id TEXT PRIMARY KEY, seller_email TEXT NOT NULL, seller_name TEXT NOT NULL, seller_initials TEXT,
+    title TEXT NOT NULL, platform TEXT NOT NULL, stream_url TEXT NOT NULL, broadcast_room TEXT,
+    is_live BOOLEAN NOT NULL DEFAULT TRUE, product_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+    viewer_count INTEGER NOT NULL DEFAULT 0, started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), ended_at TIMESTAMPTZ
+  )`, "live_stream_sessions");
+  await run(sql`CREATE INDEX IF NOT EXISTS live_stream_sessions_live_idx ON live_stream_sessions(is_live, started_at DESC)`, "live_stream_sessions_live_idx");
+  await run(sql`CREATE TABLE IF NOT EXISTS live_stream_messages (
+    id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL REFERENCES live_stream_sessions(id) ON DELETE CASCADE,
+    sender_email TEXT NOT NULL, sender_name TEXT NOT NULL, text TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`, "live_stream_messages");
+  await run(sql`CREATE INDEX IF NOT EXISTS live_stream_messages_session_idx ON live_stream_messages(session_id, created_at)`, "live_stream_messages_session_idx");
+
   // ── Reviews & seller reputation ──
   await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMP WITH TIME ZONE`, "orders.shipped_at");
   await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE`, "orders.delivered_at");
