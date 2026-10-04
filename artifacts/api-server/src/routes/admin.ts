@@ -210,21 +210,90 @@ router.get("/admin/users", async (req, res) => {
     const search = (req.query.search as string) ?? "";
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
     const offset = parseInt(req.query.offset as string) || 0;
+    const pattern = "%" + search + "%";
 
-    const rows = search
-      ? await db.execute(sql`
-          SELECT id, email, name, credits, stripe_customer_id, banned, seller_type, created_at
-          FROM users WHERE email ILIKE ${"%" + search + "%"} OR name ILIKE ${"%" + search + "%"}
-          ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
-        `).then(r => r.rows)
-      : await db.execute(sql`
-          SELECT id, email, name, credits, stripe_customer_id, banned, seller_type, created_at
-          FROM users ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
-        `).then(r => r.rows);
+    // Admin Users 2.0: aggregate operational activity without exposing private message bodies.
+    // All joins are by normalised email so older records remain attributable after the upgrade.
+    const rows = await db.execute(sql`
+      WITH listing_stats AS (
+        SELECT LOWER(seller_email) email,
+          COUNT(*)::int listings_total,
+          COUNT(*) FILTER (WHERE LOWER(status)='active')::int listings_active,
+          MAX(created_at) last_listing_at
+        FROM listings GROUP BY LOWER(seller_email)
+      ), order_sell AS (
+        SELECT LOWER(seller_email) email,
+          COUNT(*) FILTER (WHERE LOWER(status) <> 'cancelled')::int sold,
+          COALESCE(SUM(price) FILTER (WHERE LOWER(status) <> 'cancelled'),0)::float sales_value,
+          MAX(created_at) last_sale_at
+        FROM orders WHERE seller_email IS NOT NULL GROUP BY LOWER(seller_email)
+      ), order_buy AS (
+        SELECT LOWER(buyer_email) email,
+          COUNT(*) FILTER (WHERE LOWER(status) <> 'cancelled')::int bought,
+          COALESCE(SUM(price) FILTER (WHERE LOWER(status) <> 'cancelled'),0)::float spent,
+          MAX(created_at) last_purchase_at
+        FROM orders GROUP BY LOWER(buyer_email)
+      ), msg_sent AS (
+        SELECT LOWER(sender_email) email, COUNT(*)::int messages_sent, MAX(created_at) last_message_at
+        FROM marketplace_messages GROUP BY LOWER(sender_email)
+      ), msg_received AS (
+        SELECT participant email, COUNT(*)::int messages_received
+        FROM (
+          SELECT LOWER(c.buyer_email) participant, m.id
+          FROM marketplace_messages m JOIN marketplace_conversations c ON c.id=m.conversation_id
+          WHERE LOWER(m.sender_email) <> LOWER(c.buyer_email)
+          UNION ALL
+          SELECT LOWER(c.seller_email) participant, m.id
+          FROM marketplace_messages m JOIN marketplace_conversations c ON c.id=m.conversation_id
+          WHERE LOWER(m.sender_email) <> LOWER(c.seller_email)
+        ) x GROUP BY participant
+      ), conv_stats AS (
+        SELECT email, COUNT(*)::int conversations FROM (
+          SELECT LOWER(buyer_email) email, id FROM marketplace_conversations
+          UNION ALL SELECT LOWER(seller_email) email, id FROM marketplace_conversations
+        ) x GROUP BY email
+      ), review_stats AS (
+        SELECT LOWER(reviewee_email) email, COUNT(*) FILTER (WHERE deleted_by_reviewer_at IS NULL AND removed_at IS NULL)::int reviews_received,
+          ROUND(AVG(rating) FILTER (WHERE deleted_by_reviewer_at IS NULL AND removed_at IS NULL)::numeric,2)::float rating
+        FROM reviews GROUP BY LOWER(reviewee_email)
+      ), dispute_stats AS (
+        SELECT email, COUNT(*)::int disputes_total,
+          COUNT(*) FILTER (WHERE LOWER(status) NOT IN ('resolved','closed','rejected','cancelled'))::int disputes_open
+        FROM (
+          SELECT LOWER(buyer_email) email,status FROM disputes
+          UNION ALL SELECT LOWER(seller_email) email,status FROM disputes WHERE seller_email IS NOT NULL
+        ) x GROUP BY email
+      ), live_stats AS (
+        SELECT LOWER(seller_email) email, COUNT(*)::int live_streams, COALESCE(SUM(viewer_count),0)::int live_viewers,
+          MAX(started_at) last_live_at FROM live_stream_sessions GROUP BY LOWER(seller_email)
+      )
+      SELECT u.id,u.email,u.name,u.credits,u.stripe_customer_id,u.banned,u.seller_type,u.created_at,
+        COALESCE(ls.listings_total,0)::int listings_total, COALESCE(ls.listings_active,0)::int listings_active,
+        COALESCE(os.sold,0)::int sold, COALESCE(os.sales_value,0)::float sales_value,
+        COALESCE(ob.bought,0)::int bought, COALESCE(ob.spent,0)::float spent,
+        COALESCE(ms.messages_sent,0)::int messages_sent, COALESCE(mr.messages_received,0)::int messages_received,
+        COALESCE(cs.conversations,0)::int conversations,
+        COALESCE(rs.reviews_received,0)::int reviews_received, COALESCE(rs.rating,0)::float rating,
+        COALESCE(ds.disputes_total,0)::int disputes_total, COALESCE(ds.disputes_open,0)::int disputes_open,
+        COALESCE(lvs.live_streams,0)::int live_streams, COALESCE(lvs.live_viewers,0)::int live_viewers,
+        GREATEST(u.created_at,ls.last_listing_at,os.last_sale_at,ob.last_purchase_at,ms.last_message_at,lvs.last_live_at) last_activity
+      FROM users u
+      LEFT JOIN listing_stats ls ON ls.email=LOWER(u.email)
+      LEFT JOIN order_sell os ON os.email=LOWER(u.email)
+      LEFT JOIN order_buy ob ON ob.email=LOWER(u.email)
+      LEFT JOIN msg_sent ms ON ms.email=LOWER(u.email)
+      LEFT JOIN msg_received mr ON mr.email=LOWER(u.email)
+      LEFT JOIN conv_stats cs ON cs.email=LOWER(u.email)
+      LEFT JOIN review_stats rs ON rs.email=LOWER(u.email)
+      LEFT JOIN dispute_stats ds ON ds.email=LOWER(u.email)
+      LEFT JOIN live_stats lvs ON lvs.email=LOWER(u.email)
+      WHERE (${search ? sql`(u.email ILIKE ${pattern} OR u.name ILIKE ${pattern})` : sql`TRUE`})
+      ORDER BY u.created_at DESC LIMIT ${limit} OFFSET ${offset}
+    `).then(r => r.rows);
 
     const [{ count }] = await db.execute(
       search
-        ? sql`SELECT COUNT(*)::int as count FROM users WHERE email ILIKE ${"%" + search + "%"} OR name ILIKE ${"%" + search + "%"}`
+        ? sql`SELECT COUNT(*)::int as count FROM users WHERE email ILIKE ${pattern} OR name ILIKE ${pattern}`
         : sql`SELECT COUNT(*)::int as count FROM users`
     ).then(r => r.rows as any[]);
 

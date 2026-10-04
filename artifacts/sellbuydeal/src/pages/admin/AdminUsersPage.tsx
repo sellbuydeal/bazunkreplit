@@ -11,6 +11,9 @@ import { useAdmin } from "@/context/AdminContext";
 interface User {
   id: string; email: string; name: string | null;
   credits: string; banned: boolean; seller_type?: "private" | "sole_trader" | "business"; created_at: string;
+  listings_total: number; listings_active: number; sold: number; sales_value: number; bought: number; spent: number;
+  messages_sent: number; messages_received: number; conversations: number; reviews_received: number; rating: number;
+  disputes_total: number; disputes_open: number; live_streams: number; live_viewers: number; last_activity: string;
 }
 
 const MILESTONE_DEFS = [
@@ -304,17 +307,17 @@ export function AdminUsersPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50">
-                {["User", "Credits", "Joined", "Adjust Credits", "Actions"].map(h => (
+                {["User", "Selling", "Buying", "Messages", "Reputation / Risk", "Credits", "Last activity", "Adjust Credits", "Actions"].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={5} className="text-center text-gray-400 py-10">Loading…</td></tr>
+                <tr><td colSpan={9} className="text-center text-gray-400 py-10">Loading…</td></tr>
               )}
               {!loading && users.length === 0 && (
-                <tr><td colSpan={5} className="text-center text-gray-400 py-10">
+                <tr><td colSpan={9} className="text-center text-gray-400 py-10">
                   No users found{!search && " — press “Sync users” above to import your existing accounts."}
                 </td></tr>
               )}
@@ -328,15 +331,36 @@ export function AdminUsersPage() {
                       {u.banned && <span className="inline-block mt-1 text-[9px] font-bold text-red-500 bg-red-100 px-1.5 py-0.5 rounded-full">SUSPENDED</span>}
                     </td>
 
+                    {/* Marketplace activity */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <p className="font-bold text-gray-800 text-xs">{u.listings_total} listed · {u.sold} sold</p>
+                      <p className="text-[10px] text-gray-400">{u.listings_active} active · £{Number(u.sales_value || 0).toFixed(2)} sales</p>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <p className="font-bold text-gray-800 text-xs">{u.bought} bought</p>
+                      <p className="text-[10px] text-gray-400">£{Number(u.spent || 0).toFixed(2)} spent</p>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <p className="font-bold text-gray-800 text-xs">↑ {u.messages_sent} · ↓ {u.messages_received}</p>
+                      <p className="text-[10px] text-gray-400">{u.conversations} conversations</p>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <p className="font-bold text-gray-800 text-xs">{u.reviews_received ? `${Number(u.rating || 0).toFixed(1)}★ · ${u.reviews_received} reviews` : "No reviews"}</p>
+                      <p className={`text-[10px] ${u.disputes_open ? "text-red-600 font-bold" : "text-gray-400"}`}>{u.disputes_open} open · {u.disputes_total} disputes</p>
+                      {u.live_streams > 0 && <p className="text-[10px] text-violet-500">{u.live_streams} live streams · {u.live_viewers} viewers recorded</p>}
+                    </td>
+
                     {/* Credits */}
                     <td className="px-4 py-3 whitespace-nowrap">
                       <p className="font-bold text-[#4A5CE8] text-xs">{Math.round(parseFloat(u.credits) * 100).toLocaleString()} cr</p>
                       <p className="text-[10px] text-gray-400">£{parseFloat(u.credits).toFixed(2)}</p>
                     </td>
 
-                    {/* Joined */}
+                    {/* Last activity */}
                     <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
-                      {new Date(u.created_at).toLocaleDateString()}
+                      <p>{u.last_activity ? new Date(u.last_activity).toLocaleDateString() : "—"}</p>
+                      <p className="text-[10px]">Joined {new Date(u.created_at).toLocaleDateString()}</p>
+                      <p className="text-[10px] capitalize">{(u.seller_type ?? "private").replace("_", " ")}</p>
                     </td>
 
                     {/* Adjust Credits */}
@@ -446,7 +470,7 @@ export function AdminUsersPage() {
 
                   {expandedEmail === u.email && (
                     <tr key={`${u.email}-milestones`} className="bg-[#4A5CE8]/3 border-t border-[#4A5CE8]/10">
-                      <td colSpan={5} className="px-4 py-5">
+                      <td colSpan={9} className="px-4 py-5">
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-2">
                             <Trophy className="w-4 h-4 text-[#4A5CE8]" />
