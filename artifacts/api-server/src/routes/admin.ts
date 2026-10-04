@@ -212,46 +212,64 @@ router.get("/admin/users", async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
     const pattern = "%" + search + "%";
 
-    // Admin Users 2.0: aggregate operational activity without exposing private message bodies.
-    // All joins are by normalised email so older records remain attributable after the upgrade.
+    // Admin Users 2.0 activity aggregation.  Historical Official Store imports used
+    // bazunkdeals@gmail.com before the store moved to cczslater@gmail.com.  Treat both
+    // identities as the same marketplace owner for monitoring, without rewriting old data.
     const rows = await db.execute(sql`
-      WITH listing_stats AS (
-        SELECT LOWER(seller_email) email,
-          COUNT(*)::int listings_total,
-          COUNT(*) FILTER (WHERE LOWER(status)='active')::int listings_active,
-          MAX(created_at) last_listing_at
-        FROM listings GROUP BY LOWER(seller_email)
-      ), order_sell AS (
-        SELECT LOWER(seller_email) email,
-          COUNT(*) FILTER (WHERE LOWER(status) <> 'cancelled')::int sold,
-          COALESCE(SUM(price) FILTER (WHERE LOWER(status) <> 'cancelled'),0)::float sales_value,
-          MAX(created_at) last_sale_at
+      WITH user_identity AS (
+        SELECT LOWER(email) user_email, LOWER(email) activity_email FROM users
+        UNION ALL SELECT 'cczslater@gmail.com', 'bazunkdeals@gmail.com'
+      ), listing_raw AS (
+        SELECT LOWER(seller_email) activity_email, COUNT(*)::int total,
+          COUNT(*) FILTER (WHERE LOWER(COALESCE(status,'')) IN ('active','published','live'))::int active,
+          MAX(created_at) last_at
+        FROM listings WHERE seller_email IS NOT NULL GROUP BY LOWER(seller_email)
+      ), listing_stats AS (
+        SELECT ui.user_email email, COALESCE(SUM(lr.total),0)::int listings_total,
+          COALESCE(SUM(lr.active),0)::int listings_active, MAX(lr.last_at) last_listing_at
+        FROM user_identity ui LEFT JOIN listing_raw lr ON lr.activity_email=ui.activity_email GROUP BY ui.user_email
+      ), sell_raw AS (
+        SELECT LOWER(seller_email) activity_email,
+          COUNT(*) FILTER (WHERE LOWER(COALESCE(status,'')) NOT IN ('cancelled','canceled'))::int sold,
+          COALESCE(SUM(price) FILTER (WHERE LOWER(COALESCE(status,'')) NOT IN ('cancelled','canceled')),0)::float sales_value,
+          MAX(created_at) last_at
         FROM orders WHERE seller_email IS NOT NULL GROUP BY LOWER(seller_email)
+      ), order_sell AS (
+        SELECT ui.user_email email, COALESCE(SUM(sr.sold),0)::int sold,
+          COALESCE(SUM(sr.sales_value),0)::float sales_value, MAX(sr.last_at) last_sale_at
+        FROM user_identity ui LEFT JOIN sell_raw sr ON sr.activity_email=ui.activity_email GROUP BY ui.user_email
       ), order_buy AS (
         SELECT LOWER(buyer_email) email,
-          COUNT(*) FILTER (WHERE LOWER(status) <> 'cancelled')::int bought,
-          COALESCE(SUM(price) FILTER (WHERE LOWER(status) <> 'cancelled'),0)::float spent,
-          MAX(created_at) last_purchase_at
-        FROM orders GROUP BY LOWER(buyer_email)
+          COUNT(*) FILTER (WHERE LOWER(COALESCE(status,'')) NOT IN ('cancelled','canceled'))::int bought,
+          COALESCE(SUM(price) FILTER (WHERE LOWER(COALESCE(status,'')) NOT IN ('cancelled','canceled')),0)::float spent,
+          MAX(created_at) last_purchase_at FROM orders WHERE buyer_email IS NOT NULL GROUP BY LOWER(buyer_email)
+      ), sent_raw AS (
+        SELECT LOWER(sender_email) activity_email, COUNT(*)::int n, MAX(created_at) last_at
+        FROM marketplace_messages WHERE sender_email IS NOT NULL GROUP BY LOWER(sender_email)
       ), msg_sent AS (
-        SELECT LOWER(sender_email) email, COUNT(*)::int messages_sent, MAX(created_at) last_message_at
-        FROM marketplace_messages GROUP BY LOWER(sender_email)
-      ), msg_received AS (
-        SELECT participant email, COUNT(*)::int messages_received
-        FROM (
-          SELECT LOWER(c.buyer_email) participant, m.id
-          FROM marketplace_messages m JOIN marketplace_conversations c ON c.id=m.conversation_id
-          WHERE LOWER(m.sender_email) <> LOWER(c.buyer_email)
+        SELECT ui.user_email email, COALESCE(SUM(sr.n),0)::int messages_sent, MAX(sr.last_at) last_message_at
+        FROM user_identity ui LEFT JOIN sent_raw sr ON sr.activity_email=ui.activity_email GROUP BY ui.user_email
+      ), received_raw AS (
+        SELECT participant activity_email, COUNT(*)::int n FROM (
+          SELECT LOWER(c.buyer_email) participant, m.id FROM marketplace_messages m
+          JOIN marketplace_conversations c ON c.id=m.conversation_id
+          WHERE c.buyer_email IS NOT NULL AND LOWER(m.sender_email) <> LOWER(c.buyer_email)
           UNION ALL
-          SELECT LOWER(c.seller_email) participant, m.id
-          FROM marketplace_messages m JOIN marketplace_conversations c ON c.id=m.conversation_id
-          WHERE LOWER(m.sender_email) <> LOWER(c.seller_email)
+          SELECT LOWER(c.seller_email) participant, m.id FROM marketplace_messages m
+          JOIN marketplace_conversations c ON c.id=m.conversation_id
+          WHERE c.seller_email IS NOT NULL AND LOWER(m.sender_email) <> LOWER(c.seller_email)
         ) x GROUP BY participant
-      ), conv_stats AS (
-        SELECT email, COUNT(*)::int conversations FROM (
-          SELECT LOWER(buyer_email) email, id FROM marketplace_conversations
-          UNION ALL SELECT LOWER(seller_email) email, id FROM marketplace_conversations
+      ), msg_received AS (
+        SELECT ui.user_email email, COALESCE(SUM(rr.n),0)::int messages_received
+        FROM user_identity ui LEFT JOIN received_raw rr ON rr.activity_email=ui.activity_email GROUP BY ui.user_email
+      ), conv_raw AS (
+        SELECT email activity_email, COUNT(*)::int n FROM (
+          SELECT LOWER(buyer_email) email,id FROM marketplace_conversations WHERE buyer_email IS NOT NULL
+          UNION ALL SELECT LOWER(seller_email),id FROM marketplace_conversations WHERE seller_email IS NOT NULL
         ) x GROUP BY email
+      ), conv_stats AS (
+        SELECT ui.user_email email, COALESCE(SUM(cr.n),0)::int conversations
+        FROM user_identity ui LEFT JOIN conv_raw cr ON cr.activity_email=ui.activity_email GROUP BY ui.user_email
       ), review_stats AS (
         SELECT LOWER(reviewee_email) email, COUNT(*) FILTER (WHERE deleted_by_reviewer_at IS NULL AND removed_at IS NULL)::int reviews_received,
           ROUND(AVG(rating) FILTER (WHERE deleted_by_reviewer_at IS NULL AND removed_at IS NULL)::numeric,2)::float rating
@@ -259,10 +277,8 @@ router.get("/admin/users", async (req, res) => {
       ), dispute_stats AS (
         SELECT email, COUNT(*)::int disputes_total,
           COUNT(*) FILTER (WHERE LOWER(status) NOT IN ('resolved','closed','rejected','cancelled'))::int disputes_open
-        FROM (
-          SELECT LOWER(buyer_email) email,status FROM disputes
-          UNION ALL SELECT LOWER(seller_email) email,status FROM disputes WHERE seller_email IS NOT NULL
-        ) x GROUP BY email
+        FROM (SELECT LOWER(buyer_email) email,status FROM disputes
+          UNION ALL SELECT LOWER(seller_email),status FROM disputes WHERE seller_email IS NOT NULL) x GROUP BY email
       ), live_stats AS (
         SELECT LOWER(seller_email) email, COUNT(*)::int live_streams, COALESCE(SUM(viewer_count),0)::int live_viewers,
           MAX(started_at) last_live_at FROM live_stream_sessions GROUP BY LOWER(seller_email)
@@ -291,12 +307,9 @@ router.get("/admin/users", async (req, res) => {
       ORDER BY u.created_at DESC LIMIT ${limit} OFFSET ${offset}
     `).then(r => r.rows);
 
-    const [{ count }] = await db.execute(
-      search
-        ? sql`SELECT COUNT(*)::int as count FROM users WHERE email ILIKE ${pattern} OR name ILIKE ${pattern}`
-        : sql`SELECT COUNT(*)::int as count FROM users`
-    ).then(r => r.rows as any[]);
-
+    const [{ count }] = await db.execute(search
+      ? sql`SELECT COUNT(*)::int count FROM users WHERE email ILIKE ${pattern} OR name ILIKE ${pattern}`
+      : sql`SELECT COUNT(*)::int count FROM users`).then(r => r.rows as any[]);
     res.json({ users: rows, total: count });
   } catch (err) {
     logger.error({ err }, "Failed to list users");

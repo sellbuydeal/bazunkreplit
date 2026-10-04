@@ -333,16 +333,16 @@ export function AdminUsersPage() {
 
                     {/* Marketplace activity */}
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="font-bold text-gray-800 text-xs">{u.listings_total} listed · {u.sold} sold</p>
+                      <p className="font-bold text-gray-800 text-xs">{Number(u.listings_total ?? 0)} listed · {Number(u.sold ?? 0)} sold</p>
                       <p className="text-[10px] text-gray-400">{u.listings_active} active · £{Number(u.sales_value || 0).toFixed(2)} sales</p>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="font-bold text-gray-800 text-xs">{u.bought} bought</p>
+                      <p className="font-bold text-gray-800 text-xs">{Number(u.bought ?? 0)} bought</p>
                       <p className="text-[10px] text-gray-400">£{Number(u.spent || 0).toFixed(2)} spent</p>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="font-bold text-gray-800 text-xs">↑ {u.messages_sent} · ↓ {u.messages_received}</p>
-                      <p className="text-[10px] text-gray-400">{u.conversations} conversations</p>
+                      <p className="font-bold text-gray-800 text-xs">↑ {Number(u.messages_sent ?? 0)} · ↓ {Number(u.messages_received ?? 0)}</p>
+                      <p className="text-[10px] text-gray-400">{Number(u.conversations ?? 0)} conversations</p>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <p className="font-bold text-gray-800 text-xs">{u.reviews_received ? `${Number(u.rating || 0).toFixed(1)}★ · ${u.reviews_received} reviews` : "No reviews"}</p>
