@@ -968,6 +968,91 @@ router.delete("/admin/clear-amazon-imports", async (req, res) => {
   }
 });
 
+
+// GET /api/admin/importer-control — operational overview for Amazon/eBay/AliExpress imports
+router.get("/admin/importer-control", async (_req, res) => {
+  try {
+    const listingRows = await db.execute(sql`
+      SELECT id, public_id, title, status, price, specifications, updated_at
+      FROM listings
+      WHERE specifications LIKE '%"source":"Amazon UK"%'
+         OR specifications LIKE '%"source":"eBay UK"%'
+         OR specifications LIKE '%"source":"eBay US"%'
+      ORDER BY updated_at DESC
+    `).then(r => r.rows as Record<string, unknown>[]);
+
+    const aliRows = await db.execute(sql`
+      SELECT si.id, si.listing_id, si.supplier_id, si.supplier_url, si.supplier_price,
+             si.last_synced_at, si.sync_status, si.sync_error, si.updated_at,
+             l.public_id, l.title, l.status, l.price
+      FROM supplier_imports si
+      JOIN listings l ON l.id = si.listing_id
+      WHERE LOWER(si.supplier_source) = 'aliexpress'
+      ORDER BY COALESCE(si.last_synced_at, si.updated_at) DESC
+    `).then(r => r.rows as Record<string, unknown>[]);
+
+    const bySource: Record<string, { total:number; active:number; paused:number; failed:number; lastActivity:string|null }> = {
+      amazon: { total:0, active:0, paused:0, failed:0, lastActivity:null },
+      ebay: { total:0, active:0, paused:0, failed:0, lastActivity:null },
+      aliexpress: { total:0, active:0, paused:0, failed:0, lastActivity:null },
+    };
+    const alerts: Record<string, unknown>[] = [];
+
+    for (const row of listingRows) {
+      let specs: Record<string, unknown> = {};
+      try { specs = JSON.parse(String(row.specifications ?? '{}')); } catch {}
+      const source = String(specs.source ?? '').toLowerCase();
+      const key = source.includes('amazon') ? 'amazon' : source.includes('ebay') ? 'ebay' : null;
+      if (!key) continue;
+      const bucket = bySource[key];
+      bucket.total++;
+      const st = String(row.status ?? '');
+      if (st === 'active') bucket.active++;
+      if (st === 'paused') bucket.paused++;
+      if (!bucket.lastActivity && row.updated_at) bucket.lastActivity = String(row.updated_at);
+      if (specs.source_price_anomaly || st === 'paused') {
+        bucket.failed++;
+        alerts.push({
+          source: key, id: row.id, publicId: row.public_id, title: row.title, status: st,
+          type: specs.source_price_anomaly ? 'price_change' : 'unavailable',
+          currentSourcePrice: specs.ebay_price ?? specs.amazon_price_gbp ?? null,
+          proposedSourcePrice: specs.proposed_source_price ?? null,
+          lastChecked: specs.source_last_checked ?? row.updated_at ?? null,
+          error: specs.source_price_anomaly ? 'Source price changed outside the safety range; listing paused.' : 'Listing is paused.',
+        });
+      }
+    }
+
+    for (const row of aliRows) {
+      const b = bySource.aliexpress; b.total++;
+      const st = String(row.status ?? '');
+      if (st === 'active') b.active++;
+      if (st === 'paused') b.paused++;
+      if (!b.lastActivity && (row.last_synced_at || row.updated_at)) b.lastActivity = String(row.last_synced_at ?? row.updated_at);
+      if (String(row.sync_status) === 'error') {
+        b.failed++;
+        alerts.push({ source:'aliexpress', id:row.id, publicId:row.public_id, title:row.title, status:st,
+          type:'sync_error', currentSourcePrice:row.supplier_price, proposedSourcePrice:null,
+          lastChecked:row.last_synced_at ?? row.updated_at ?? null, error:row.sync_error ?? 'Supplier sync failed.' });
+      }
+    }
+
+    res.json({
+      keyConfigured: rapidApiKeyStatus().configured,
+      sources: bySource,
+      trackedUsage: {
+        importedProducts: bySource.amazon.total + bySource.ebay.total + bySource.aliexpress.total,
+        productsNeedingAttention: alerts.length,
+      },
+      alerts: alerts.slice(0, 200),
+      note: 'Usage shown here is Bazunk-tracked importer activity, not RapidAPI billing/quota usage.',
+    });
+  } catch (err) {
+    logger.error({ err }, 'Failed to load importer control centre');
+    res.status(500).json({ error: 'Failed to load importer control centre' });
+  }
+});
+
 // ── eBay routes ──────────────────────────────────────────────────────────────
 
 // GET /api/admin/search-ebay — search eBay UK or US

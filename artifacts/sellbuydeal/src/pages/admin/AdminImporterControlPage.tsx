@@ -1,0 +1,40 @@
+import { useCallback, useEffect, useState } from "react";
+import { Activity, AlertTriangle, CheckCircle2, Clock3, Package, RefreshCw, Server, XCircle } from "lucide-react";
+import { AdminLayout } from "./AdminLayout";
+import { useAdmin } from "@/context/AdminContext";
+
+type SourceKey = "amazon" | "ebay" | "aliexpress";
+type SourceStats = { total:number; active:number; paused:number; failed:number; lastActivity:string|null };
+type AlertRow = { source:SourceKey; id:number; publicId?:string; title:string; status:string; type:string; currentSourcePrice?:number|string|null; proposedSourcePrice?:number|string|null; lastChecked?:string|null; error?:string|null };
+type Data = { keyConfigured:boolean; sources:Record<SourceKey,SourceStats>; trackedUsage:{importedProducts:number;productsNeedingAttention:number}; alerts:AlertRow[]; note:string };
+
+const LABEL: Record<SourceKey,string> = { amazon:"Amazon", ebay:"eBay", aliexpress:"AliExpress" };
+function ago(v:string|null|undefined) { if(!v) return "Never"; const d=new Date(v); if(Number.isNaN(d.getTime())) return "Unknown"; return d.toLocaleString(); }
+
+export function AdminImporterControlPage() {
+  const { authFetch } = useAdmin();
+  const [data,setData]=useState<Data|null>(null); const [loading,setLoading]=useState(true);
+  const [testing,setTesting]=useState(false); const [health,setHealth]=useState<Record<string,string>>({});
+  const [syncing,setSyncing]=useState<SourceKey|null>(null); const [msg,setMsg]=useState<string|null>(null);
+
+  const load=useCallback(async()=>{ setLoading(true); try { const r=await authFetch('/api/admin/importer-control'); const d=await r.json(); if(!r.ok) throw new Error(d.error||'Failed to load'); setData(d); } catch(e){ setMsg(e instanceof Error?e.message:'Failed to load'); } finally { setLoading(false); } },[authFetch]);
+  useEffect(()=>{load();},[load]);
+
+  async function testApis(){ setTesting(true); setMsg(null); try { const r=await authFetch('/api/admin/rapidapi/test',{method:'POST'}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'Health test failed'); const out:Record<string,string>={}; for(const x of (d.results||[])) out[String(x.name||'').toLowerCase()]=x.ok?'Connected':(x.error||'Error'); setHealth(out); } catch(e){setMsg(e instanceof Error?e.message:'Health test failed');} finally{setTesting(false);} }
+  async function sync(source:SourceKey){ setSyncing(source); setMsg(null); try {
+    if(source==='amazon'){ const r=await authFetch('/api/admin/sync-amazon-prices',{method:'POST'}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'Amazon sync failed'); setMsg(d.message||'Amazon sync complete'); }
+    else if(source==='ebay'){ const r=await authFetch('/api/admin/sync-ebay-prices',{method:'POST'}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'eBay sync failed'); setMsg(d.message||'eBay sync complete'); }
+    else { const r=await authFetch('/api/supplier/sync',{method:'POST'}); const d=await r.json(); if(!r.ok) throw new Error(d.error||'AliExpress sync failed'); setMsg('AliExpress sync started. Refresh in a moment to see results.'); }
+    await load();
+  } catch(e){setMsg(e instanceof Error?e.message:'Sync failed');} finally{setSyncing(null);} }
+
+  return <AdminLayout><div className="max-w-7xl mx-auto space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-black text-gray-900">Importer Control Centre</h1><p className="text-sm text-gray-500 mt-1">Health, sync status and source-product problems across Amazon, eBay and AliExpress.</p></div><div className="flex gap-2"><button onClick={testApis} disabled={testing} className="px-4 py-2 rounded-xl border bg-white font-bold text-sm flex items-center gap-2"><Activity className="w-4 h-4"/>{testing?'Testing…':'Test API Health'}</button><button onClick={load} className="px-4 py-2 rounded-xl bg-gray-900 text-white font-bold text-sm flex items-center gap-2"><RefreshCw className="w-4 h-4"/>Refresh</button></div></div>
+    {msg&&<div className="rounded-xl border bg-white p-3 text-sm font-medium">{msg}</div>}
+    {!data&&loading?<div className="p-10 text-center text-gray-500">Loading importer status…</div>:data&&<>
+      <div className="grid sm:grid-cols-3 gap-4">{(["amazon","ebay","aliexpress"] as SourceKey[]).map(k=>{const s=data.sources[k]; const h=Object.entries(health).find(([name])=>name.includes(k==='aliexpress'?'aliexpress':k))?.[1]; return <div key={k} className="bg-white border rounded-2xl p-5 shadow-sm"><div className="flex justify-between"><div><p className="font-black text-lg">{LABEL[k]}</p><p className="text-xs text-gray-500 mt-1">{h ? h : data.keyConfigured?'Key configured — run health test':'RapidAPI key missing'}</p></div>{h==='Connected'?<CheckCircle2 className="text-green-600"/>:h?<XCircle className="text-red-500"/>:<Server className="text-gray-400"/>}</div><div className="grid grid-cols-3 gap-2 mt-5 text-center"><div><b className="text-xl">{s.total}</b><p className="text-[11px] text-gray-500">Imported</p></div><div><b className="text-xl text-green-700">{s.active}</b><p className="text-[11px] text-gray-500">Active</p></div><div><b className="text-xl text-red-600">{s.failed}</b><p className="text-[11px] text-gray-500">Attention</p></div></div><div className="mt-4 text-xs text-gray-500 flex items-center gap-1"><Clock3 className="w-3.5 h-3.5"/>Last activity: {ago(s.lastActivity)}</div><button onClick={()=>sync(k)} disabled={syncing!==null} className="mt-4 w-full py-2 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-black flex justify-center items-center gap-2"><RefreshCw className={`w-4 h-4 ${syncing===k?'animate-spin':''}`}/>{syncing===k?'Syncing…':'Sync now'}</button></div>})}</div>
+      <div className="grid sm:grid-cols-2 gap-4"><div className="bg-white border rounded-2xl p-5"><div className="flex items-center gap-2"><Package className="w-5 h-5"/><h2 className="font-black">Bazunk-tracked usage</h2></div><div className="mt-4 text-3xl font-black">{data.trackedUsage.importedProducts}</div><p className="text-sm text-gray-500">products currently tracked across the three importers</p><p className="text-xs text-gray-400 mt-3">{data.note}</p></div><div className="bg-white border rounded-2xl p-5"><div className="flex items-center gap-2"><AlertTriangle className="w-5 h-5"/><h2 className="font-black">Needs attention</h2></div><div className="mt-4 text-3xl font-black">{data.trackedUsage.productsNeedingAttention}</div><p className="text-sm text-gray-500">failed syncs, unavailable/paused items or protected price changes</p></div></div>
+      <div className="bg-white border rounded-2xl overflow-hidden"><div className="p-5 border-b"><h2 className="font-black text-lg">Failed products & price alerts</h2><p className="text-sm text-gray-500">Products Bazunk could not sync or deliberately paused for safety.</p></div>{data.alerts.length===0?<div className="p-10 text-center text-gray-500"><CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-green-600"/>No importer problems currently recorded.</div>:<div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-left"><tr><th className="p-3">Source</th><th className="p-3">Product</th><th className="p-3">Problem</th><th className="p-3">Source price</th><th className="p-3">Proposed</th><th className="p-3">Checked</th></tr></thead><tbody>{data.alerts.map((a,i)=><tr key={`${a.source}-${a.id}-${i}`} className="border-t"><td className="p-3 font-bold">{LABEL[a.source]}</td><td className="p-3 max-w-sm"><div className="font-semibold truncate">{a.title}</div><div className="text-xs text-gray-400">{a.publicId||`#${a.id}`}</div></td><td className="p-3 text-red-700">{a.error||a.type}</td><td className="p-3">{a.currentSourcePrice??'—'}</td><td className="p-3">{a.proposedSourcePrice??'—'}</td><td className="p-3 text-xs text-gray-500">{ago(a.lastChecked)}</td></tr>)}</tbody></table></div>}</div>
+    </>}
+  </div></AdminLayout>;
+}

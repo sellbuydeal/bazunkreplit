@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { LayoutDashboard, Users, Settings, CreditCard, LogOut, ShieldCheck, Package, Shield, RotateCcw, Gavel, Zap, LifeBuoy, Gift, Megaphone, List, ArrowDownToLine, FileText, Star } from "lucide-react";
+import { LayoutDashboard, Users, Settings, CreditCard, LogOut, ShieldCheck, Package, Shield, RotateCcw, Gavel, Zap, LifeBuoy, Gift, Megaphone, List, ArrowDownToLine, FileText, Star, Activity } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
 
 const NAV = [
@@ -8,6 +8,7 @@ const NAV = [
   { label: "Products",     href: "/admin/products",     icon: Package         },
   { label: "Listings",     href: "/admin/listings",     icon: List            },
   { label: "Imports",      href: "/admin/imports",      icon: ArrowDownToLine },
+  { label: "Importer Control", href: "/admin/importer-control", icon: Activity },
   { label: "Classifieds",  href: "/admin/classifieds",  icon: FileText        },
   { label: "Payments",   href: "/admin/payments",   icon: CreditCard      },
   { label: "Auctions",   href: "/admin/auctions",   icon: Gavel           },

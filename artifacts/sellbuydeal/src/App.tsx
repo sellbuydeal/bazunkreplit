@@ -65,6 +65,7 @@ import { AdminSettingsPage } from "@/pages/admin/AdminSettingsPage";
 import { AdminProductsPage } from "@/pages/admin/AdminProductsPage";
 import { AdminListingsPage } from "@/pages/admin/AdminListingsPage";
 import { AdminImportsPage } from "@/pages/admin/AdminImportsPage";
+import { AdminImporterControlPage } from "@/pages/admin/AdminImporterControlPage";
 import { AdminClassifiedsPage } from "@/pages/admin/AdminClassifiedsPage";
 import { AdminDisputesPage } from "@/pages/admin/AdminDisputesPage";
 import { AdminReturnsPage } from "@/pages/admin/AdminReturnsPage";
@@ -273,6 +274,7 @@ function Router() {
       <Route path="/admin/products" component={AdminProductsPage} />
       <Route path="/admin/listings" component={AdminListingsPage} />
       <Route path="/admin/imports" component={AdminImportsPage} />
+      <Route path="/admin/importer-control" component={AdminImporterControlPage} />
       <Route path="/admin/classifieds" component={AdminClassifiedsPage} />
       <Route path="/admin/payments" component={AdminPaymentsPage} />
       <Route path="/admin/disputes" component={AdminDisputesPage} />
