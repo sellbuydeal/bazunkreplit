@@ -23,8 +23,12 @@ import verificationRouter from "./verification.js";
 import userImporterRouter from "./userImporter.js";
 import userRapidApiRouter from "./userRapidApi.js";
 import referralsRouter from "./referrals.js";
+import { featureGate } from "../middlewares/featureGate.js";
 
 const router: IRouter = Router();
+
+// Runtime feature gates: disabled modules stay in code/database but public APIs stop immediately.
+router.use(featureGate);
 
 router.use(healthRouter);
 router.use(stripeRouter);

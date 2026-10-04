@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { CircleDollarSign, LayoutDashboard, Users, Settings, CreditCard, ShoppingCart, LogOut, ShieldCheck, Package, Shield, RotateCcw, Gavel, Zap, LifeBuoy, Gift, Megaphone, List, ArrowDownToLine, FileText, Star, Activity, ScrollText, ServerCog } from "lucide-react";
+import { CircleDollarSign, LayoutDashboard, Users, Settings, CreditCard, ShoppingCart, LogOut, ShieldCheck, Package, Shield, RotateCcw, Gavel, Zap, LifeBuoy, Gift, Megaphone, List, ArrowDownToLine, FileText, Star, Activity, ScrollText, ServerCog, Flag } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
 
 const NAV = [
@@ -24,6 +24,7 @@ const NAV = [
   { label: "Reviews",    href: "/admin/reviews",    icon: Star            },
   { label: "Audit Log",  href: "/admin/audit-log",  icon: ScrollText       },
   { label: "System Status", href: "/admin/system-status", icon: ServerCog },
+  { label: "Feature Flags", href: "/admin/feature-flags", icon: Flag },
   { label: "Settings",   href: "/admin/settings",   icon: Settings        },
 ];
 

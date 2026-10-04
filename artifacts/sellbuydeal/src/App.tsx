@@ -63,6 +63,8 @@ import { AdminCreditsEconomyPage } from "@/pages/admin/AdminCreditsEconomyPage";
 import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
 import { AdminAuditLogPage } from "@/pages/admin/AdminAuditLogPage";
 import { AdminSystemStatusPage } from "@/pages/admin/AdminSystemStatusPage";
+import { AdminFeatureFlagsPage } from "@/pages/admin/AdminFeatureFlagsPage";
+import { FeatureGate } from "@/components/FeatureGate";
 import { AdminPaymentsPage } from "@/pages/admin/AdminPaymentsPage";
 import { AdminOrdersPage } from "@/pages/admin/AdminOrdersPage";
 import { AdminSettingsPage } from "@/pages/admin/AdminSettingsPage";
@@ -252,31 +254,32 @@ function Router() {
       <Route path="/register">{() => <Redirect to="/sign-up" />}</Route>
       <Route path="/categories" component={CategoriesPage} />
       <Route path="/sell" component={SellPage} />
-      <Route path="/sell/quick" component={QuickSellPage} />
+      <Route path="/sell/quick">{() => <FeatureGate feature="quick_sell" name="Quick Sell"><QuickSellPage /></FeatureGate>}</Route>
       <Route path="/dashboard" component={DashboardPage} />
-      <Route path="/importers" component={ImportersPage} />
+      <Route path="/importers">{() => <FeatureGate feature="importers" name="Importers"><ImportersPage /></FeatureGate>}</Route>
       <Route path="/browse" component={BrowsePage} />
       <Route path="/search" component={BrowsePage} />
       <Route path="/listing/:id" component={ListingPage} />
       <Route path="/checkout" component={CheckoutPage} />
-      <Route path="/bundle" component={BundlePage} />
-      <Route path="/classifieds" component={ClassifiedsPage} />
-      <Route path="/messages" component={MessagesPage} />
+      <Route path="/bundle">{() => <FeatureGate feature="bundles" name="Bundles"><BundlePage /></FeatureGate>}</Route>
+      <Route path="/classifieds">{() => <FeatureGate feature="classifieds" name="Classifieds"><ClassifiedsPage /></FeatureGate>}</Route>
+      <Route path="/messages">{() => <FeatureGate feature="messaging" name="Messaging"><MessagesPage /></FeatureGate>}</Route>
       <Route path="/seller/:id" component={SellerProfilePage} />
-      <Route path="/credits" component={CreditsPage} />
-      <Route path="/promotions" component={PromotionsPage} />
+      <Route path="/credits">{() => <FeatureGate feature="credits" name="Credits"><CreditsPage /></FeatureGate>}</Route>
+      <Route path="/promotions">{() => <FeatureGate feature="promotions" name="Promotions"><PromotionsPage /></FeatureGate>}</Route>
       <Route path="/support" component={SupportPage} />
       <Route path="/faq" component={SupportPage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/privacy" component={PrivacyPage} />
-      <Route path="/offers" component={OffersPage} />
-      <Route path="/live" component={LiveHubPage} />
-      <Route path="/live/:id" component={LivePage} />
+      <Route path="/offers">{() => <FeatureGate feature="offers" name="Make an Offer"><OffersPage /></FeatureGate>}</Route>
+      <Route path="/live">{() => <FeatureGate feature="live" name="Live selling"><LiveHubPage /></FeatureGate>}</Route>
+      <Route path="/live/:id">{() => <FeatureGate feature="live" name="Live selling"><LivePage /></FeatureGate>}</Route>
       <Route path="/admin" component={AdminLoginPage} />
       <Route path="/admin/dashboard" component={AdminDashboardPage} />
       <Route path="/admin/users" component={AdminUsersPage} />
       <Route path="/admin/audit-log" component={AdminAuditLogPage} />
       <Route path="/admin/system-status" component={AdminSystemStatusPage} />
+      <Route path="/admin/feature-flags" component={AdminFeatureFlagsPage} />
       <Route path="/admin/products" component={AdminProductsPage} />
       <Route path="/admin/listings" component={AdminListingsPage} />
       <Route path="/admin/imports" component={AdminImportsPage} />
@@ -288,12 +291,12 @@ function Router() {
       <Route path="/admin/returns" component={AdminReturnsPage} />
       <Route path="/admin/auctions" component={AdminAuctionsPage} />
       <Route path="/admin/settings" component={AdminSettingsPage} />
-      <Route path="/auctions/create" component={CreateAuctionPage} />
-      <Route path="/auctions/:id" component={AuctionDetailPage} />
-      <Route path="/auctions" component={AuctionsPage} />
-      <Route path="/flash-sales/create" component={CreateFlashSalePage} />
-      <Route path="/flash-sales/:id" component={FlashSaleDetailPage} />
-      <Route path="/flash-sales" component={FlashSalesPage} />
+      <Route path="/auctions/create">{() => <FeatureGate feature="auctions" name="Auctions"><CreateAuctionPage /></FeatureGate>}</Route>
+      <Route path="/auctions/:id">{() => <FeatureGate feature="auctions" name="Auctions"><AuctionDetailPage /></FeatureGate>}</Route>
+      <Route path="/auctions">{() => <FeatureGate feature="auctions" name="Auctions"><AuctionsPage /></FeatureGate>}</Route>
+      <Route path="/flash-sales/create">{() => <FeatureGate feature="flash_sales" name="Flash Sales"><CreateFlashSalePage /></FeatureGate>}</Route>
+      <Route path="/flash-sales/:id">{() => <FeatureGate feature="flash_sales" name="Flash Sales"><FlashSaleDetailPage /></FeatureGate>}</Route>
+      <Route path="/flash-sales">{() => <FeatureGate feature="flash_sales" name="Flash Sales"><FlashSalesPage /></FeatureGate>}</Route>
       <Route path="/admin/flash-sales" component={AdminFlashSalesPage} />
       <Route path="/admin/support" component={AdminSupportPage} />
       <Route path="/admin/rewards" component={AdminRewardsPage} />
@@ -303,12 +306,12 @@ function Router() {
       <Route path="/admin/reviews" component={AdminReviewsPage} />
       <Route path="/admin/verification" component={AdminVerificationPage} />
       <Route path="/setup" component={SetupWizardPage} />
-      <Route path="/video" component={VideoPage} />
-      <Route path="/rewards/referrals" component={ReferralsPage} />
-      <Route path="/rewards" component={RewardsPage} />
+      <Route path="/video">{() => <FeatureGate feature="product_video" name="Product Video"><VideoPage /></FeatureGate>}</Route>
+      <Route path="/rewards/referrals">{() => <FeatureGate feature="referrals" name="Referrals"><ReferralsPage /></FeatureGate>}</Route>
+      <Route path="/rewards">{() => <FeatureGate feature="games" name="Rewards Arcade"><RewardsPage /></FeatureGate>}</Route>
       <Route path="/treasure-hunt">{() => { window.location.replace("/rewards"); return null; }}</Route>
-      <Route path="/buyer-protection" component={BuyerProtectionPage} />
-      <Route path="/cashback" component={CashbackPage} />
+      <Route path="/buyer-protection">{() => <FeatureGate feature="buyer_protection" name="Buyer Protection"><BuyerProtectionPage /></FeatureGate>}</Route>
+      <Route path="/cashback">{() => <FeatureGate feature="cashback" name="Cashback"><CashbackPage /></FeatureGate>}</Route>
       <Route component={NotFound} />
     </Switch>
   );
