@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowUp, Star, Home, Eye, Crown, Clock,
-  Coins, ChevronLeft, Check, Zap, AlertCircle, X, Search, Package,
+  Coins, ChevronLeft, Check, Zap, Video, AlertCircle, X, Search, Package,
   Loader2, ChevronRight, Users, Send, Tag, Trophy, MessageSquare,
   Bell, CalendarClock, BarChart3, Share2, Lock, Timer, RefreshCw, Percent, Truck, Bot,
 } from "lucide-react";
@@ -100,6 +100,17 @@ const PROMOTIONS: Promotion[] = [
     iconBg: "bg-pink-50",
     iconColor: "text-pink-500",
     perks: ["Top-3 placement guaranteed", "Category spotlight", "10-day duration"],
+  },
+  {
+    id: "product-video",
+    title: "Product Video",
+    description: "Add a product video to your listing and show buyers the item in action",
+    credits: 149,
+    duration: 3650,
+    icon: Video,
+    iconBg: "bg-fuchsia-50",
+    iconColor: "text-fuchsia-500",
+    perks: ["Video on your listing", "Show the item in action", "One-time listing add-on"],
   },
   {
     id: "urgent-badge",

@@ -8,6 +8,7 @@ import { refreshSellerMilestones } from "../lib/milestones.js";
 import { sendSystemMessage } from "../lib/systemMessages.js";
 
 import { awardReferralMilestone } from "../lib/referrals.js";
+import { getPromoConfig } from "../lib/promoConfig.js";
 
 const router = Router();
 
@@ -265,6 +266,23 @@ router.post("/listings", async (req, res) => {
       : null;
     const currency = typeof body.currency === "string" && body.currency ? body.currency.toUpperCase() : "GBP";
     const status = typeof body.status === "string" ? body.status : "active";
+    const premiumVideo = body.premiumVideo === true;
+
+    // Product Video is priced in credits and controlled by Admin → Promotions.
+    // Validate the balance before creating the listing so a failed add-on cannot create duplicates.
+    let productVideoConfig: Awaited<ReturnType<typeof getPromoConfig>> = null;
+    if (premiumVideo) {
+      productVideoConfig = await getPromoConfig("product-video");
+      if (!productVideoConfig || !productVideoConfig.enabled) {
+        res.status(400).json({ error: "Product Video is not currently available." });
+        return;
+      }
+      const balance = await storage.getCredits(sellerEmail);
+      if (balance < productVideoConfig.cost) {
+        res.status(402).json({ error: "Insufficient credits", message: `Product Video costs ${Math.round(productVideoConfig.cost * 100)} credits.`, balance: Math.round(Number(balance) * 100), required: Math.round(productVideoConfig.cost * 100) });
+        return;
+      }
+    }
 
     let priceGbp: string | null = null;
     try {
@@ -303,6 +321,14 @@ router.post("/listings", async (req, res) => {
       .returning();
 
     console.log("Listing successfully created:", listing.id);
+
+    if (premiumVideo && productVideoConfig) {
+      const newBalance = await storage.addCredits(sellerEmail, -productVideoConfig.cost);
+      const expiresAt = new Date();
+      expiresAt.setFullYear(expiresAt.getFullYear() + 10);
+      await db.insert(listingPromotionsTable).values({ listingId: listing.id, type: "product-video", expiresAt });
+      void sendSystemMessage(sellerEmail, { category: "Listings", subject: "Product Video added", body: `Product Video was added to “${listing.title}” for ${Math.round(productVideoConfig.cost * 100)} credits. Your new balance is ${Math.round(Number(newBalance) * 100)} credits.` });
+    }
 
     // First listing ever posted by this seller completes the "First
     // Listing" milestone. Safe to call on every post — completeMilestone()

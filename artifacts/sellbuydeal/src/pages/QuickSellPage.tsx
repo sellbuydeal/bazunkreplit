@@ -158,6 +158,7 @@ export function QuickSellPage() {
   const [newSpecKey, setNewSpecKey] = useState("");
   const [newSpecValue, setNewSpecValue] = useState("");
   const [premiumVideo, setPremiumVideo] = useState(false);
+  const [productVideoCredits, setProductVideoCredits] = useState(149);
   const [published, setPublished] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -178,6 +179,13 @@ export function QuickSellPage() {
       }
     } catch { /* ignore */ }
   }, [user?.email]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    fetch("/api/promotions/config", { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((cfg) => { const cost = Number(cfg?.["product-video"]?.cost); if (Number.isFinite(cost)) setProductVideoCredits(Math.round(cost * 100)); })
+      .catch(() => {});
+  }, []);
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -232,6 +240,7 @@ export function QuickSellPage() {
           sellerUsername: user?.username ?? null,
           tags: tags.trim() || undefined,
           specifications: specifications.length > 0 ? specifications : undefined,
+          premiumVideo,
         }),
       });
       if (!res.ok) {
@@ -1054,11 +1063,12 @@ export function QuickSellPage() {
                 </div>
                 <span className="font-bold text-gray-900">Premium Video</span>
               </div>
-              <span className="text-xs font-bold bg-[#F26B21] text-white px-3 py-1 rounded-full">+$2.99</span>
+              <span className="text-xs font-bold bg-[#F26B21] text-white px-3 py-1 rounded-full">{productVideoCredits} credits</span>
             </div>
             <p className="text-sm text-gray-500 mb-5">
               Add a video to showcase your item in action. Videos increase engagement by 300%!
             </p>
+            <p className="text-xs text-gray-500 mt-1">{productVideoCredits} credits are deducted only when the listing is successfully published.</p>
 
             <div className="bg-white rounded-xl border border-yellow-100 p-4 mb-4">
               <div className="flex items-center justify-between">
@@ -1076,7 +1086,7 @@ export function QuickSellPage() {
                   }`}
                   data-testid="button-premium-video"
                 >
-                  {premiumVideo ? "Added ✓" : "Premium +$2.99"}
+                  {premiumVideo ? `Added ✓ · ${productVideoCredits} credits` : `Add · ${productVideoCredits} credits`}
                 </button>
               </div>
             </div>

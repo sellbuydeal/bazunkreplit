@@ -39,6 +39,7 @@ export const PROMO_DEFAULTS: Record<string, PromoDefault> = {
   "badge-renovated":      L(0.99, 30, "Recently Renovated Badge"),
   "badge-best-seller":    L(0.99, 30, "Best Seller Badge"),
   "engagement-boost":     L(1.79, 14, "Engagement Features"),
+  "product-video":        L(1.49, 3650, "Product Video", { oneShot: true }),
 
   // ── New seller tools ──
   "follower-notify":      L(1.49, 1,  "Follower Notifications", { oneShot: true }),
