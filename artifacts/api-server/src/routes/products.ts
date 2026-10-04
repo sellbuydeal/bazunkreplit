@@ -199,9 +199,9 @@ router.get("/admin/products", async (req, res) => {
       SELECT
         id::text AS id, title, description, price::float AS price,
         status, condition, seller_email, seller_name,
-        category AS category_slug, category AS category_name,
-        image AS images, created_at, updated_at,
-        NULL AS inventory, NULL AS tags, '[]'::text AS variants, NULL AS category_id
+        category AS category_slug, category AS category_name, subcategory,
+        image AS images, created_at, updated_at, specifications, currency,
+        NULL AS inventory, tags, '[]'::text AS variants, category AS category_id
       FROM listings
       WHERE (${search} = '' OR title ILIKE ${searchPat} OR description ILIKE ${searchPat})
         AND (${dbStatus} = '' OR status = ${dbStatus})
@@ -256,13 +256,41 @@ router.post("/admin/products", async (req, res) => {
 router.get("/admin/products/:id", async (req, res) => {
   try {
     const [row] = await db.execute(sql`
-      SELECT id::text AS id, title, description, price::float AS price,
-        status, condition, seller_email, category AS category_slug,
-        category AS category_name, image AS images, created_at, updated_at
+      SELECT id::text AS id, public_id, title, description, price::float AS price,
+        status, condition, seller_email, seller_name, seller_username,
+        category AS category_id, category AS category_slug, category AS category_name,
+        subcategory, image, tags, specifications, currency, price_gbp,
+        created_at, updated_at
       FROM listings WHERE id = ${parseInt(req.params.id) || 0}
     `).then(r => r.rows as any[]);
     if (!row) { res.status(404).json({ error: "Product not found" }); return; }
-    res.json({ ...row, images: row.images ? [row.images] : [], status: row.status === "active" ? "approved" : row.status });
+    let specs: Record<string, any> = {};
+    try { specs = row.specifications ? JSON.parse(row.specifications) : {}; } catch { specs = {}; }
+    res.json({
+      ...row,
+      images: row.image ? [row.image] : [],
+      status: row.status === "active" ? "approved" : row.status,
+      inventory: Number(specs.inventory ?? 1),
+      brand: String(specs.brand ?? ""),
+      sku: String(specs.sku ?? row.public_id ?? ""),
+      ships_from: String(specs.ships_from ?? specs.source_country ?? ""),
+      ships_from_location: String(specs.ships_from_location ?? specs.source_item_location ?? ""),
+      ships_to: String(specs.ships_to ?? ""),
+      shipping_price: specs.shipping_price ?? specs.shipping ?? "",
+      free_shipping: Boolean(specs.free_shipping ?? (String(specs.source_shipping_label ?? "").toLowerCase() === "free")),
+      dispatch_time: String(specs.dispatch_time ?? ""),
+      delivery_estimate: String(specs.delivery_estimate ?? ""),
+      source: specs.source ?? null,
+      source_url: specs.ebay_url ?? specs.amazon_url ?? specs.aliexpress_url ?? specs.supplier_url ?? null,
+      source_item_id: specs.item_id ?? specs.asin ?? specs.product_id ?? specs.supplier_id ?? null,
+      source_condition: specs.source_condition ?? null,
+      source_price: specs.ebay_price ?? specs.amazon_price ?? specs.supplier_price ?? null,
+      source_postage: specs.source_shipping_label ?? specs.shipping ?? null,
+      last_source_check: specs.last_source_check ?? specs.last_synced_at ?? null,
+      markup_pct: specs.markup_pct ?? specs.markup ?? null,
+      minimum_profit: specs.minimum_profit ?? null,
+      specifications_object: specs,
+    });
   } catch (err) {
     logger.error({ err }, "Failed to get product");
     res.status(500).json({ error: "Failed to get product" });
@@ -271,17 +299,44 @@ router.get("/admin/products/:id", async (req, res) => {
 
 router.put("/admin/products/:id", async (req, res) => {
   try {
-    const { title, description, price, condition, status } = req.body;
+    const {
+      title, description, price, condition, status, category_id, subcategory,
+      seller_email, tags, images, currency, inventory, brand, sku,
+      ships_from, ships_from_location, ships_to, shipping_price, free_shipping,
+      dispatch_time, delivery_estimate,
+    } = req.body;
     if (!title) { res.status(400).json({ error: "title required" }); return; }
+    const id = parseInt(req.params.id) || 0;
+    const [current] = await db.execute(sql`SELECT specifications FROM listings WHERE id = ${id}`)
+      .then(r => r.rows as any[]);
+    if (!current) { res.status(404).json({ error: "Product not found" }); return; }
+    let specs: Record<string, any> = {};
+    try { specs = current.specifications ? JSON.parse(current.specifications) : {}; } catch { specs = {}; }
+    // Admin-editable merchandising/fulfilment fields live alongside private source metadata.
+    // Source identifiers/prices are intentionally preserved so manual edits never break syncing.
+    Object.assign(specs, {
+      inventory: Math.max(0, Number(inventory ?? specs.inventory ?? 1)),
+      brand: brand ?? "", sku: sku ?? "",
+      ships_from: ships_from ?? "", ships_from_location: ships_from_location ?? "",
+      ships_to: ships_to ?? "", shipping_price: shipping_price === "" ? null : Number(shipping_price),
+      free_shipping: Boolean(free_shipping), dispatch_time: dispatch_time ?? "",
+      delivery_estimate: delivery_estimate ?? "",
+      admin_manual_override: true,
+      admin_manual_override_at: new Date().toISOString(),
+    });
     const dbStatus = status === "approved" ? "active" : status ?? "pending";
+    const image = Array.isArray(images) && images.length ? String(images[0]) : null;
     const [row] = await db.execute(sql`
       UPDATE listings SET
-        title = ${title}, description = ${description ?? null}, price = ${price ?? 0},
-        condition = ${condition ?? "used"}, status = ${dbStatus}, updated_at = NOW()
-      WHERE id = ${parseInt(req.params.id) || 0} RETURNING id::text, title, status
+        title = ${title}, description = ${description ?? ""}, price = ${price ?? 0},
+        price_gbp = ${price ?? 0}, currency = ${currency ?? "GBP"},
+        category = ${category_id || "other"}, subcategory = ${subcategory || null},
+        condition = ${condition ?? "used"}, status = ${dbStatus},
+        seller_email = ${seller_email ?? ""}, tags = ${tags || null}, image = ${image},
+        specifications = ${JSON.stringify(specs)}, updated_at = NOW()
+      WHERE id = ${id} RETURNING id::text, title, status
     `).then(r => r.rows as any[]);
-    if (!row) { res.status(404).json({ error: "Product not found" }); return; }
-    res.json(row);
+    res.json({ ...row, status: row.status === "active" ? "approved" : row.status });
   } catch (err) {
     logger.error({ err }, "Failed to update product");
     res.status(500).json({ error: "Failed to update product" });

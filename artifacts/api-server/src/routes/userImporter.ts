@@ -195,6 +195,7 @@ router.get("/user/search-ebay", async (req, res) => {
           seller_username:  String(seller.username ?? ""),
           seller_feedback:  String(seller.feedbackPercentage ?? ""),
           condition:        String(p.condition ?? ""),
+          condition_id:     p.conditionId != null ? String(p.conditionId) : null,
           ebay_url:         `${ebayBase}/itm/${p.legacyItemId}`,
           country,
           categories:       categoryNames,
@@ -223,7 +224,7 @@ router.post("/user/import-ebay", async (req, res) => {
 
   interface SelectedEbay {
     item_id: string; title: string; price: number; currency: "GBP" | "USD";
-    image: string | null; ebay_url: string; condition: string;
+    image: string | null; ebay_url: string; condition: string; condition_id?: string | null;
     seller_username?: string; seller_feedback?: string;
     categories?: string[]; shipping_label?: string | null; shipping_type?: string;
     original_price?: string | null; discount_pct?: string | null;
@@ -263,58 +264,50 @@ router.post("/user/import-ebay", async (req, res) => {
     const prefix      = site === "uk" ? "BZK-EBY-UK" : "BZK-EBY-US";
     const publicId    = `${prefix}-${date}-${String(Date.now()).slice(-6)}-${String(inserted + 1).padStart(3, "0")}`;
     const source      = site === "uk" ? "eBay UK" : "eBay US";
+    const originalCondition = String(p.condition ?? "").trim();
+    const c = originalCondition.toLowerCase();
+    // Preserve eBay's useful condition detail instead of collapsing unknown values to "used".
+    // This is deliberately text-based because RapidAPI returns the human eBay condition label.
+    const condNorm = c.includes("new with tags") ? "new-with-tags"
+      : c.includes("new without tags") ? "new-without-tags"
+      : c.includes("new with defects") ? "new-with-defects"
+      : c === "new" || c.startsWith("brand new") ? "new"
+      : c.includes("open box") ? "open-box"
+      : c.includes("certified refurbished") ? "certified-refurbished"
+      : c.includes("excellent refurbished") ? "excellent-refurbished"
+      : c.includes("very good refurbished") ? "very-good-refurbished"
+      : c.includes("good refurbished") ? "good-refurbished"
+      : c.includes("refurbished") ? "refurbished"
+      : c.includes("parts") || c.includes("not working") ? "for-parts"
+      : c.includes("excellent") ? "excellent"
+      : c.includes("very good") ? "very-good"
+      : c.includes("good") ? "good"
+      : c.includes("pre-owned") || c.includes("preowned") || c.includes("used") ? "used"
+      : (c || "used").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
     const specs       = JSON.stringify({
       source, item_id: p.item_id, ebay_url: p.ebay_url,
       ebay_price: p.price, ebay_currency: currency, ebay_site: site,
       shipping: shippingAmt, markup_pct: markupPct,
+      source_condition: originalCondition || null,
+      source_condition_id: p.condition_id ?? null,
+      source_item_location: p.item_location ?? null,
+      source_country: p.country ?? null,
+      source_shipping_label: p.shipping_label ?? null,
+      source_shipping_type: p.shipping_type ?? null,
+      source_seller_username: p.seller_username ?? null,
+      source_seller_feedback: p.seller_feedback ?? null,
+      source_original_price: p.original_price ?? null,
+      source_discount_pct: p.discount_pct ?? null,
+      source_buying_options: p.buying_options ?? [],
+      last_source_check: new Date().toISOString(),
     });
 
-    const sym      = p.currency === "GBP" ? "£" : "$";
-    const descParts: string[] = [p.title, ""];
-
-    // Condition
-    if (p.condition) descParts.push(`Condition: ${p.condition}`);
-
-    // Categories
-    if (p.categories?.length) descParts.push(`Category: ${p.categories.join(" › ")}`);
-
-    // Seller
-    const sellerLine = [
-      p.seller_username ? `Sold by: ${p.seller_username}` : null,
-      p.seller_feedback ? `(${p.seller_feedback}% positive feedback)` : null,
-    ].filter(Boolean).join(" ");
-    if (sellerLine) descParts.push(sellerLine);
-
-    // Shipping
-    if (p.shipping_label) {
-      const shipType = p.shipping_type === "FIXED" ? "Standard" : p.shipping_type === "FREE" ? "Free" : p.shipping_type ?? "";
-      descParts.push(`Shipping: ${p.shipping_label}${shipType && shipType !== "Free" ? ` (${shipType})` : ""}`);
-    }
-
-    // Location
-    if (p.item_location) descParts.push(`Item location: ${p.item_location}`);
-
-    // Buying options
-    if (p.buying_options?.length) {
-      descParts.push(`Listing type: ${p.buying_options.map(o => o.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase())).join(", ")}`);
-    }
-
-    descParts.push("");
-
-    // Original price / discount
-    if (p.original_price) {
-      descParts.push(`Original eBay retail price: ${sym}${p.original_price}${p.discount_pct ? ` (${p.discount_pct})` : ""}`);
-    }
-    descParts.push(`eBay price: ${sym}${p.price.toFixed(2)}`);
-    descParts.push(`View original listing: ${p.ebay_url}`);
-
-    while (descParts.length && descParts[descParts.length - 1] === "") descParts.pop();
-    const description = descParts.join("\n");
+    // Public description must describe the item, not expose Bazunk's sourcing metadata.
+    // The full source details remain privately in specifications for Admin and syncing.
+    const description = p.title;
 
     const image     = p.image ?? null;
-    const condition = p.condition ?? "used";
-    const condNorm    = ["new", "used", "refurbished", "for-parts"].includes(condition.toLowerCase())
-      ? condition.toLowerCase() : "used";
 
     await db.execute(sql`
       INSERT INTO listings (public_id, title, price, price_gbp, currency, category, subcategory,

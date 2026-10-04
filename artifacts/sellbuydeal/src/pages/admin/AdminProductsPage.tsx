@@ -21,18 +21,27 @@ interface Product {
   id: string; title: string; description: string | null; price: string;
   status: string; inventory: number; condition: string; tags: string | null;
   images: string[]; variants: Variant[]; seller_email: string | null;
-  category_id: string | null; category_name: string | null; created_at: string;
+  category_id: string | null; category_name: string | null; subcategory?: string | null; created_at: string;
+  currency?: string; brand?: string; sku?: string; ships_from?: string; ships_from_location?: string;
+  ships_to?: string; shipping_price?: string | number; free_shipping?: boolean; dispatch_time?: string;
+  delivery_estimate?: string; source?: string | null; source_url?: string | null; source_item_id?: string | null;
+  source_condition?: string | null; source_price?: string | number | null; source_postage?: string | number | null;
+  last_source_check?: string | null; markup_pct?: string | number | null; minimum_profit?: string | number | null;
 }
 
 interface ProductForm {
   title: string; description: string; price: string; category_id: string;
   condition: string; status: string; inventory: string; tags: string;
-  seller_email: string; images: string[]; variants: Variant[];
+  seller_email: string; images: string[]; variants: Variant[]; subcategory: string; currency: string;
+  brand: string; sku: string; ships_from: string; ships_from_location: string; ships_to: string;
+  shipping_price: string; free_shipping: boolean; dispatch_time: string; delivery_estimate: string;
 }
 
 const EMPTY_FORM: ProductForm = {
   title: "", description: "", price: "0", category_id: "", condition: "new",
   status: "pending", inventory: "0", tags: "", seller_email: "", images: [], variants: [],
+  subcategory: "", currency: "GBP", brand: "", sku: "", ships_from: "", ships_from_location: "",
+  ships_to: "", shipping_price: "", free_shipping: false, dispatch_time: "", delivery_estimate: "",
 };
 
 const STATUS_STYLE: Record<string, string> = {
@@ -149,7 +158,15 @@ function ProductsTab({ authFetch, categories }: { authFetch: (url: string, opts?
   }
 
   function openAdd() { setEditProduct(null); setDrawerOpen(true); }
-  function openEdit(p: Product) { setEditProduct(p); setDrawerOpen(true); }
+  async function openEdit(p: Product) {
+    setActionId(p.id);
+    try {
+      const res = await authFetch(`/api/admin/products/${p.id}`);
+      if (res.ok) setEditProduct(await res.json());
+      else setEditProduct(p);
+      setDrawerOpen(true);
+    } finally { setActionId(null); }
+  }
   function closeDrawer() { setDrawerOpen(false); setEditProduct(null); }
 
   const STATUS_PILLS = [
@@ -176,7 +193,7 @@ function ProductsTab({ authFetch, categories }: { authFetch: (url: string, opts?
           className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 text-gray-600"
         >
           <option value="">All Categories</option>
-          {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
         </select>
         <button onClick={load} disabled={loading} className="p-2.5 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-gray-700 disabled:opacity-40">
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -338,6 +355,10 @@ function ProductDrawer({
     seller_email: product.seller_email ?? "",
     images: Array.isArray(product.images) ? [...product.images] : [],
     variants: Array.isArray(product.variants) ? product.variants.map(v => ({ ...v, priceModifier: String(v.priceModifier), inventory: String(v.inventory) })) : [],
+    subcategory: product.subcategory ?? "", currency: product.currency ?? "GBP", brand: product.brand ?? "", sku: product.sku ?? "",
+    ships_from: product.ships_from ?? "", ships_from_location: product.ships_from_location ?? "", ships_to: product.ships_to ?? "",
+    shipping_price: product.shipping_price == null ? "" : String(product.shipping_price), free_shipping: Boolean(product.free_shipping),
+    dispatch_time: product.dispatch_time ?? "", delivery_estimate: product.delivery_estimate ?? "",
   } : { ...EMPTY_FORM });
 
   const [saving, setSaving] = useState(false);
@@ -437,8 +458,20 @@ function ProductDrawer({
                 <select value={form.condition} onChange={e => set("condition", e.target.value)}
                   className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 bg-white">
                   <option value="new">New</option>
-                  <option value="used">Used</option>
+                  <option value="new-with-tags">New with tags</option>
+                  <option value="new-without-tags">New without tags</option>
+                  <option value="new-with-defects">New with defects</option>
+                  <option value="open-box">Open box</option>
+                  <option value="certified-refurbished">Certified refurbished</option>
+                  <option value="excellent-refurbished">Excellent refurbished</option>
+                  <option value="very-good-refurbished">Very good refurbished</option>
+                  <option value="good-refurbished">Good refurbished</option>
                   <option value="refurbished">Refurbished</option>
+                  <option value="excellent">Excellent</option>
+                  <option value="very-good">Very good</option>
+                  <option value="good">Good</option>
+                  <option value="used">Used / Pre-owned</option>
+                  <option value="for-parts">For parts / not working</option>
                 </select>
               </label>
               <label className="block">
@@ -455,7 +488,7 @@ function ProductDrawer({
                 <select value={form.category_id} onChange={e => set("category_id", e.target.value)}
                   className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 bg-white">
                   <option value="">None</option>
-                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
                 </select>
               </label>
             </div>
@@ -474,6 +507,51 @@ function ProductDrawer({
                   placeholder="tag1, tag2, tag3" />
               </label>
             </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Subcategory</span>
+                <input value={form.subcategory} onChange={e => set("subcategory", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="e.g. microwaves" /></label>
+              <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Brand</span>
+                <input value={form.brand} onChange={e => set("brand", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></label>
+              <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">SKU</span>
+                <input value={form.sku} onChange={e => set("sku", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></label>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 p-4 space-y-3">
+              <div><h3 className="text-sm font-black text-gray-800">Shipping & fulfilment</h3><p className="text-xs text-gray-400">Customer-facing delivery information for this listing.</p></div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Ships from country</span>
+                  <input value={form.ships_from} onChange={e => set("ships_from", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="United Kingdom" /></label>
+                <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Ship-from location</span>
+                  <input value={form.ships_from_location} onChange={e => set("ships_from_location", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="Sunderland, UK" /></label>
+                <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Ships to</span>
+                  <input value={form.ships_to} onChange={e => set("ships_to", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="United Kingdom" /></label>
+                <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Postage price</span>
+                  <input type="number" min="0" step="0.01" disabled={form.free_shipping} value={form.shipping_price} onChange={e => set("shipping_price", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm disabled:bg-gray-50" /></label>
+                <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Dispatch time</span>
+                  <input value={form.dispatch_time} onChange={e => set("dispatch_time", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="1 business day" /></label>
+                <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Delivery estimate</span>
+                  <input value={form.delivery_estimate} onChange={e => set("delivery_estimate", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="2–4 business days" /></label>
+              </div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700"><input type="checkbox" checked={form.free_shipping} onChange={e => set("free_shipping", e.target.checked)} /> Free shipping</label>
+            </div>
+
+            {isEdit && product?.source && (
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 space-y-2">
+                <div><h3 className="text-sm font-black text-gray-800">Source & Sync</h3><p className="text-xs text-gray-500">Private sourcing data. Editing the product above does not remove this information.</p></div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                  <div><span className="text-gray-400">Source</span><p className="font-semibold text-gray-700">{product.source}</p></div>
+                  <div><span className="text-gray-400">Source item</span><p className="font-semibold text-gray-700">{product.source_item_id || "—"}</p></div>
+                  <div><span className="text-gray-400">Original condition</span><p className="font-semibold text-gray-700">{product.source_condition || "—"}</p></div>
+                  <div><span className="text-gray-400">Source price</span><p className="font-semibold text-gray-700">{product.source_price ?? "—"}</p></div>
+                  <div><span className="text-gray-400">Source postage</span><p className="font-semibold text-gray-700">{product.source_postage ?? "—"}</p></div>
+                  <div><span className="text-gray-400">Last source check</span><p className="font-semibold text-gray-700">{product.last_source_check ? new Date(product.last_source_check).toLocaleString() : "—"}</p></div>
+                  <div><span className="text-gray-400">Markup</span><p className="font-semibold text-gray-700">{product.markup_pct != null ? `${product.markup_pct}%` : "—"}</p></div>
+                  <div><span className="text-gray-400">Minimum profit</span><p className="font-semibold text-gray-700">{product.minimum_profit ?? "—"}</p></div>
+                </div>
+                {product.source_url && <a href={product.source_url} target="_blank" rel="noreferrer" className="inline-flex text-xs font-bold text-[#4A5CE8] hover:underline">View original source listing ↗</a>}
+              </div>
+            )}
           </div>
 
           {/* Images */}
