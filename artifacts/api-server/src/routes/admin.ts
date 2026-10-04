@@ -16,6 +16,7 @@ import {
 } from "../lib/rapidapi.js";
 import { ensureAdminAuditLog, recordAdminAudit } from "../lib/adminAudit.js";
 import { ensureCreditEconomyTable, recordCreditEconomy } from "../lib/creditEconomy.js";
+import { RoomServiceClient } from "livekit-server-sdk";
 
 // Settings that must never be sent to the browser or edited through the generic settings route
 const PRIVATE_SETTING_KEYS = new Set(["admin_password_hash", "admin_email", "rapidapi_key"]);
@@ -90,6 +91,99 @@ router.get("/settings/public", async (_req, res) => {
 // ── All routes below require admin token ──────────────────────────────────────
 
 router.use("/admin", requireAdmin);
+
+
+// ── System Status ─────────────────────────────────────────────────────────────
+// Performs real server-side connectivity checks. Secrets are never returned.
+// Last successful checks are persisted so a temporary failure still shows when
+// the integration was last known to be healthy.
+router.get("/admin/system-status", async (_req, res) => {
+  const checkedAt = new Date().toISOString();
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS system_integration_status (
+        integration TEXT PRIMARY KEY,
+        last_success_at TIMESTAMPTZ,
+        last_check_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        last_status TEXT NOT NULL DEFAULT 'unknown',
+        last_message TEXT
+      )
+    `);
+
+    const previousRows = await db.execute(sql`SELECT * FROM system_integration_status`);
+    const previous = new Map((previousRows.rows as any[]).map((r:any) => [r.integration, r]));
+
+    type Check = { key:string; name:string; group:string; configured:boolean; ok:boolean; message:string; latencyMs:number|null };
+    const timed = async (key:string, name:string, group:string, configured:boolean, fn:()=>Promise<string|void>): Promise<Check> => {
+      const start = Date.now();
+      if (!configured) return { key, name, group, configured:false, ok:false, message:"Not configured", latencyMs:null };
+      try {
+        const msg = await fn();
+        return { key, name, group, configured:true, ok:true, message:msg || "Connected", latencyMs:Date.now()-start };
+      } catch (e:any) {
+        return { key, name, group, configured:true, ok:false, message:e?.message ? String(e.message).slice(0,220) : "Connection failed", latencyMs:Date.now()-start };
+      }
+    };
+
+    const postgresPromise = timed("postgresql", "PostgreSQL", "Core", true, async () => {
+      await db.execute(sql`SELECT 1 AS ok`); return "Database responding";
+    });
+    const clerkPromise = timed("clerk", "Clerk", "Authentication", Boolean(process.env.CLERK_SECRET_KEY), async () => {
+      await (clerkClient as any).users.getUserList({ limit: 1 }); return "Authentication API responding";
+    });
+    const stripePromise = timed("stripe", "Stripe", "Payments", Boolean(process.env.STRIPE_SECRET_KEY), async () => {
+      const stripe = await getUncachableStripeClient();
+      await stripe.balance.retrieve(); return "Payments API responding";
+    });
+    const livekitConfigured = Boolean(process.env.LIVEKIT_URL && process.env.LIVEKIT_API_KEY && process.env.LIVEKIT_API_SECRET);
+    const livekitPromise = timed("livekit", "LiveKit", "Live streaming", livekitConfigured, async () => {
+      const svc = new RoomServiceClient(process.env.LIVEKIT_URL!, process.env.LIVEKIT_API_KEY!, process.env.LIVEKIT_API_SECRET!);
+      await svc.listRooms(); return "Live streaming API responding";
+    });
+
+    let rapidChecks: Check[] = [];
+    if (!process.env.RAPIDAPI_KEY) {
+      rapidChecks = [
+        { key:"rapidapi_amazon", name:"Amazon importer", group:"RapidAPI", configured:false, ok:false, message:"RapidAPI key not configured", latencyMs:null },
+        { key:"rapidapi_ebay", name:"eBay importer", group:"RapidAPI", configured:false, ok:false, message:"RapidAPI key not configured", latencyMs:null },
+        { key:"rapidapi_aliexpress", name:"AliExpress importer", group:"RapidAPI", configured:false, ok:false, message:"RapidAPI key not configured", latencyMs:null },
+      ];
+    } else {
+      const start = Date.now();
+      try {
+        const rr = await testRapidApi();
+        const keyFor = (name:string) => name.toLowerCase().includes("amazon") ? "rapidapi_amazon" : name.toLowerCase().includes("ebay") ? "rapidapi_ebay" : "rapidapi_aliexpress";
+        rapidChecks = rr.map((r:any) => ({ key:keyFor(r.api || r.name || ""), name:(r.api || r.name || "RapidAPI importer").replace(/ \(.+\)$/," importer"), group:"RapidAPI", configured:true, ok:Boolean(r.ok), message:String(r.message || (r.ok ? "Connected" : "Connection failed")), latencyMs:Date.now()-start }));
+      } catch (e:any) {
+        const message = e?.message ? String(e.message).slice(0,220) : "RapidAPI check failed";
+        rapidChecks = ["Amazon","eBay","AliExpress"].map(n => ({ key:`rapidapi_${n.toLowerCase()}`, name:`${n} importer`, group:"RapidAPI", configured:true, ok:false, message, latencyMs:Date.now()-start }));
+      }
+    }
+
+    const checks: Check[] = [...await Promise.all([postgresPromise, clerkPromise, stripePromise, livekitPromise]), ...rapidChecks];
+    for (const c of checks) {
+      await db.execute(sql`
+        INSERT INTO system_integration_status (integration,last_success_at,last_check_at,last_status,last_message)
+        VALUES (${c.key}, ${c.ok ? new Date() : null}, NOW(), ${c.ok ? "connected" : c.configured ? "error" : "not_configured"}, ${c.message})
+        ON CONFLICT (integration) DO UPDATE SET
+          last_success_at = CASE WHEN ${c.ok} THEN NOW() ELSE system_integration_status.last_success_at END,
+          last_check_at = NOW(), last_status = EXCLUDED.last_status, last_message = EXCLUDED.last_message
+      `);
+    }
+
+    const items = checks.map(c => ({
+      ...c,
+      status: c.ok ? "connected" : c.configured ? "error" : "not_configured",
+      lastSuccessfulCheck: c.ok ? checkedAt : (previous.get(c.key) as any)?.last_success_at || null,
+      checkedAt,
+    }));
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ checkedAt, summary:{ connected:items.filter(x=>x.status==="connected").length, errors:items.filter(x=>x.status==="error").length, notConfigured:items.filter(x=>x.status==="not_configured").length, total:items.length }, integrations:items });
+  } catch (err:any) {
+    logger.error({ err }, "System status check failed");
+    res.status(500).json({ error:"System status check failed", message:err?.message || "Unknown error", checkedAt });
+  }
+});
 
 // Immutable Admin Audit Log. This endpoint is read-only by design.
 router.get("/admin/audit-log", async (req, res) => {
