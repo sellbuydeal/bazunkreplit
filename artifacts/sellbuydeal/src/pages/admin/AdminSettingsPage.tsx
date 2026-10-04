@@ -112,8 +112,6 @@ const AD_SLOTS = [
   { key: "categories_top", label: "Categories — Top Banner",     desc: "Leaderboard (728×90) below the category header, above the grid" },
   { key: "classifieds_mid",label: "Classifieds — Mid Banner",    desc: "Leaderboard (728×90) between the hero and search filters" },
   { key: "support_mid",    label: "Support — Mid Banner",        desc: "Leaderboard (728×90) between the hero and FAQ tabs" },
-  { key: "live_left",      label: "Live Page — Left Vertical",    desc: "Vertical advert beside the Live Now content on desktop; moves below the content on smaller screens" },
-  { key: "live_bottom",    label: "Live Page — Bottom Banner",    desc: "Leaderboard (728×90) below the Live Now content" },
 ] as const;
 
 
@@ -142,7 +140,14 @@ export function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [tab, setTab] = useState<Tab>("branding");
+  const [tab, setTabState] = useState<Tab>(() => {
+    const savedTab = sessionStorage.getItem("bazunk-admin-settings-tab") as Tab | null;
+    return savedTab && TABS.some(t => t.id === savedTab) ? savedTab : "branding";
+  });
+  const setTab = (next: Tab) => {
+    sessionStorage.setItem("bazunk-admin-settings-tab", next);
+    setTabState(next);
+  };
 
   const [newEmail, setNewEmail] = useState("");
   const [currentPw, setCurrentPw] = useState("");
@@ -184,8 +189,7 @@ export function AdminSettingsPage() {
     } finally { setLoading(false); }
   }
 
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
+  async function save() {
     setSaving(true);
     try {
       const res = await authFetch("/api/admin/settings", { method: "PUT", body: JSON.stringify(settings) });
@@ -296,6 +300,7 @@ export function AdminSettingsPage() {
           return (
             <button
               key={t.id}
+              type="button"
               onClick={() => setTab(t.id)}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-semibold transition-all ${
                 tab === t.id ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
@@ -311,7 +316,7 @@ export function AdminSettingsPage() {
       {loading ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-6 animate-pulse h-72" />
       ) : (
-        <form onSubmit={save} className="space-y-4">
+        <div className="space-y-4">
 
           {/* ── BRANDING & SEO ── */}
           {tab === "branding" && (
@@ -761,7 +766,7 @@ export function AdminSettingsPage() {
           {/* Save button — not shown on access/fees tabs (each has its own form) */}
           {tab !== "access" && tab !== "fees" && (
             <div className="flex items-center gap-3">
-              <button type="submit" disabled={saving}
+              <button type="button" onClick={save} disabled={saving}
                 className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#4A5CE8] hover:bg-[#3B4FD8] text-white font-bold text-sm transition-colors disabled:opacity-50">
                 {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
                 {saving ? "Saving…" : saved ? "Saved!" : "Save Changes"}
@@ -773,7 +778,7 @@ export function AdminSettingsPage() {
               )}
             </div>
           )}
-        </form>
+        </div>
       )}
     </AdminLayout>
   );
