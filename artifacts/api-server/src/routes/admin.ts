@@ -398,7 +398,9 @@ router.put("/admin/settings", async (req, res) => {
     const updates = req.body as Record<string, string>;
     const blocked = new Set(["admin_password_hash", "_admin_email", "rapidapi_key"]);
     for (const [key, value] of Object.entries(updates)) {
-      if (blocked.has(key)) continue;
+      // Fee settings have their own endpoint. Never let a stale general-settings
+      // form overwrite business/category rates or Buyer Protection values.
+      if (blocked.has(key) || key.startsWith("fee_") || key.startsWith("buyer_protection_")) continue;
       await db.execute(
         sql`INSERT INTO site_settings (key, value, updated_at) VALUES (${key}, ${value}, NOW())
             ON CONFLICT (key) DO UPDATE SET value = ${value}, updated_at = NOW()`

@@ -206,7 +206,9 @@ export function AdminSettingsPage() {
         return;
       }
       // Use the values read back from PostgreSQL, so Saved means they really persisted.
-      if ((body as any).fees) setFeeRates((body as any).fees);
+      if ((body as any).fees) {
+        setFeeRates((body as any).fees);
+      }
       window.dispatchEvent(new Event("bazunk-settings-updated"));
       setFeesSaved(true);
       setTimeout(() => setFeesSaved(false), 2500);
@@ -217,6 +219,17 @@ export function AdminSettingsPage() {
 
   function setFeeRate(key: string, value: string) {
     setFeeRates(prev => ({ ...prev, [key]: value }));
+  }
+
+  function applyDefaultRateToAllCategories() {
+    const value = feeRates["fee_rate_default"] ?? "5";
+    setFeeRates(prev => {
+      const next = { ...prev, fee_rate_default: value };
+      for (const cat of FEE_CATEGORIES) next[`fee_rate_${cat.slug}`] = value;
+      return next;
+    });
+    setFeesSaved(false);
+    setFeesError(null);
   }
 
   async function saveCredentials(e: React.FormEvent) {
@@ -581,7 +594,7 @@ export function AdminSettingsPage() {
                   <p className="font-bold">Buyer Protection & Business Seller Fees</p>
                   <p className="text-xs text-blue-500 mt-0.5">
                     Private sellers pay <strong>no listing fee and no selling commission</strong>. Buyers pay Buyer Protection at checkout.
-                    Registered businesses and sole traders can also have a seller fee, configured by category below.
+                    Registered businesses and sole traders pay the seller fee configured below IN ADDITION to the Buyer Protection fee paid by the buyer.
                   </p>
                 </div>
               </div>
@@ -601,7 +614,7 @@ export function AdminSettingsPage() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100">
                   <h2 className="font-bold text-gray-900">Business seller default fee</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Only for registered business / sole-trader sellers when no category override exists</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Base rate for registered business / sole-trader sellers. Use “Apply to all categories” to copy this rate to every category.</p>
                 </div>
                 <div className="px-6 py-5">
                   <div className="flex items-center gap-3 max-w-xs">
@@ -612,6 +625,13 @@ export function AdminSettingsPage() {
                       className="w-28 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]"
                     />
                     <span className="text-sm font-semibold text-gray-500">% business seller fee</span>
+                  </div>
+                  <div className="mt-3 flex items-center gap-3 flex-wrap">
+                    <button type="button" onClick={applyDefaultRateToAllCategories}
+                      className="px-4 py-2 rounded-xl border border-[#4A5CE8] text-[#4A5CE8] hover:bg-blue-50 text-sm font-bold">
+                      Apply to all categories
+                    </button>
+                    <span className="text-xs text-gray-400">This fills every category with {feeRates["fee_rate_default"] ?? "5"}%. Click Save below to persist it.</span>
                   </div>
                 </div>
               </div>
