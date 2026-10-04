@@ -1,3 +1,4 @@
+import { recordCreditEconomy } from "./creditEconomy.js";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { randomUUID, createHash } from "crypto";
@@ -14,6 +15,6 @@ export async function awardReferralMilestone(referredEmail:string, milestone:'jo
  const eventId=`${row.id}:${milestone}`;
  const inserted=await db.execute(sql`INSERT INTO referral_rewards(id,referral_id,milestone,referrer_credits,friend_credits,created_at) VALUES(${eventId},${row.id},${milestone},${refAmt},${friendAmt},NOW()) ON CONFLICT(id) DO NOTHING RETURNING id`);
  if(!inserted.rows.length)return;
- for(const [email,amt,who] of [[row.referrer_email,refAmt,'referrer'],[row.referred_email,friendAmt,'friend']] as any[]){ if(amt<=0)continue; await db.execute(sql`UPDATE users SET credits=credits+${amt} WHERE LOWER(email)=LOWER(${email})`); await db.execute(sql`INSERT INTO credit_transactions(id,email,credits_added,created_at) VALUES(${randomUUID()},${email},${amt},NOW())`); }
+ for(const [email,amt,who] of [[row.referrer_email,refAmt,'referrer'],[row.referred_email,friendAmt,'friend']] as any[]){ if(amt<=0)continue; await db.execute(sql`UPDATE users SET credits=credits+${amt} WHERE LOWER(email)=LOWER(${email})`); await db.execute(sql`INSERT INTO credit_transactions(id,email,credits_added,created_at) VALUES(${randomUUID()},${email},${amt},NOW())`); await recordCreditEconomy({ email, kind: 'referral', credits: Number(amt), reason: `Referral reward: ${milestone} (${who})`, referenceType: 'referral_reward', referenceId: `${eventId}-${who}` }); }
  await db.execute(sql`UPDATE referrals SET ${sql.raw(milestone+'_rewarded_at')}=NOW() WHERE id=${row.id}`);
 }

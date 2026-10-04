@@ -1,3 +1,4 @@
+import { recordCreditEconomy } from "../lib/creditEconomy.js";
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -246,6 +247,7 @@ router.post("/rewards/play", async (req, res) => {
     }
     creditsEarned = Math.min(creditsEarned, weekRemaining);
     await storage.addCredits(email, creditsEarned / 100);
+    await recordCreditEconomy({ email, kind: "earned", credits: creditsEarned / 100, reason: `Rewards Arcade: ${game.name || gameId}`, referenceType: "reward_play", referenceId: playId, metadata: { gameId } });
   }
 
   logger.info({ email, gameId, creditsEarned, won }, "Reward game played");

@@ -1,5 +1,6 @@
 import { awardReferralMilestone } from "./referrals.js";
 import { db, creditTransactionsTable } from "@workspace/db";
+import { recordCreditEconomy } from "./creditEconomy.js";
 import { eq, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { getUncachableStripeClient } from "../stripeClient.js";
@@ -103,7 +104,7 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
     }
 
     const creditsApplied = parseFloat(session.metadata?.creditsApplied ?? "0") || 0;
-    if (creditsApplied > 0) await storage.addCredits(buyerEmail, -creditsApplied);
+    if (creditsApplied > 0) { await storage.addCredits(buyerEmail, -creditsApplied); await recordCreditEconomy({ email: buyerEmail, kind: "spent", credits: -creditsApplied, reason: "Marketplace order paid with credits", referenceType: "stripe_cart", referenceId: sessionId }); }
 
     for (const seller of sellers) {
       void refreshSellerMilestones(seller);

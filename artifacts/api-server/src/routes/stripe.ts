@@ -12,6 +12,7 @@ import { sendSystemMessage } from "../lib/systemMessages.js";
 
 const router = Router();
 
+import { recordCreditEconomy } from "../lib/creditEconomy.js";
 // 100 credits = £1
 const CREDITS_PER_GBP = 100;
 
@@ -134,6 +135,9 @@ router.post("/stripe/checkout", async (req, res) => {
       metadata: {
         email,
         totalCredits: totalCredits.toFixed(2),
+        basePrice: basePrice.toFixed(2),
+        bonusCredits: bonus.toFixed(2),
+        packageName,
       },
       success_url: `${origin}/credits?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/credits`,
@@ -304,6 +308,7 @@ router.post("/stripe/confirm-cart-payment", async (req, res) => {
     } else if (freeOrder) {
       if (creditsApplied > 0) {
         await storage.addCredits(email, -creditsApplied);
+        await recordCreditEconomy({ email, kind: "spent", credits: -creditsApplied, reason: "Marketplace order paid with credits", referenceType: "checkout" });
       }
       const cartItems = body.items as Array<{ title: string; price: number; quantity: number }> | undefined;
       if (cartItems?.length) {
@@ -431,6 +436,7 @@ router.post("/stripe/apply-credits", async (req, res) => {
     await storage.upsertUser(email);
     await storage.recordCreditTransaction(sessionId, email, totalCredits);
     const balance = await storage.addCredits(email, totalCredits);
+    await recordCreditEconomy({ email, kind: "purchased", credits: totalCredits, cashAmount: (session.amount_total ?? 0) / 100, currency: session.currency?.toUpperCase() ?? "GBP", reason: session.metadata?.packageName || "Credit purchase", referenceType: "stripe_checkout", referenceId: session.id, metadata: { bonusCredits: Number(session.metadata?.bonusCredits || 0), paymentStatus: session.payment_status } });
 
     void sendCreditsConfirmation({ email, creditsAdded: totalCredits, newBalance: balance });
     void sendSystemMessage(email, {

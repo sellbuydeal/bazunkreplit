@@ -1,3 +1,4 @@
+import { recordCreditEconomy } from "../lib/creditEconomy.js";
 import { isBanned } from "../lib/banned.js";
 import { Router } from "express";
 import { db, listingsTable, listingPromotionsTable } from "@workspace/db";
@@ -324,6 +325,7 @@ router.post("/listings", async (req, res) => {
 
     if (premiumVideo && productVideoConfig) {
       const newBalance = await storage.addCredits(sellerEmail, -productVideoConfig.cost);
+      await recordCreditEconomy({ email: sellerEmail, kind: "spent", credits: -productVideoConfig.cost, reason: "Product Video", referenceType: "product_video" });
       const expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 10);
       await db.insert(listingPromotionsTable).values({ listingId: listing.id, type: "product-video", expiresAt });

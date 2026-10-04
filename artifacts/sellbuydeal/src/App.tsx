@@ -59,6 +59,7 @@ import IntroSplash from "@/components/IntroSplash";
 import { UserCurrencySync } from "@/components/UserCurrencySync";
 import { AdminLoginPage } from "@/pages/admin/AdminLoginPage";
 import { AdminDashboardPage } from "@/pages/admin/AdminDashboardPage";
+import { AdminCreditsEconomyPage } from "@/pages/admin/AdminCreditsEconomyPage";
 import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
 import { AdminPaymentsPage } from "@/pages/admin/AdminPaymentsPage";
 import { AdminSettingsPage } from "@/pages/admin/AdminSettingsPage";
@@ -290,6 +291,7 @@ function Router() {
       <Route path="/admin/flash-sales" component={AdminFlashSalesPage} />
       <Route path="/admin/support" component={AdminSupportPage} />
       <Route path="/admin/rewards" component={AdminRewardsPage} />
+      <Route path="/admin/credits-economy" component={AdminCreditsEconomyPage} />
       <Route path="/admin/referrals" component={AdminReferralsPage} />
       <Route path="/admin/promotions" component={AdminPromotionsPage} />
       <Route path="/admin/reviews" component={AdminReviewsPage} />

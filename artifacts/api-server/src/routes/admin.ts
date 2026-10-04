@@ -14,6 +14,7 @@ import { fetchEbayDetails, buildEbayDescription } from "../lib/ebay.js";
 import {
   saveRapidApiKey, clearRapidApiKey, rapidApiKeyStatus, testRapidApi, rapidApiErrorMessage,
 } from "../lib/rapidapi.js";
+import { ensureCreditEconomyTable, recordCreditEconomy } from "../lib/creditEconomy.js";
 
 // Settings that must never be sent to the browser or edited through the generic settings route
 const PRIVATE_SETTING_KEYS = new Set(["admin_password_hash", "admin_email", "rapidapi_key"]);
@@ -127,6 +128,51 @@ router.get("/admin/stats", async (_req, res) => {
   } catch (err) {
     logger.error({ err }, "Failed to get stats");
     res.status(500).json({ error: "Failed to get stats" });
+  }
+});
+
+// Credits Economy & Revenue
+router.get("/admin/credits-economy", async (req, res) => {
+  try {
+    await ensureCreditEconomyTable();
+    const limit = Math.min(200, Math.max(20, Number(req.query.limit) || 100));
+    const [summary, ledger, suspicious] = await Promise.all([
+      db.execute(sql`
+        SELECT
+          COALESCE((SELECT SUM(credits) FROM users),0)::float AS circulation,
+          COALESCE(SUM(CASE WHEN kind IN ('earned','referral') AND credits > 0 THEN credits ELSE 0 END),0)::float AS earned,
+          COALESCE(SUM(CASE WHEN kind='purchased' AND credits > 0 THEN credits ELSE 0 END),0)::float AS purchased,
+          COALESCE(ABS(SUM(CASE WHEN kind='spent' AND credits < 0 THEN credits ELSE 0 END)),0)::float AS spent,
+          COALESCE(SUM(CASE WHEN kind='referral' AND credits > 0 THEN credits ELSE 0 END),0)::float AS referrals,
+          COALESCE(SUM(CASE WHEN kind='admin_adjustment' THEN credits ELSE 0 END),0)::float AS adjustments,
+          COALESCE(SUM(CASE WHEN kind='purchased' THEN cash_amount ELSE 0 END),0)::float AS cash_revenue,
+          COUNT(*)::int AS ledger_entries
+        FROM credit_economy_ledger
+      `).then(r => r.rows[0] as any),
+      db.execute(sql`
+        SELECT id,email,kind,credits::float,cash_amount::float,currency,reason,reference_type,reference_id,metadata,created_at
+        FROM credit_economy_ledger ORDER BY created_at DESC LIMIT ${limit}
+      `).then(r => r.rows as any[]),
+      db.execute(sql`
+        SELECT email,
+          COUNT(*) FILTER (WHERE kind='referral' AND created_at > now()-interval '24 hours')::int AS referral_24h,
+          COUNT(*) FILTER (WHERE kind='admin_adjustment' AND created_at > now()-interval '7 days')::int AS adjustments_7d,
+          COALESCE(SUM(ABS(credits)) FILTER (WHERE created_at > now()-interval '1 hour'),0)::float AS movement_1h
+        FROM credit_economy_ledger
+        WHERE created_at > now()-interval '7 days'
+        GROUP BY email
+        HAVING COUNT(*) FILTER (WHERE kind='referral' AND created_at > now()-interval '24 hours') >= 5
+            OR COUNT(*) FILTER (WHERE kind='admin_adjustment' AND created_at > now()-interval '7 days') >= 3
+            OR COALESCE(SUM(ABS(credits)) FILTER (WHERE created_at > now()-interval '1 hour'),0) >= 50
+        ORDER BY movement_1h DESC LIMIT 50
+      `).then(r => r.rows as any[]),
+    ]);
+    // Existing transaction table provides a useful historical total even before the richer ledger existed.
+    const legacy = await db.execute(sql`SELECT COUNT(*)::int AS count, COALESCE(SUM(CASE WHEN credits_added>0 THEN credits_added ELSE 0 END),0)::float AS positive FROM credit_transactions`).then(r=>r.rows[0] as any).catch(()=>({count:0,positive:0}));
+    res.json({ summary: {...summary, legacyTransactions: legacy.count, legacyPositiveCredits: Number(legacy.positive||0)}, ledger, suspicious });
+  } catch (err) {
+    logger.error({ err }, "Failed to load credits economy");
+    res.status(500).json({ error: "Failed to load credits economy" });
   }
 });
 
@@ -271,6 +317,7 @@ router.patch("/admin/users/:email/credits", async (req, res) => {
 
     if (!updated) { res.status(404).json({ error: "User not found" }); return; }
 
+    await recordCreditEconomy({ email, kind: "admin_adjustment", credits: amount, reason: reason || "Manual admin adjustment", referenceType: "admin_adjustment" });
     logger.info({ email, amount, reason }, "Admin adjusted credits");
     res.json({ email: updated.email, newBalance: parseFloat(updated.credits) });
   } catch (err) {

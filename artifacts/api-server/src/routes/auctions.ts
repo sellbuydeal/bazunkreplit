@@ -1,3 +1,4 @@
+import { recordCreditEconomy } from "../lib/creditEconomy.js";
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -172,6 +173,7 @@ router.post("/auctions", async (req, res) => {
   let newBalance: number | undefined;
   if (fee > 0) {
     newBalance = Number(await storage.addCredits(sellerEmail, -fee));
+    await recordCreditEconomy({ email: sellerEmail, kind: "spent", credits: -fee, reason: "Auction listing fee", referenceType: "auction" });
     const parts = [wantsReserve && "Reserve Price", wantsExtension && "Auction Extensions"].filter(Boolean).join(" + ");
     void sendSystemMessage(sellerEmail, {
       category: "Promotions",

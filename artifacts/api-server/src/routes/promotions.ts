@@ -1,3 +1,4 @@
+import { recordCreditEconomy } from "../lib/creditEconomy.js";
 import { Router } from "express";
 import { db, listingPromotionsTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -68,6 +69,7 @@ router.post("/promotions/apply", async (req, res) => {
     }
 
     const newBalance = await storage.addCredits(email, -config.cost);
+    await recordCreditEconomy({ email, kind: "spent", credits: -config.cost, reason: `Promotion: ${config.label}`, referenceType: "promotion", metadata: { promotionType: type } });
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + config.daysValid);
