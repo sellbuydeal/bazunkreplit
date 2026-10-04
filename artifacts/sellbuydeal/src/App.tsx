@@ -61,6 +61,7 @@ import { AdminLoginPage } from "@/pages/admin/AdminLoginPage";
 import { AdminDashboardPage } from "@/pages/admin/AdminDashboardPage";
 import { AdminCreditsEconomyPage } from "@/pages/admin/AdminCreditsEconomyPage";
 import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
+import { AdminAuditLogPage } from "@/pages/admin/AdminAuditLogPage";
 import { AdminPaymentsPage } from "@/pages/admin/AdminPaymentsPage";
 import { AdminOrdersPage } from "@/pages/admin/AdminOrdersPage";
 import { AdminSettingsPage } from "@/pages/admin/AdminSettingsPage";
@@ -273,6 +274,7 @@ function Router() {
       <Route path="/admin" component={AdminLoginPage} />
       <Route path="/admin/dashboard" component={AdminDashboardPage} />
       <Route path="/admin/users" component={AdminUsersPage} />
+      <Route path="/admin/audit-log" component={AdminAuditLogPage} />
       <Route path="/admin/products" component={AdminProductsPage} />
       <Route path="/admin/listings" component={AdminListingsPage} />
       <Route path="/admin/imports" component={AdminImportsPage} />

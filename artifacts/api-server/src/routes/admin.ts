@@ -14,6 +14,7 @@ import { fetchEbayDetails, buildEbayDescription } from "../lib/ebay.js";
 import {
   saveRapidApiKey, clearRapidApiKey, rapidApiKeyStatus, testRapidApi, rapidApiErrorMessage,
 } from "../lib/rapidapi.js";
+import { ensureAdminAuditLog, recordAdminAudit } from "../lib/adminAudit.js";
 import { ensureCreditEconomyTable, recordCreditEconomy } from "../lib/creditEconomy.js";
 
 // Settings that must never be sent to the browser or edited through the generic settings route
@@ -89,6 +90,31 @@ router.get("/settings/public", async (_req, res) => {
 // ── All routes below require admin token ──────────────────────────────────────
 
 router.use("/admin", requireAdmin);
+
+// Immutable Admin Audit Log. This endpoint is read-only by design.
+router.get("/admin/audit-log", async (req, res) => {
+  try {
+    await ensureAdminAuditLog();
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 75)));
+    const offset = Math.max(0, Number(req.query.offset ?? 0));
+    const category = String(req.query.category ?? "").trim();
+    const search = String(req.query.search ?? "").trim();
+    const rows = await db.execute(sql`
+      SELECT id, actor, category, action, target_type, target_id, summary, before_data, after_data, metadata, ip_address, user_agent, created_at
+      FROM admin_audit_log
+      WHERE (${category} = '' OR category = ${category})
+        AND (${search} = '' OR summary ILIKE ${'%' + search + '%'} OR COALESCE(target_id,'') ILIKE ${'%' + search + '%'} OR actor ILIKE ${'%' + search + '%'})
+      ORDER BY created_at DESC LIMIT ${limit} OFFSET ${offset}
+    `).then(r => r.rows as any[]);
+    const [{ count }] = await db.execute(sql`
+      SELECT COUNT(*)::int count FROM admin_audit_log
+      WHERE (${category} = '' OR category = ${category})
+        AND (${search} = '' OR summary ILIKE ${'%' + search + '%'} OR COALESCE(target_id,'') ILIKE ${'%' + search + '%'} OR actor ILIKE ${'%' + search + '%'})
+    `).then(r => r.rows as any[]);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ entries: rows, total: Number(count ?? 0) });
+  } catch (err) { logger.error({ err }, "Failed to read audit log"); res.status(500).json({ error: "Failed to read audit log" }); }
+});
 
 // Dashboard stats
 
@@ -420,6 +446,7 @@ router.patch("/admin/users/:email/credits", async (req, res) => {
     const { amount, reason } = req.body;
     if (typeof amount !== "number") { res.status(400).json({ error: "amount required" }); return; }
 
+    const [beforeUser] = await db.execute(sql`SELECT email, credits FROM users WHERE email = ${email}`).then(r => r.rows as any[]);
     const [updated] = await db.execute(
       sql`UPDATE users SET credits = GREATEST(0, credits + ${amount}) WHERE email = ${email} RETURNING email, credits`
     ).then(r => r.rows as any[]);
@@ -428,6 +455,9 @@ router.patch("/admin/users/:email/credits", async (req, res) => {
 
     await recordCreditEconomy({ email, kind: "admin_adjustment", credits: amount, reason: reason || "Manual admin adjustment", referenceType: "admin_adjustment" });
     logger.info({ email, amount, reason }, "Admin adjusted credits");
+    await recordAdminAudit({ req, category: "credits", action: "credits.adjust", targetType: "user", targetId: email,
+      summary: `Admin ${amount >= 0 ? "credited" : "debited"} ${email} ${Math.abs(amount)} credits${reason ? ` — ${reason}` : ""}`,
+      before: { credits: Number(beforeUser?.credits ?? 0) }, after: { credits: Number(updated.credits), adjustment: amount }, metadata: { reason: reason ?? null } });
     res.json({ email: updated.email, newBalance: parseFloat(updated.credits) });
   } catch (err) {
     logger.error({ err }, "Failed to adjust credits");
@@ -441,12 +471,14 @@ router.patch("/admin/users/:email", async (req, res) => {
   try {
     const email = decodeURIComponent(req.params.email);
     const { name } = req.body;
+    const [beforeUser] = await db.execute(sql`SELECT email, name, seller_type FROM users WHERE email = ${email}`).then(r => r.rows as any[]);
     const sellerType = ["private", "sole_trader", "business"].includes(String(req.body?.sellerType)) ? String(req.body.sellerType) : undefined;
     const [updated] = await db.execute(
       sql`UPDATE users SET name = ${name ?? null}, seller_type = COALESCE(${sellerType ?? null}, seller_type) WHERE email = ${email} RETURNING email, name, seller_type`
     ).then(r => r.rows as any[]);
     if (!updated) { res.status(404).json({ error: "User not found" }); return; }
     logger.info({ email, name }, "Admin edited user");
+    await recordAdminAudit({ req, category: "users", action: "user.update", targetType: "user", targetId: email, summary: `Admin updated user ${email}`, before: beforeUser, after: updated });
     res.json({ email: updated.email, name: updated.name, sellerType: updated.seller_type });
   } catch (err) {
     logger.error({ err }, "Failed to edit user");
@@ -459,8 +491,10 @@ router.patch("/admin/users/:email", async (req, res) => {
 router.delete("/admin/users/:email", async (req, res) => {
   try {
     const email = decodeURIComponent(req.params.email);
+    const [beforeUser] = await db.execute(sql`SELECT email, name, seller_type, credits, banned FROM users WHERE email = ${email}`).then(r => r.rows as any[]);
     await db.execute(sql`DELETE FROM users WHERE email = ${email}`);
     logger.info({ email }, "Admin deleted user");
+    await recordAdminAudit({ req, category: "users", action: "user.delete", targetType: "user", targetId: email, summary: `Admin deleted user ${email}`, before: beforeUser });
     res.json({ success: true });
   } catch (err) {
     logger.error({ err }, "Failed to delete user");
@@ -475,12 +509,14 @@ router.patch("/admin/users/:email/ban", async (req, res) => {
     const email = decodeURIComponent(req.params.email);
     const { banned } = req.body;
     if (typeof banned !== "boolean") { res.status(400).json({ error: "banned (boolean) required" }); return; }
+    const [beforeUser] = await db.execute(sql`SELECT email, banned FROM users WHERE email = ${email}`).then(r => r.rows as any[]);
 
     const [updated] = await db.execute(
       sql`UPDATE users SET banned = ${banned} WHERE email = ${email} RETURNING email, banned`
     ).then(r => r.rows as any[]);
 
     if (!updated) { res.status(404).json({ error: "User not found" }); return; }
+    await recordAdminAudit({ req, category: "users", action: banned ? "user.suspend" : "user.unsuspend", targetType: "user", targetId: email, summary: `Admin ${banned ? "suspended" : "unsuspended"} user ${email}`, before: beforeUser, after: updated });
 
     res.json({ email: updated.email, banned: updated.banned });
   } catch (err) {
@@ -552,6 +588,9 @@ router.get("/admin/settings", async (_req, res) => {
 router.put("/admin/settings", async (req, res) => {
   try {
     const updates = req.body as Record<string, string>;
+    const keys = Object.keys(updates);
+    const oldRows = keys.length ? await db.execute(sql`SELECT key, value FROM site_settings`).then(r => r.rows as any[]) : [];
+    const beforeSettings = Object.fromEntries(oldRows.filter((r:any) => keys.includes(String(r.key))).map((r:any) => [r.key, r.value]));
     const blocked = new Set(["admin_password_hash", "_admin_email", "rapidapi_key"]);
     for (const [key, value] of Object.entries(updates)) {
       // Fee settings have their own persistence endpoint. Never let a stale copy
@@ -562,6 +601,8 @@ router.put("/admin/settings", async (req, res) => {
             ON CONFLICT (key) DO UPDATE SET value = ${value}, updated_at = NOW()`
       );
     }
+    const safeAfter = Object.fromEntries(Object.entries(updates).filter(([k]) => !isPrivateSetting(k) && !k.startsWith("fee_") && !k.startsWith("buyer_protection_")));
+    await recordAdminAudit({ req, category: "settings", action: "settings.update", targetType: "site_settings", targetId: "general", summary: `Admin changed ${Object.keys(safeAfter).length} site setting(s)`, before: beforeSettings, after: safeAfter });
     res.json({ success: true });
   } catch (err) {
     logger.error({ err }, "Failed to update settings");
@@ -594,6 +635,9 @@ router.put("/admin/fee-settings", async (req, res) => {
       key === "fee_listing_free" || key === "fee_rate_default" || key.startsWith("fee_rate_") || key.startsWith("buyer_protection_")
     );
     if (!entries.length) return res.status(400).json({ error: "No fee settings supplied" });
+    const changedKeys = entries.map(([key]) => key);
+    const oldFeeRows = await db.execute(sql`SELECT key, value FROM site_settings WHERE key LIKE 'fee_%' OR key LIKE 'buyer_protection_%'`).then(r => r.rows as any[]);
+    const beforeFees = Object.fromEntries(oldFeeRows.filter((r:any) => changedKeys.includes(String(r.key))).map((r:any) => [r.key, r.value]));
 
     for (const [key, raw] of entries) {
       let value = String(raw ?? "").trim();
@@ -617,6 +661,8 @@ router.put("/admin/fee-settings", async (req, res) => {
     const fees: Record<string, string> = {};
     for (const row of rows) fees[String(row.key)] = String(row.value ?? "");
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    const changed = Object.fromEntries(changedKeys.map(k => [k, { from: beforeFees[k] ?? null, to: fees[k] ?? null }]));
+    await recordAdminAudit({ req, category: "fees", action: "fees.update", targetType: "site_settings", targetId: "buyer-protection-and-business-fees", summary: `Admin changed ${changedKeys.length} Buyer Protection/business fee setting(s)`, before: beforeFees, after: Object.fromEntries(changedKeys.map(k => [k, fees[k] ?? null])), metadata: { changed } });
     res.json({ success: true, fees });
   } catch (err) {
     logger.error({ err }, "Failed to update fee settings");

@@ -22,6 +22,7 @@ const NAV = [
   { label: "Referrals",  href: "/admin/referrals",  icon: Users           },
   { label: "Promotions", href: "/admin/promotions", icon: Megaphone       },
   { label: "Reviews",    href: "/admin/reviews",    icon: Star            },
+  { label: "Audit Log",  href: "/admin/audit-log",  icon: ScrollText       },
   { label: "Settings",   href: "/admin/settings",   icon: Settings        },
 ];
 
