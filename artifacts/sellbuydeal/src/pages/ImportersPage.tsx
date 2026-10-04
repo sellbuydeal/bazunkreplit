@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useAuth as useClerkAuth } from "@clerk/react";
+import { Link } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { UserAmazonImporterSection } from "@/components/UserAmazonImporterSection";
 import { UserEbayImporterSection } from "@/components/UserEbayImporterSection";
 import { ImporterSection } from "@/components/ImporterSection";
-import { KeyRound, CheckCircle2, AlertCircle, ExternalLink, PackageSearch } from "lucide-react";
+import { KeyRound, CheckCircle2, AlertCircle, ExternalLink, PackageSearch, ArrowLeft } from "lucide-react";
 
 type Tab="amazon"|"ebay"|"aliexpress";
 const links={amazon:"https://rapidapi.com/letscrape-6bRBa3QguO5/api/real-time-amazon-data",ebay:"https://rapidapi.com/mahmudulhasandev/api/real-time-ebay-data",aliexpress:"https://rapidapi.com/ecommdatahub/api/aliexpress-datahub"};
@@ -17,6 +18,7 @@ export function ImportersPage(){
  if(!user) return <div className="max-w-5xl mx-auto px-4 py-16 text-center"><h1 className="text-3xl font-black">Product Importers</h1><p className="mt-3 text-gray-500">Sign in to use marketplace importers.</p></div>;
  const ready=status?.bazunk || status?.connected;
  return <div className="max-w-7xl mx-auto px-4 py-10">
+  <Link href="/" className="inline-flex items-center gap-2 mb-5 px-4 py-2 rounded-xl border bg-white text-sm font-bold text-gray-700 hover:text-[#4A5CE8] hover:border-[#4A5CE8]/40 transition-colors"><ArrowLeft className="w-4 h-4"/>Back to Home</Link>
   <div className="flex items-center gap-3 mb-2"><PackageSearch className="w-8 h-8 text-[#F26B21]"/><h1 className="text-3xl font-black">Product Importers</h1></div><p className="text-gray-500 mb-7">Import inventory from Amazon, eBay and AliExpress without loading importer code inside your Dashboard.</p>
   <div className="rounded-2xl border bg-white p-5 mb-7 shadow-sm">
    <div className="flex items-start gap-3"><KeyRound className="w-6 h-6 text-[#4A5CE8] mt-1"/><div className="flex-1"><h2 className="font-black text-lg">RapidAPI Connection</h2>

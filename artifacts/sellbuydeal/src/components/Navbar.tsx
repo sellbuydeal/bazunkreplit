@@ -218,7 +218,7 @@ export function Navbar() {
           </div>
 
           {/* Desktop nav */}
-          <div className="hidden xl:flex items-center gap-1.5 text-sm font-medium flex-shrink-0 mr-2">
+          <div className="hidden xl:flex items-center gap-1 text-[13px] font-medium flex-shrink-0 mr-1">
 
             {/* Primary links */}
             {primaryLinks.map(({ href, label, live }) => {
@@ -227,7 +227,7 @@ export function Navbar() {
                 <Link
                   key={href}
                   href={href}
-                  className={`px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                  className={`px-2.5 py-1.5 rounded-full transition-colors whitespace-nowrap flex items-center gap-1 ${
                     live
                       ? `text-red-600 font-semibold ${active ? "bg-red-100" : "bg-red-50 hover:bg-red-100"}`
                       : active
@@ -250,10 +250,10 @@ export function Navbar() {
             <div ref={rewardsRef} className="relative">
               <button
                 onClick={handleRewardsClick}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap text-amber-700 font-semibold bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-200 hover:to-orange-200"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-full transition-colors whitespace-nowrap text-amber-700 font-semibold bg-gradient-to-r from-amber-100 to-orange-100 hover:from-amber-200 hover:to-orange-200"
                 data-testid="link-rewards"
               >
-                <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                <Trophy className="w-3 h-3 text-amber-500" />
                 Rewards
               </button>
               <AnimatePresence>
@@ -299,13 +299,13 @@ export function Navbar() {
             <div ref={moreRef} className="relative">
               <button
                 onClick={() => setMoreOpen((v) => !v)}
-                className={`flex items-center gap-1 px-3.5 py-1.5 rounded-full transition-colors whitespace-nowrap ${
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full transition-colors whitespace-nowrap ${
                   moreOpen ? "text-[#4A5CE8] bg-[#4A5CE8]/10" : "text-gray-600 hover:text-[#4A5CE8] hover:bg-[#4A5CE8]/5"
                 }`}
                 data-testid="button-more-nav"
               >
                 More
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+                <ChevronDown className={`w-3 h-3 transition-transform ${moreOpen ? "rotate-180" : ""}`} />
               </button>
               <AnimatePresence>
                 {moreOpen && (
@@ -344,10 +344,10 @@ export function Navbar() {
           </div>
 
           {/* Right section */}
-          <div className="flex items-center gap-2.5 flex-1 min-w-0 justify-end">
+          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
 
             {/* Desktop search */}
-            <div ref={searchRef} className="relative w-[250px] 2xl:w-[310px] flex-none hidden lg:block ml-3">
+            <div ref={searchRef} className="relative w-[190px] 2xl:w-[240px] flex-none hidden lg:block ml-1">
               <form onSubmit={handleSubmit}>
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <Input
