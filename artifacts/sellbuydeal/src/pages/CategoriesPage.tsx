@@ -215,7 +215,12 @@ export function CategoriesPage() {
                     <div className="w-11 h-11 rounded-xl bg-black/10 border border-white/20 flex items-center justify-center backdrop-blur-sm">
                       <CategoryIcon name={category.icon} />
                     </div>
-                    <div className="min-w-0 flex-1 pt-0.5 drop-shadow-md">
+                    <div className="relative isolate min-w-0 flex-1 pt-0.5 drop-shadow-md">
+                      <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -inset-x-4 -inset-y-3 -z-10"
+                        style={{ background: "radial-gradient(ellipse at 40% 50%, rgba(10, 15, 25, 0.40) 0%, rgba(10, 15, 25, 0.30) 45%, rgba(10, 15, 25, 0) 75%)" }}
+                      />
                       <p className="text-[16px] leading-tight font-black text-white">{category.name}</p>
                       <p className="mt-1 text-[12px] font-extrabold text-white">
                         {category.subcategories.length} subcategories
