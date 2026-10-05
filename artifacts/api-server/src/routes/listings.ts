@@ -483,6 +483,10 @@ router.patch("/listings/profile/me", async (req, res) => {
   try {
     const email = await authenticatedEmail(req);
     if (!email) { res.status(401).json({ error: "Sign in required" }); return; }
+    // PATCH may be the first profile request after sign-up. Ensure the local
+    // marketplace user exists instead of relying on the preceding GET having run.
+    await db.execute(sql`INSERT INTO users (id,email,credits) VALUES (${email},${email},0.50) ON CONFLICT (email) DO NOTHING`);
+
     const b = req.body ?? {};
     const cleanName = typeof b.name === "string" ? b.name.trim().slice(0,120) : null;
     const cleanUsername = typeof b.username === "string" ? b.username.trim().replace(/^@/,"") : null;
@@ -518,10 +522,21 @@ router.patch("/listings/profile/me", async (req, res) => {
       notification_preferences=COALESCE(${prefsJson}::jsonb,notification_preferences),
       onboarding_step=COALESCE(${step},onboarding_step), onboarding_completed=COALESCE(${completed},onboarding_completed)
       WHERE LOWER(email)=LOWER(${email})`);
+    // The profile update above is authoritative. Older deployments can have
+    // different optional seller-name columns on individual selling surfaces.
+    // Propagate retrospectively where supported, but never make onboarding fail
+    // because a legacy table/column is absent.
     if (cleanUsername) {
-      await db.execute(sql`UPDATE listings SET seller_username=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`);
-      await db.execute(sql`UPDATE auctions SET seller_name=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`);
-      await db.execute(sql`UPDATE flash_sales SET seller_username=${cleanUsername}, seller_name=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`);
+      const propagate = async (query: any, surface: string) => {
+        try {
+          await db.execute(query);
+        } catch (propagationError) {
+          console.warn(`profile username propagation skipped for ${surface}`, propagationError);
+        }
+      };
+      await propagate(sql`UPDATE listings SET seller_username=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`, "listings");
+      await propagate(sql`UPDATE auctions SET seller_name=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`, "auctions");
+      await propagate(sql`UPDATE flash_sales SET seller_username=${cleanUsername}, seller_name=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`, "flash_sales");
     }
     const out = await db.execute(sql`SELECT name,username,phone,address_line1,address_line2,city,postcode,country,seller_type,notification_preferences,onboarding_step,onboarding_completed FROM users WHERE LOWER(email)=LOWER(${email}) LIMIT 1`);
     res.json(out.rows[0] ?? { success:true });
