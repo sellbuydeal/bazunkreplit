@@ -15,6 +15,7 @@ interface Listing {
   category: string;
   promotions: string[];
   sellerName: string;
+  sellerUsername?: string;
 }
 
 const CONDITION_COLORS: Record<string, string> = {
@@ -247,7 +248,7 @@ export function FeaturedListings() {
                   </div>
 
                   <div className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> {listing.sellerName || "Verified Seller"}
+                    <CheckCircle2 className="w-3.5 h-3.5" /> {listing.sellerUsername ? `@${listing.sellerUsername}` : (listing.sellerName || "Verified Seller")}
                   </div>
                 </div>
               </motion.div>

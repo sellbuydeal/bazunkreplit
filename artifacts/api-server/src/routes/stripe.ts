@@ -63,7 +63,7 @@ router.post("/stripe/sync-user", async (req, res) => {
     if (await isBanned(email)) { res.status(403).json({ error: "This account has been suspended.", banned: true }); return; }
     const user = await storage.upsertUser(email, name);
     const balance = parseFloat(user.credits as string);
-    res.json({ balance });
+    res.json({ balance, username: user.username ?? null, name: user.name ?? null });
   } catch (err) {
     logger.error({ err }, "Failed to sync user");
     res.status(500).json({ error: "Failed to sync user", message: String(err) });

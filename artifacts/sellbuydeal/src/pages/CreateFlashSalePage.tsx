@@ -158,7 +158,7 @@ export function CreateFlashSalePage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               sellerEmail: user.email,
-              sellerName: user.name ?? user.username,
+              sellerName: user.username ?? user.name,
               sellerUsername: user.username,
               title: listing.title,
               description: listing.description ?? null,
@@ -189,7 +189,7 @@ export function CreateFlashSalePage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             sellerEmail: user.email,
-            sellerName: user.name ?? user.username,
+            sellerName: user.username ?? user.name,
             title: form.title.trim(),
             description: form.description.trim() || null,
             image: form.image.trim() || null,

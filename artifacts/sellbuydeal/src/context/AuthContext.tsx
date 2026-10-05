@@ -28,7 +28,7 @@ const AuthContext = createContext<AuthContextValue>({
   refreshBalance: async () => {},
 });
 
-async function syncUserWithServer(email: string, name?: string): Promise<number | null | "suspended"> {
+async function syncUserWithServer(email: string, name?: string): Promise<{ balance: number; username?: string | null; name?: string | null } | null | "suspended"> {
   try {
     const res = await fetch("/api/stripe/sync-user", {
       method: "POST",
@@ -41,7 +41,7 @@ async function syncUserWithServer(email: string, name?: string): Promise<number 
     }
     if (!res.ok) return null;
     const data = await res.json();
-    return typeof data.balance === "number" ? data.balance : null;
+    return typeof data.balance === "number" ? { balance: data.balance, username: data.username ?? null, name: data.name ?? null } : null;
   } catch {
     return null;
   }
@@ -62,6 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { user: clerkUser, isLoaded } = useUser();
   const { signOut } = useClerk();
   const [balance, setBalance] = useState(0);
+  const [profileUsername, setProfileUsername] = useState<string | null>(null);
 
   const email = clerkUser?.primaryEmailAddress?.emailAddress ?? "";
   const clerkId = clerkUser?.id ?? null;
@@ -78,9 +79,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         window.alert("This account has been suspended. Please contact Bazunk support if you think this is a mistake.");
         return;
       }
-      if (b !== null) setBalance(b);
+      if (b !== null) { setBalance(b.balance); setProfileUsername(b.username ?? null); }
     });
   }, [clerkId, email]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const onProfile = (event: Event) => {
+      const username = (event as CustomEvent<{ username?: string }>).detail?.username;
+      if (username) setProfileUsername(username);
+    };
+    window.addEventListener("bazunk-profile-updated", onProfile);
+    return () => window.removeEventListener("bazunk-profile-updated", onProfile);
+  }, []);
 
   const refreshBalance = useCallback(async () => {
     if (!email) return;
@@ -98,10 +108,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return {
       name,
       email,
-      username: clerkUser.username ?? email.split("@")[0] ?? "user",
+      username: profileUsername ?? clerkUser.username ?? email.split("@")[0] ?? "user",
       balance,
     };
-  }, [isLoaded, clerkUser, email, balance]);
+  }, [isLoaded, clerkUser, email, balance, profileUsername]);
 
   // login/register kept for API compatibility — Clerk handles these flows via /sign-in and /sign-up
   async function login(_email: string, _password: string): Promise<boolean> {

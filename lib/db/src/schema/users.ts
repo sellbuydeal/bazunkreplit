@@ -4,6 +4,7 @@ export const usersTable = pgTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull().unique(),
   name: text("name"),
+  username: text("username"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeAccountId: text("stripe_account_id"),
   credits: numeric("credits", { precision: 10, scale: 2 }).notNull().default("0"),

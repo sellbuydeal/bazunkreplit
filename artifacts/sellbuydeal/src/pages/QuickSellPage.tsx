@@ -235,7 +235,7 @@ export function QuickSellPage() {
           condition,
           image: photos[0] ?? null,
           sellerEmail: user?.email ?? "guest",
-          sellerName: user?.name ?? null,
+          sellerName: user?.username ?? user?.name ?? null,
           sellerUsername: user?.username ?? null,
           tags: tags.trim() || undefined,
           specifications: specifications.length > 0 ? specifications : undefined,

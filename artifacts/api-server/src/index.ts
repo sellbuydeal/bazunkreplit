@@ -48,6 +48,8 @@ async function runAppMigrations() {
     )
   `, "users");
 
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT`, "users.username");
+  await run(sql`CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique_ci ON users (LOWER(username)) WHERE username IS NOT NULL`, "users.username.unique");
   await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`, "users.banned");
   await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_type TEXT NOT NULL DEFAULT 'private'`, "users.seller_type");
   await run(sql`CREATE TABLE IF NOT EXISTS user_rapidapi_keys (email TEXT PRIMARY KEY, encrypted_key TEXT NOT NULL, key_last4 TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`, "user_rapidapi_keys");

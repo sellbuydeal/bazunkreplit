@@ -1,6 +1,7 @@
 import { recordCreditEconomy } from "../lib/creditEconomy.js";
 import { isBanned } from "../lib/banned.js";
 import { Router } from "express";
+import { clerkClient, getAuth } from "@clerk/express";
 import { db, listingsTable, listingPromotionsTable } from "@workspace/db";
 import { eq, desc, and, gt, sql, inArray } from "drizzle-orm";
 import { toGbp } from "../fxRates.js";
@@ -424,23 +425,31 @@ router.delete("/listings/:id", async (req, res) => {
 });
 
 router.patch("/listings/seller-name", async (req, res) => {
-  const { email, name, username } = req.body as { email?: string; name?: string; username?: string };
-  if (!email || (!name && !username)) {
-    res.status(400).json({ error: "email and at least one of name/username are required" });
-    return;
-  }
   try {
-    const updates: Partial<typeof listingsTable.$inferInsert> = {};
-    if (name) updates.sellerName = name;
-    if (username) updates.sellerUsername = username;
-    await db.update(listingsTable).set(updates).where(eq(listingsTable.sellerEmail, email));
-    if (name) await db.execute(sql`UPDATE auctions SET seller_name = ${name} WHERE seller_email = ${email}`);
-    if (username) await db.execute(sql`UPDATE flash_sales SET seller_username = ${username} WHERE seller_email = ${email}`);
-    if (name) await db.execute(sql`UPDATE flash_sales SET seller_name = ${name} WHERE seller_email = ${email}`);
-    if (username) await db.execute(sql`UPDATE flash_sales SET seller_username = ${username} WHERE seller_email = ${email}`);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: "Failed to update seller info" });
+    const auth = getAuth(req);
+    if (!auth.isAuthenticated || !auth.userId) { res.status(401).json({ error: "Sign in required" }); return; }
+    const clerkUser = await clerkClient.users.getUser(auth.userId);
+    const email = clerkUser.primaryEmailAddress?.emailAddress?.toLowerCase();
+    if (!email) { res.status(400).json({ error: "Account email not found" }); return; }
+
+    const { name, username } = req.body as { name?: string; username?: string };
+    const cleanName = typeof name === "string" ? name.trim().slice(0, 120) : "";
+    const cleanUsername = typeof username === "string" ? username.trim().replace(/^@/, "") : "";
+    if (!/^[A-Za-z0-9._-]{3,30}$/.test(cleanUsername)) {
+      res.status(400).json({ error: "Username must be 3–30 characters using letters, numbers, dots, underscores or hyphens." }); return;
+    }
+    const taken = await db.execute(sql`SELECT 1 FROM users WHERE LOWER(username)=LOWER(${cleanUsername}) AND LOWER(email)<>LOWER(${email}) LIMIT 1`);
+    if (taken.rows.length) { res.status(409).json({ error: "That username is already taken." }); return; }
+
+    await db.execute(sql`UPDATE users SET username=${cleanUsername}, name=COALESCE(NULLIF(${cleanName}, ''), name) WHERE LOWER(email)=LOWER(${email})`);
+    // Retrospective privacy fix: every existing selling surface is updated to the chosen public username.
+    await db.execute(sql`UPDATE listings SET seller_username=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`);
+    await db.execute(sql`UPDATE auctions SET seller_name=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`);
+    await db.execute(sql`UPDATE flash_sales SET seller_username=${cleanUsername}, seller_name=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`);
+    res.json({ success: true, username: cleanUsername });
+  } catch (err: any) {
+    if (String(err?.code) === "23505") { res.status(409).json({ error: "That username is already taken." }); return; }
+    res.status(500).json({ error: "Failed to update seller profile" });
   }
 });
 

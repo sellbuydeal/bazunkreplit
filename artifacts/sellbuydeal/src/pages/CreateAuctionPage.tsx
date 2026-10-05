@@ -172,7 +172,7 @@ export function CreateAuctionPage() {
           category,
           condition,
           sellerEmail: user.email,
-          sellerName: user.name ?? user.username,
+          sellerName: user.username ?? user.name,
           sellerUsername: user.username,
           startingBid: toGBP(startBid),
           reservePrice: reservePrice ? toGBP(parseFloat(reservePrice)) : null,

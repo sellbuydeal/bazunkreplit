@@ -151,10 +151,10 @@ function SellerCard({ sellerName, sellerUsername, sellerEmail, location, verifie
         </div>
         <div>
           <div className="flex items-center gap-1.5">
-            <p className="font-semibold text-gray-900 text-sm">{sellerName}</p>
+            <p className="font-semibold text-gray-900 text-sm">{sellerUsername ? `@${sellerUsername}` : sellerName}</p>
             {verified && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
           </div>
-          {sellerUsername && <p className="text-xs text-gray-400 mt-0.5">@{sellerUsername}</p>}
+          {sellerUsername && <p className="text-xs text-gray-400 mt-0.5">Bazunk seller</p>}
           {!sellerUsername && <p className="text-xs text-gray-400 mt-0.5">Bazunk seller</p>}
         </div>
       </div>
