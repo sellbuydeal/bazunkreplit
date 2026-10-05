@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, CheckCircle2, CircleAlert, Database, KeyRound, Radio, RefreshCw, Server, CreditCard, Cloud, Clock3 } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
+import { AdminLayout } from "./AdminLayout";
 
 const API = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "";
 type Item = { key:string; name:string; group:string; configured:boolean; status:"connected"|"error"|"not_configured"; message:string; latencyMs:number|null; lastSuccessfulCheck:string|null; checkedAt:string };
@@ -22,7 +23,7 @@ export function AdminSystemStatusPage() {
     } catch(e:any) { setError(e?.message || "Status check failed"); } finally { setLoading(false); }
   };
   useEffect(()=>{ load(); },[]);
-  return <div className="space-y-5">
+  return <AdminLayout><div className="space-y-5">
     <div className="flex items-start justify-between gap-4">
       <div><h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Activity className="w-6 h-6 text-[#F26B21]"/>System Status</h1><p className="text-sm text-gray-500 mt-1">Live server-side checks for Bazunk's core services and integrations. No secret keys are exposed here.</p></div>
       <button onClick={load} disabled={loading} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1A1D2E] text-white text-sm font-semibold disabled:opacity-60"><RefreshCw className={`w-4 h-4 ${loading?"animate-spin":""}`}/>Run checks</button>
@@ -42,6 +43,6 @@ export function AdminSystemStatusPage() {
       <div className="flex items-center gap-2 text-xs text-gray-500"><Clock3 className="w-3.5 h-3.5"/>Last full check: {when(data.checkedAt)}. RapidAPI checks make a small real request to each importer API.</div>
     </>}
     {!data && loading && <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-500">Checking Bazunk services…</div>}
-  </div>;
+  </div></AdminLayout>;
 }
 function Summary({label,value,cls}:{label:string;value:number;cls:string}) { return <div className="bg-white border border-gray-200 rounded-2xl p-4"><div className="text-xs uppercase tracking-wide text-gray-500 font-semibold">{label}</div><div className={`text-2xl font-bold mt-1 ${cls}`}>{value}</div></div> }
