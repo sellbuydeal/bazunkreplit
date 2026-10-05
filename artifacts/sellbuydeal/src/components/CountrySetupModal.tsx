@@ -81,10 +81,10 @@ export function CountrySetupModal({ email, onDone }: CountrySetupModalProps) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 16 }}
         transition={{ duration: 0.2 }}
-        className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden"
+        className="w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-visible"
       >
         {/* Header */}
-        <div className="bg-gradient-to-br from-[#F26B21] to-[#D97706] px-6 pt-6 pb-5 text-white">
+        <div className="bg-gradient-to-br from-[#F26B21] to-[#D97706] px-6 pt-6 pb-5 text-white rounded-t-2xl">
           <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center mb-3">
             <Globe className="w-6 h-6 text-white" />
           </div>
@@ -95,7 +95,7 @@ export function CountrySetupModal({ email, onDone }: CountrySetupModalProps) {
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-4">
+        <div className="px-6 py-5 space-y-4 rounded-b-2xl">
           {/* Country dropdown */}
           <div className="relative">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 block">
@@ -124,7 +124,7 @@ export function CountrySetupModal({ email, onDone }: CountrySetupModalProps) {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 4 }}
                   transition={{ duration: 0.12 }}
-                  className="absolute left-0 right-0 top-[calc(100%+4px)] bg-white rounded-xl border border-gray-100 shadow-xl z-10 overflow-hidden"
+                  className="absolute left-0 right-0 top-[calc(100%+4px)] bg-white rounded-xl border border-gray-100 shadow-2xl z-[120] overflow-hidden"
                 >
                   <div className="p-2 border-b border-gray-100">
                     <input
@@ -136,7 +136,7 @@ export function CountrySetupModal({ email, onDone }: CountrySetupModalProps) {
                       className="w-full px-3 py-2 rounded-lg bg-gray-50 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#F26B21]/30 border border-gray-200"
                     />
                   </div>
-                  <div className="max-h-52 overflow-y-auto py-1">
+                  <div className="max-h-[min(20rem,45vh)] overflow-y-auto overscroll-contain py-1">
                     {filtered.map((c) => (
                       <button
                         key={c.code}
