@@ -384,7 +384,7 @@ export function BrowsePage() {
     }
 
     return result;
-  }, [allListings, query, selectedCategories, selectedSubcategories, selectedConditions, minPrice, maxPrice, verifiedOnly, sort]);
+  }, [allListings, query, selectedCategories, selectedSubcategories, selectedConditions, minPrice, maxPrice, verifiedOnly, shipFrom, shipTo, freeShipping, minRating, listedWithin, sort]);
 
   function toggleCategory(slug: string) {
     setSelectedCategories((prev) => {
