@@ -1,13 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { Megaphone, Loader2 } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 type Option = { type: string; label: string; daysValid: number };
 type Active = { id: number; type: string; expires_at: string };
 
 export function AdminListingPromotion({ listingId, title, status }: { listingId: string | number; title: string; status: string }) {
   const { authFetch } = useAdmin();
+  const selectId = useId();
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<Option[]>([]);
   const [active, setActive] = useState<Active[]>([]);
@@ -64,7 +67,15 @@ export function AdminListingPromotion({ listingId, title, status }: { listingId:
         {loading ? <p className="flex gap-2 text-sm"><Loader2 className="w-4 h-4 animate-spin" /> Loading promotions…</p> : <>
           {active.length > 0 && <div className="text-sm"><h3 className="font-semibold mb-2">Active promotions</h3><ul className="space-y-2">{active.map(a => <li key={a.id}>{options.find(o => o.type === a.type)?.label || a.type} <span className="text-gray-500">· until {new Date(a.expires_at).toLocaleString()}</span></li>)}</ul></div>}
           {options.length > 0 ? <>
-            <label className="text-sm font-semibold">Promotion<select value={type} disabled={busy} onChange={e => { setType(e.target.value); setDays(String(options.find(o => o.type === e.target.value)?.daysValid || 7)); setSuccess(""); }} className="block w-full border rounded-lg p-2 mt-1">{options.map(o => <option key={o.type} value={o.type}>{o.label}</option>)}</select></label>
+            <div className="space-y-1">
+              <label htmlFor={selectId} className="text-sm font-semibold">Promotion</label>
+              <Select value={type} disabled={busy} onValueChange={value => { setType(value); setDays(String(options.find(o => o.type === value)?.daysValid || 7)); setSuccess(""); }}>
+                <SelectTrigger id={selectId} className="bg-background text-foreground border-input"><SelectValue placeholder="Choose a promotion" /></SelectTrigger>
+                <SelectContent className="z-[60] max-h-72 bg-popover text-popover-foreground border-border">
+                  {options.map(o => <SelectItem key={o.type} value={o.type}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <label className="text-sm font-semibold">Duration in days<input type="number" min={1} max={365} step={1} value={days} disabled={busy} onChange={e => { setDays(e.target.value); setSuccess(""); }} className="block w-full border rounded-lg p-2 mt-1" /></label>
             <button type="button" onClick={apply} disabled={busy} className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl p-3 font-bold disabled:opacity-50">{busy ? "Applying…" : "Apply promotion"}</button>
           </> : !error && <p className="text-sm text-gray-500">No timed listing promotions are currently enabled.</p>}
