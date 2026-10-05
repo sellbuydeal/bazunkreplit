@@ -274,7 +274,7 @@ function ProductsTab({ authFetch, categories }: { authFetch: (url: string, opts?
                       <span className={`text-[10px] font-bold px-2 py-1 rounded-full border capitalize ${STATUS_STYLE[p.status] ?? "bg-gray-100 text-gray-500 border-gray-200"}`}>{p.status}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5 max-w-40">
                         {p.status === "pending" && (
                           <>
                             <button onClick={() => setStatus(p.id, "approved")} disabled={isActing} title="Approve"
