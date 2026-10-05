@@ -453,4 +453,83 @@ router.patch("/listings/seller-name", async (req, res) => {
   }
 });
 
+
+// ── Account profile + first-dashboard onboarding ───────────────────────────
+async function authenticatedEmail(req: any): Promise<string | null> {
+  const auth = getAuth(req);
+  if (!auth.isAuthenticated || !auth.userId) return null;
+  const clerkUser = await clerkClient.users.getUser(auth.userId);
+  return clerkUser.primaryEmailAddress?.emailAddress?.toLowerCase() ?? null;
+}
+
+router.get("/listings/profile/me", async (req, res) => {
+  try {
+    const email = await authenticatedEmail(req);
+    if (!email) { res.status(401).json({ error: "Sign in required" }); return; }
+    await db.execute(sql`INSERT INTO users (id,email,credits) VALUES (${email},${email},0.50) ON CONFLICT (email) DO NOTHING`);
+    const r = await db.execute(sql`
+      SELECT email,name,username,phone,address_line1,address_line2,city,postcode,country,
+             seller_type,notification_preferences,onboarding_step,onboarding_completed
+      FROM users WHERE LOWER(email)=LOWER(${email}) LIMIT 1
+    `);
+    res.json(r.rows[0]);
+  } catch (err) {
+    console.error("profile/me failed", err);
+    res.status(500).json({ error: "Failed to load profile" });
+  }
+});
+
+router.patch("/listings/profile/me", async (req, res) => {
+  try {
+    const email = await authenticatedEmail(req);
+    if (!email) { res.status(401).json({ error: "Sign in required" }); return; }
+    const b = req.body ?? {};
+    const cleanName = typeof b.name === "string" ? b.name.trim().slice(0,120) : null;
+    const cleanUsername = typeof b.username === "string" ? b.username.trim().replace(/^@/,"") : null;
+    if (cleanUsername !== null && !/^[A-Za-z0-9._-]{3,30}$/.test(cleanUsername)) {
+      res.status(400).json({ error: "Username must be 3–30 characters using letters, numbers, dots, underscores or hyphens." }); return;
+    }
+    if (cleanUsername) {
+      const taken = await db.execute(sql`SELECT 1 FROM users WHERE LOWER(username)=LOWER(${cleanUsername}) AND LOWER(email)<>LOWER(${email}) LIMIT 1`);
+      if (taken.rows.length) { res.status(409).json({ error: "That username is already taken." }); return; }
+    }
+    const phone = typeof b.phone === "string" ? b.phone.trim().slice(0,40) : null;
+    const a1 = typeof b.addressLine1 === "string" ? b.addressLine1.trim().slice(0,180) : null;
+    const a2 = typeof b.addressLine2 === "string" ? b.addressLine2.trim().slice(0,180) : null;
+    const city = typeof b.city === "string" ? b.city.trim().slice(0,100) : null;
+    const postcode = typeof b.postcode === "string" ? b.postcode.trim().slice(0,30) : null;
+    const country = typeof b.country === "string" ? b.country.trim().slice(0,80) : null;
+    const sellerType = ["private","sole_trader","business"].includes(b.sellerType) ? b.sellerType : null;
+    const step = Number.isInteger(b.onboardingStep) ? Math.max(1,Math.min(6,b.onboardingStep)) : null;
+    const completed = b.onboardingCompleted === true ? true : null;
+    const prefs = b.notificationPreferences && typeof b.notificationPreferences === "object" ? b.notificationPreferences : null;
+
+    // JSON is stringified and cast server-side so it is never interpolated as SQL text.
+    const prefsJson = prefs ? JSON.stringify({
+      orders: prefs.orders !== false,
+      offers: prefs.offers !== false,
+      messages: prefs.messages !== false,
+      promotions: prefs.promotions === true,
+    }) : null;
+    await db.execute(sql`UPDATE users SET
+      name=COALESCE(${cleanName},name), username=COALESCE(${cleanUsername},username), phone=COALESCE(${phone},phone),
+      address_line1=COALESCE(${a1},address_line1), address_line2=COALESCE(${a2},address_line2), city=COALESCE(${city},city),
+      postcode=COALESCE(${postcode},postcode), country=COALESCE(${country},country), seller_type=COALESCE(${sellerType},seller_type),
+      notification_preferences=COALESCE(${prefsJson}::jsonb,notification_preferences),
+      onboarding_step=COALESCE(${step},onboarding_step), onboarding_completed=COALESCE(${completed},onboarding_completed)
+      WHERE LOWER(email)=LOWER(${email})`);
+    if (cleanUsername) {
+      await db.execute(sql`UPDATE listings SET seller_username=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`);
+      await db.execute(sql`UPDATE auctions SET seller_name=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`);
+      await db.execute(sql`UPDATE flash_sales SET seller_username=${cleanUsername}, seller_name=${cleanUsername} WHERE LOWER(seller_email)=LOWER(${email})`);
+    }
+    const out = await db.execute(sql`SELECT name,username,phone,address_line1,address_line2,city,postcode,country,seller_type,notification_preferences,onboarding_step,onboarding_completed FROM users WHERE LOWER(email)=LOWER(${email}) LIMIT 1`);
+    res.json(out.rows[0] ?? { success:true });
+  } catch (err: any) {
+    if (String(err?.code)==="23505") { res.status(409).json({ error:"That username is already taken." }); return; }
+    console.error("profile/me update failed", err);
+    res.status(500).json({ error:"Failed to save profile" });
+  }
+});
+
 export default router;

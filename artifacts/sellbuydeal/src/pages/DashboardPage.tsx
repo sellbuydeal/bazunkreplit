@@ -31,6 +31,7 @@ import { LiveChat } from "@/components/LiveChat";
 import { ALL_PRODUCTS } from "@/data/products";
 
 import { SellerSales } from "@/components/SellerSales";
+import { AccountSetupWizard } from "@/components/AccountSetupWizard";
 import { ReviewModal } from "@/components/ReviewModal";
 import { CATEGORIES as SITE_CATEGORIES } from "@/data/categories";
 
@@ -5261,6 +5262,7 @@ function VerificationSection({ userEmail }: { userEmail: string }) {
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
+  const { getToken: getClerkToken } = useClerkAuth();
   const rawSettings = useRawSettings();
   const { items: watchlistItems, removeFromWatchlist, toggleAlert } = useWatchlist();
   const { addToCart } = useCart();
@@ -5351,6 +5353,7 @@ export function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
+      <AccountSetupWizard fallbackName={user.name} />
       <Navbar />
 
       {/* Mobile sticky sub-header */}
@@ -6008,25 +6011,28 @@ export function DashboardPage() {
                       <button
                         onClick={async () => {
                           const updated = { ...profileForm };
-                          setSavedProfile(updated);
-                          // Always use the actual Clerk email (not the form email) for DB cascade
                           const clerkEmail = user?.email || "";
                           const displayName = updated.name.trim() || savedProfile.name;
-                          if (clerkEmail) {
-                            try { localStorage.setItem(`sbd_profile_v1_${clerkEmail}`, JSON.stringify({ name: displayName, username: updated.username })); } catch {}
-                            if (displayName || updated.username) {
-                              try {
-                                await fetch("/api/listings/seller-name", {
-                                  method: "PATCH",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ email: clerkEmail, name: displayName || undefined, username: updated.username || undefined }),
-                                });
-                              } catch {}
-                            }
+                          try {
+                            const token = await getClerkToken();
+                            const response = await fetch("/api/listings/profile/me", {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                              body: JSON.stringify({ name: displayName, username: updated.username }),
+                            });
+                            const data = await response.json().catch(() => ({}));
+                            if (!response.ok) { window.alert(data.error || "Profile could not be saved."); return; }
+                            const persisted = { ...updated, name: data.name ?? displayName, username: data.username ?? updated.username };
+                            setSavedProfile(persisted);
+                            setProfileForm(persisted);
+                            try { localStorage.setItem(`sbd_profile_v1_${clerkEmail}`, JSON.stringify({ name: persisted.name, username: persisted.username })); } catch {}
+                            window.dispatchEvent(new CustomEvent("bazunk-profile-updated", { detail: { username: persisted.username } }));
+                            setProfileEdit(false);
+                            setProfileSaved(true);
+                            setTimeout(() => setProfileSaved(false), 3000);
+                          } catch {
+                            window.alert("Profile could not be saved. Please try again.");
                           }
-                          setProfileEdit(false);
-                          setProfileSaved(true);
-                          setTimeout(() => setProfileSaved(false), 3000);
                         }}
                         className="px-4 py-2 rounded-xl bg-[#4A5CE8] text-white text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5"
                         data-testid="button-save-profile"

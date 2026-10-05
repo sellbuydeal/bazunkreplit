@@ -52,6 +52,15 @@ async function runAppMigrations() {
   await run(sql`CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique_ci ON users (LOWER(username)) WHERE username IS NOT NULL`, "users.username.unique");
   await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`, "users.banned");
   await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_type TEXT NOT NULL DEFAULT 'private'`, "users.seller_type");
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`, "users.phone");
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS address_line1 TEXT`, "users.address_line1");
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS address_line2 TEXT`, "users.address_line2");
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS city TEXT`, "users.city");
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS postcode TEXT`, "users.postcode");
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS country TEXT`, "users.country");
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_preferences JSONB NOT NULL DEFAULT '{"orders":true,"offers":true,"messages":true,"promotions":false}'::jsonb`, "users.notification_preferences");
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_step INTEGER NOT NULL DEFAULT 1`, "users.onboarding_step");
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE`, "users.onboarding_completed");
   await run(sql`CREATE TABLE IF NOT EXISTS user_rapidapi_keys (email TEXT PRIMARY KEY, encrypted_key TEXT NOT NULL, key_last4 TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`, "user_rapidapi_keys");
 
   await run(sql`
