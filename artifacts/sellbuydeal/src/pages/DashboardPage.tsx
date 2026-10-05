@@ -31,6 +31,7 @@ import { LiveKitBroadcaster } from "@/components/LiveKitBroadcaster";
 import { LiveChat } from "@/components/LiveChat";
 import { ALL_PRODUCTS } from "@/data/products";
 
+import { StoreToolkit } from "@/components/StoreToolkit";
 import { SellerSales } from "@/components/SellerSales";
 import { ReviewModal } from "@/components/ReviewModal";
 import { CATEGORIES as SITE_CATEGORIES } from "@/data/categories";
@@ -314,7 +315,7 @@ function OffersSection() {
             : "Browse listings and make an offer — negotiate the best price directly."}
         </p>
         <Link
-          href={tab === "received" ? "/sell/quick" : "/browse"}
+          href={tab === "received" ? "/sell/direct" : "/browse"}
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-colors"
         >
           {tab === "received" ? (
@@ -823,7 +824,7 @@ function MyListingsSection({ userEmail }: { userEmail: string }) {
           <h2 className="font-bold text-gray-900">My Listings</h2>
           <p className="text-xs text-gray-400 mt-0.5">{listings.length} listing{listings.length !== 1 ? "s" : ""}</p>
         </div>
-        <Link href="/sell/quick" className="flex items-center gap-1.5 text-sm font-semibold text-white bg-[#F26B21] px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">
+        <Link href="/sell/direct" className="flex items-center gap-1.5 text-sm font-semibold text-white bg-[#F26B21] px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">
           <Plus className="w-4 h-4" /> New Listing
         </Link>
       </div>
@@ -839,7 +840,7 @@ function MyListingsSection({ userEmail }: { userEmail: string }) {
           </div>
           <p className="font-semibold text-gray-700 mb-1">No listings yet</p>
           <p className="text-sm text-gray-400 mb-5">Create your first listing and start selling today</p>
-          <Link href="/sell/quick" className="px-6 py-2.5 rounded-xl bg-[#F26B21] text-white font-bold text-sm hover:opacity-90 transition-opacity">
+          <Link href="/sell/direct" className="px-6 py-2.5 rounded-xl bg-[#F26B21] text-white font-bold text-sm hover:opacity-90 transition-opacity">
             Create a Listing
           </Link>
         </div>
@@ -1050,7 +1051,7 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
           <div className="py-8 text-center">
             <Package className="w-8 h-8 mx-auto mb-2 text-gray-200" />
             <p className="text-sm text-gray-400 font-medium">No listings yet</p>
-            <Link href="/sell/quick" className="mt-3 inline-flex items-center gap-1 text-xs text-[#4A5CE8] font-semibold hover:underline">
+            <Link href="/sell/direct" className="mt-3 inline-flex items-center gap-1 text-xs text-[#4A5CE8] font-semibold hover:underline">
               <Plus className="w-3 h-3" /> Create your first listing
             </Link>
           </div>
@@ -1087,7 +1088,7 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
           </div>
         )}
         <div className="flex items-center gap-4 mt-4 pt-2 border-t border-gray-100">
-          <Link href="/sell/quick" className="flex items-center gap-1.5 text-sm text-[#4A5CE8] font-semibold hover:underline" data-testid="link-create-listing">
+          <Link href="/sell/direct" className="flex items-center gap-1.5 text-sm text-[#4A5CE8] font-semibold hover:underline" data-testid="link-create-listing">
             <Plus className="w-3.5 h-3.5" /> Create New Listing
           </Link>
           <span className="text-gray-200">|</span>
@@ -1102,7 +1103,7 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
         <h2 className="font-bold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Link
-            href="/sell/quick"
+            href="/sell/direct"
             className="flex flex-col items-center text-center p-4 rounded-xl border-2 border-dashed border-gray-200 hover:border-[#4A5CE8]/40 hover:bg-blue-50/30 transition-colors group"
             data-testid="link-quick-action-create-listing"
           >
@@ -1232,7 +1233,7 @@ const MILESTONES = [
   },
   // ── Monthly challenges ───────────────────────────────────────────────────
   {
-    id: "quick-seller", name: "Quick Seller", task: "Sell 3 items this month",
+    id: "quick-seller", name: "Direct Seller", task: "Sell 3 items this month",
     progress: 0, total: 3, reward: "Fee-free next listing",
     rewardIcon: Tag, iconBg: "bg-blue-50", iconColor: "text-blue-500",
     color: "bg-blue-500", completed: false, oneTime: false,
@@ -2601,6 +2602,9 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   /* setup form */
+  const [setupCover, setSetupCover] = useState(COVER_PRESETS[2].style);
+  const [saveError, setSaveError] = useState("");
+  const [savedNotice, setSavedNotice] = useState("");
   const [storeName, setStoreName] = useState("");
   const [storeCategory, setStoreCategory] = useState("Electronics & Technology");
   const [storeDesc, setStoreDesc] = useState("");
@@ -2610,7 +2614,9 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
   const [store, setStore] = useState<{
     name: string; category: string; description: string; businessType: string;
     slug: string; totalViews: number; followers: number; activeItems: number;
-    coverStyle?: string; coverImage?: string;
+    coverStyle?: string; coverImage?: string; logoColorIdx?: number;
+    contact?: typeof contact; taxId?: string; payments?: string[]; shipping?: string[];
+    policies?: typeof policies; social?: typeof social; storeSettings?: typeof storeSettings;
   }>({ name: "", category: "", description: "", businessType: "individual", slug: "", totalViews: 0, followers: 0, activeItems: 0, coverStyle: COVER_PRESETS[0].style });
 
   useEffect(() => {
@@ -2620,9 +2626,22 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
       setStoreLoadedKey(null);
       return;
     }
+    setSaveError(""); setSavedNotice("");
+    setContact({ email: "", phone: "", address: "", hours: "", website: "" });
+    setTaxId(""); setPayments([]); setShipping([]);
+    setPolicies({ returns: "", shipping: "", additional: "" });
+    setSocial({ facebook: "", instagram: "", twitter: "" }); setLogoColorIdx(0);
     try {
       const saved = localStorage.getItem(storeKey);
-      if (saved) { setStore(JSON.parse(saved)); setView("overview"); }
+      if (saved) {
+        const data = JSON.parse(saved);
+        setStore(data); setView("overview"); setLogoColorIdx(data.logoColorIdx ?? 0);
+        setContact(data.contact ?? { email: "", phone: "", address: "", hours: "", website: "" });
+        setTaxId(data.taxId ?? ""); setPayments(data.payments ?? []); setShipping(data.shipping ?? []);
+        setPolicies(data.policies ?? { returns: "", shipping: "", additional: "" });
+        setSocial(data.social ?? { facebook: "", instagram: "", twitter: "" });
+        setStoreSettings(data.storeSettings ?? { autoAccept: false, inventoryCount: true, vacation: false, emailNotifications: true });
+      }
       else setView("setup");
     } catch { setView("setup"); }
     setStoreLoadedKey(storeKey);
@@ -2639,32 +2658,41 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
 
   function saveStore(updates: Partial<typeof store>) {
     const next = { ...store, ...updates };
-    setStore(next);
-    if (storeKey) { try { localStorage.setItem(storeKey, JSON.stringify(next)); } catch {} }
+    if (!storeKey || storeLoadedKey !== storeKey) return false;
+    try { localStorage.setItem(storeKey, JSON.stringify(next)); setStore(next); setSaveError(""); return true; }
+    catch { setSaveError("Could not save store details. Try a smaller cover photo or check your browser storage."); return false; }
+  }
+
+  function saveDetails() {
+    if (!store.name.trim() || !store.description.trim()) { setSaveError("Add a store name and description before saving."); return; }
+    if (saveStore({ contact, taxId, payments, shipping, policies, social, storeSettings, logoColorIdx })) {
+      setSavedNotice("Store details saved in this browser."); setView("overview");
+    }
   }
 
   function handleCreate() {
-    if (!storeName.trim()) return;
+    if (!storeName.trim() || !storeDesc.trim() || !storeKey || storeLoadedKey !== storeKey) return;
     const newStore = {
-      name: storeName, category: storeCategory,
+      name: storeName.trim(), category: storeCategory,
       description: storeDesc || storeName, businessType,
       slug: storeName.toLowerCase().replace(/\s+/g, "-") + "-" + Math.random().toString(36).slice(2, 8),
       totalViews: 0, followers: 0, activeItems: 0,
-      coverStyle: COVER_PRESETS[0].style,
+      coverStyle: setupCover,
     };
-    setStore(newStore);
-    if (storeKey) { try { localStorage.setItem(storeKey, JSON.stringify(newStore)); } catch {} }
+    try { localStorage.setItem(storeKey, JSON.stringify(newStore)); setStore(newStore); }
+    catch { setSaveError("Could not create your store. Check your browser storage and try again."); return; }
     setView("overview");
   }
 
-  function handleCopy() {
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  async function handleCopy() {
+    try { await navigator.clipboard.writeText(storeUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { setSaveError("Could not copy the link. Select and copy your seller profile link below."); }
   }
 
   function handleCoverFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith("image/") || file.size > 2 * 1024 * 1024) { setSaveError("Choose an image smaller than 2 MB."); return; }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const dataUrl = ev.target?.result as string;
@@ -2686,13 +2714,14 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
   ];
   const healthScore = Math.round((healthItems.filter(h => h.done).length / healthItems.length) * 100);
 
-  const storeUrl = `bazunk.co.uk/store/${store.slug}`;
+  const storeUrl = `${window.location.origin}/seller/${encodeURIComponent(user?.email ?? "")}`;
 
   /* ─── SETUP ─── */
   if (view === "setup") {
     return (
+      <div className="space-y-5 p-4 sm:p-6">
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-        <div className="bg-gradient-to-br from-[#3B4FD8] to-[#1A1D2E] px-8 py-10 text-white relative overflow-hidden">
+        <div className="px-6 sm:px-8 py-9 text-white relative overflow-hidden" style={{ background: "linear-gradient(120deg,#6d28d9,#4338ca 55%,#ec4899)" }}>
           <div className="absolute -right-8 -top-8 w-48 h-48 rounded-full bg-white/5" />
           <div className="absolute right-16 bottom-0 w-28 h-28 rounded-full bg-white/5" />
           <div className="relative">
@@ -2700,26 +2729,28 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
               <Store className="w-7 h-7 text-white" />
             </div>
             <h2 className="text-2xl font-black mb-1">Open Your Own Store</h2>
-            <p className="text-blue-200 text-sm">Build a branded storefront, manage listings, and grow your sales.</p>
+            <p className="text-sm !text-white/90">Give your store a style of its own, manage listings and grow your sales.</p>
             <div className="flex flex-wrap gap-4 mt-5">
-              {[["✓", "Custom store page"], ["✓", "Analytics & insights"], ["✓", "Promote your brand"]].map(([icon, text]) => (
-                <span key={text} className="flex items-center gap-1.5 text-sm text-blue-100"><span>{icon}</span>{text}</span>
+              {[["✓", "Custom store branding"], ["✓", "Listings & sales tools"], ["✓", "Promote your brand"]].map(([icon, text]) => (
+                <span key={text} className="flex items-center gap-1.5 text-sm !text-white/90"><span>{icon}</span>{text}</span>
               ))}
             </div>
           </div>
         </div>
-        <div className="p-7 max-w-xl">
+        <div className="grid lg:grid-cols-[1.1fr_1fr] gap-6 p-5 sm:p-7">
+        <div>
+          {saveError && <p role="alert" className="mb-4 text-sm text-red-500">{saveError}</p>}
           <h3 className="text-base font-bold text-gray-900 mb-5">Store details</h3>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Store Name *</label>
-                <input value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="e.g. Easydeals"
+                <input maxLength={80} aria-label="Store name" value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="e.g. Easydeals"
                   className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8]" />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Category *</label>
-                <select value={storeCategory} onChange={(e) => setStoreCategory(e.target.value)}
+                <select aria-label="Store category" value={storeCategory} onChange={(e) => setStoreCategory(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] bg-white">
                   {["Electronics & Technology","Fashion & Clothing","Home & Garden","Gaming","Sports & Outdoors","Toys & Hobbies","Books & Music","Other"].map(c => <option key={c}>{c}</option>)}
                 </select>
@@ -2727,7 +2758,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">Store Description *</label>
-              <textarea value={storeDesc} onChange={(e) => setStoreDesc(e.target.value)}
+              <textarea aria-label="Store description" value={storeDesc} onChange={(e) => setStoreDesc(e.target.value)}
                 placeholder="Tell buyers what your store is about..." rows={3} maxLength={500}
                 className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] resize-none" />
               <p className="text-[10px] text-gray-400 mt-1">{500 - storeDesc.length} chars left</p>
@@ -2744,11 +2775,20 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
               </div>
             </div>
           </div>
-          <button onClick={handleCreate} disabled={!storeName.trim()}
-            className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-[#3B4FD8] to-[#1A1D2E] text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+          <div className="mt-5"><p className="text-xs font-bold text-foreground mb-2">Choose your store colours</p><div className="flex flex-wrap gap-2">{COVER_PRESETS.map(preset => <button key={preset.id} aria-label={`Choose ${preset.id} theme`} aria-pressed={setupCover === preset.style} onClick={() => setSetupCover(preset.style)} className={`w-9 h-9 rounded-xl border-2 ${setupCover === preset.style ? "border-foreground ring-2 ring-violet-400" : "border-transparent"}`} style={{background: preset.style}} />)}</div></div>
+          <button onClick={handleCreate} disabled={!storeName.trim() || !storeDesc.trim() || !storeKey || storeLoadedKey !== storeKey}
+            className="mt-6 w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-pink-500 text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
             <Store className="w-4 h-4" /> Create Store
           </button>
+        <p className="text-xs text-muted-foreground mt-3">Your branding and store details save in this browser. Your public seller profile and listings are managed separately.</p>
         </div>
+        <aside className="rounded-2xl border border-border bg-background overflow-hidden self-start">
+          <div className="p-6" style={{background: setupCover}}><span className="text-xs font-bold !text-white/80 uppercase tracking-widest">Live brand preview</span><div className="w-14 h-14 rounded-2xl bg-black/20 mt-5 flex items-center justify-center !text-white text-2xl font-black">{storeName.trim().charAt(0).toUpperCase() || "B"}</div><h3 className="text-2xl font-black !text-white mt-4 break-words">{storeName.trim() || "Your store starts here"}</h3><p className="text-sm !text-white/80 mt-1">{storeCategory}</p></div>
+          <div className="p-5"><p className="text-sm text-foreground break-words">{storeDesc || "Tell buyers what makes your collection special."}</p><div className="mt-5 space-y-3">{[{label:"Add your store name",done:!!storeName.trim()},{label:"Describe what you sell",done:!!storeDesc.trim()},{label:"Choose your category",done:!!storeCategory}].map(step => <div key={step.label} className="flex items-center gap-2 text-xs text-muted-foreground"><CheckCircle2 className={`w-4 h-4 ${step.done ? "text-emerald-500" : "text-muted-foreground"}`}/>{step.label}</div>)}</div><p className="text-xs text-muted-foreground mt-5 leading-relaxed">After setup, customise your cover, contact details, social links and policies.</p></div>
+        </aside>
+        </div>
+      </div>
+      <StoreToolkit onNavigate={onNavigate}/>
       </div>
     );
   }
@@ -2765,15 +2805,16 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
             <h2 className="text-xl font-black text-gray-900">Edit Store</h2>
             <p className="text-xs text-gray-400">Update your store information and settings</p>
           </div>
-          <button onClick={() => setView("overview")}
+          <button onClick={saveDetails}
             className="px-5 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:opacity-90 transition-opacity shadow-sm">
             Save Changes
           </button>
         </div>
 
-        <div className="flex">
+        {saveError && <p role="alert" className="px-6 py-3 text-sm text-red-500">{saveError}</p>}
+        <div className="flex flex-col sm:flex-row">
           {/* Left nav */}
-          <nav className="w-52 flex-shrink-0 border-r border-gray-100 py-4">
+          <nav className="w-full sm:w-52 flex-shrink-0 border-r border-gray-100 py-4">
             {EDIT_TABS.map((tab) => {
               const Icon = tab.icon;
               const active = editTab === tab.id;
@@ -2795,36 +2836,36 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
             {editTab === "basic" && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-5">Basic Information</h3>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Store Name *</label>
-                    <input defaultValue={store.name} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8]" />
+                    <input value={store.name} onChange={e => setStore({ ...store, name: e.target.value })} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8]" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Category *</label>
-                    <select defaultValue={store.category} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] bg-white">
+                    <select value={store.category} onChange={e => setStore({ ...store, category: e.target.value })} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] bg-white">
                       {["Electronics & Technology", "Fashion & Clothing", "Home & Garden", "Gaming", "Sports & Outdoors", "Toys & Hobbies", "Books & Music", "Other"].map((c) => <option key={c}>{c}</option>)}
                     </select>
                   </div>
                 </div>
                 <div className="mb-4">
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5">Store Description *</label>
-                  <textarea defaultValue={store.description} rows={4} maxLength={500} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] resize-none" />
-                  <p className="text-[10px] text-gray-400 mt-1">491 characters remaining</p>
+                  <textarea value={store.description} onChange={e => setStore({ ...store, description: e.target.value })} rows={4} maxLength={500} className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] resize-none" />
+                  <p className="text-[10px] text-gray-400 mt-1">{500 - store.description.length} characters remaining</p>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-2">Business Type</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid sm:grid-cols-2 gap-2">
                     {[["individual", "Individual Seller"], ["registered", "Registered Business"], ["llc", "Limited Liability Company"], ["corporation", "Corporation"]].map(([val, label]) => (
                       <label key={val} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-colors ${store.businessType === val ? "border-[#4A5CE8] bg-blue-50/40" : "border-gray-200"}`}>
-                        <input type="radio" value={val} defaultChecked={store.businessType === val} name="biztype" className="accent-[#4A5CE8]" />
+                        <input type="radio" value={val} checked={store.businessType === val} onChange={() => setStore({ ...store, businessType: val })} name="biztype" className="accent-[#4A5CE8]" />
                         <span className="text-sm text-gray-700">{label}</span>
                       </label>
                     ))}
                   </div>
                 </div>
                 <div className="mt-5 flex justify-end">
-                  <button onClick={() => setView("overview")} className="px-6 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:opacity-90 transition-opacity">Save Changes</button>
+                  <button onClick={saveDetails} className="px-6 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:opacity-90 transition-opacity">Save Changes</button>
                 </div>
               </div>
             )}
@@ -2832,7 +2873,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
             {editTab === "contact" && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-5">Contact Details</h3>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid sm:grid-cols-2 gap-4 mb-4">
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Contact Email</label>
                     <input value={contact.email} onChange={(e) => setContact({ ...contact, email: e.target.value })} placeholder="contact@yourstore.com" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8]" />
@@ -2855,7 +2896,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
                   <input value={contact.website} onChange={(e) => setContact({ ...contact, website: e.target.value })} placeholder="https://yourwebsite.com" className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8]" />
                 </div>
                 <div className="flex justify-end">
-                  <button onClick={() => setView("overview")} className="px-6 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:opacity-90 transition-opacity">Save Changes</button>
+                  <button onClick={saveDetails} className="px-6 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:opacity-90 transition-opacity">Save Changes</button>
                 </div>
               </div>
             )}
@@ -2870,7 +2911,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
                 </div>
                 <div className="mb-5">
                   <p className="text-xs font-semibold text-gray-600 mb-2">Payment Methods Accepted</p>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid sm:grid-cols-3 gap-2">
                     {["Credit Cards", "PayPal", "Apple Pay", "Google Pay", "Bitcoin", "Bank Transfer"].map((m) => (
                       <label key={m} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                         <input type="checkbox" className="accent-[#4A5CE8]" checked={payments.includes(m)} onChange={() => setPayments((p) => p.includes(m) ? p.filter((x) => x !== m) : [...p, m])} />
@@ -2891,7 +2932,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
                   </div>
                 </div>
                 <div className="flex justify-end">
-                  <button onClick={() => setView("overview")} className="px-6 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:opacity-90 transition-opacity">Save Changes</button>
+                  <button onClick={saveDetails} className="px-6 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:opacity-90 transition-opacity">Save Changes</button>
                 </div>
               </div>
             )}
@@ -2912,7 +2953,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
                   </div>
                 ))}
                 <div className="flex justify-end mt-2">
-                  <button onClick={() => setView("overview")} className="px-6 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:opacity-90 transition-opacity">Save Changes</button>
+                  <button onClick={saveDetails} className="px-6 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:opacity-90 transition-opacity">Save Changes</button>
                 </div>
               </div>
             )}
@@ -2940,7 +2981,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
                   </div>
                 ))}
                 <div className="flex justify-end mt-4">
-                  <button onClick={() => setView("overview")} className="px-6 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:opacity-90 transition-opacity">Save Changes</button>
+                  <button onClick={saveDetails} className="px-6 py-2.5 rounded-xl bg-[#F59E0B] text-white font-bold text-sm hover:opacity-90 transition-opacity">Save Changes</button>
                 </div>
               </div>
             )}
@@ -2948,31 +2989,17 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
             {editTab === "settings" && (
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-5">Store Settings</h3>
-                <div className="space-y-0 border border-gray-200 rounded-xl overflow-hidden mb-7">
-                  {([
-                    ["autoAccept",        "Auto-accept offers",       "Automatically accept offers above a certain percentage"],
-                    ["inventoryCount",    "Show inventory count",     "Display remaining quantity to buyers"],
-                    ["vacation",          "Vacation mode",            "Hide your store temporarily"],
-                    ["emailNotifications","Email notifications",      "Receive notifications for orders and messages"],
-                  ] as const).map(([key, title, desc]) => (
-                    <div key={key} className="flex items-center justify-between px-4 py-4 border-b border-gray-100 last:border-0">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">{title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
-                      </div>
-                      <Toggle on={storeSettings[key]} onToggle={() => setStoreSettings((s) => ({ ...s, [key]: !s[key] }))} />
-                    </div>
-                  ))}
-                </div>
+                <p className="text-sm text-muted-foreground mb-4">Manage your selling preferences through the connected account tools.</p>
+                <div className="grid sm:grid-cols-2 gap-3 mb-7">{[{label:"Offer acceptance",section:"auto-accept",icon:Handshake},{label:"Notifications & profile",section:"profile",icon:Bell},{label:"Pause individual listings",section:"my-listings",icon:PauseCircle},{label:"Payout settings",section:"seller-payouts",icon:Banknote}].map(({label,section,icon:Icon}) => <button key={section} onClick={() => onNavigate(section)} className="flex items-center gap-3 p-4 rounded-xl border border-border bg-background text-foreground text-sm font-semibold hover:border-violet-400"><Icon className="w-5 h-5 text-violet-500"/>{label}<ArrowRight className="w-4 h-4 ml-auto"/></button>)}</div>
 
                 {/* Danger Zone */}
                 <div>
                   <h4 className="text-base font-bold text-gray-900 mb-3">Danger Zone</h4>
                   <div className="border-2 border-red-200 rounded-xl p-5">
                     <p className="text-sm font-bold text-red-600 mb-1">Delete Store</p>
-                    <p className="text-xs text-red-400 mb-4">Permanently delete your store and all associated data. This action cannot be undone.</p>
+                    <p className="text-xs text-red-400 mb-4">Remove the store details saved in this browser. Your listings and orders are kept.</p>
                     <button
-                      onClick={() => { if (storeKey) { try { localStorage.removeItem(storeKey); } catch {} } setView("setup"); }}
+                      onClick={() => { if (!window.confirm("Remove your saved store details from this browser? Your listings and orders will be kept.")) return; if (storeKey) { try { localStorage.removeItem(storeKey); } catch {} } setView("setup"); }}
                       className="px-5 py-2.5 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors flex items-center gap-2"
                     >
                       <AlertTriangle className="w-4 h-4" /> Delete Store
@@ -2990,7 +3017,10 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
 
   /* ─── OVERVIEW ─── */
   return (
-    <div className="space-y-4 p-1">
+    <div className="space-y-5 p-4 sm:p-6">
+      {saveError && <p role="alert" className="text-sm text-red-500">{saveError}</p>}
+      {savedNotice && <p role="status" className="text-sm text-emerald-600">{savedNotice}</p>}
+      <StoreToolkit onNavigate={onNavigate} />
       {/* Hidden file input for cover upload */}
       <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
 
@@ -3054,7 +3084,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
           <div className="flex items-end justify-between -mt-8 mb-3">
             {/* Clickable avatar — cycles logo colour */}
             <button
-              onClick={() => setLogoColorIdx(i => (i + 1) % LOGO_COLORS.length)}
+              onClick={() => { const next = (logoColorIdx + 1) % LOGO_COLORS.length; if (saveStore({ logoColorIdx: next })) setLogoColorIdx(next); }}
               title="Click to change colour"
               className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${LOGO_COLORS[logoColorIdx]} border-4 border-white shadow-lg flex items-center justify-center hover:scale-105 transition-transform`}
             >
@@ -3075,14 +3105,15 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
           </div>
           <p className="text-xs text-gray-400">{store.category}</p>
           <p className="text-sm text-gray-500 mt-1">{store.description}</p>
+          <p className="text-xs text-muted-foreground mt-3">Branding saves in this browser. Share your public seller profile below.</p>
           <div className="flex items-center gap-1.5 mt-2">
             <Globe className="w-3.5 h-3.5 text-[#4A5CE8]" />
-            <span className="text-xs text-[#4A5CE8] font-medium">{storeUrl}</span>
-            <button onClick={handleCopy} className="p-1 rounded text-gray-400 hover:text-gray-600 transition-colors">
+            <span className="text-xs text-[#4A5CE8] font-medium break-all">{storeUrl}</span>
+            <button aria-label={copied ? "Seller profile link copied" : "Copy seller profile link"} onClick={handleCopy} className="p-1 rounded text-gray-400 hover:text-gray-600 transition-colors">
               {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
             </button>
             <button
-              onClick={() => window.open(`https://${storeUrl}`, "_blank")}
+              onClick={() => window.open(storeUrl, "_blank", "noopener,noreferrer")}
               className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-[#4A5CE8] transition-colors"
             >
               <ExternalLink className="w-3.5 h-3.5" /> Open
@@ -3094,8 +3125,8 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total Views",  value: store.totalViews,  icon: Eye,     color: "text-[#4A5CE8]", bg: "bg-blue-50" },
-          { label: "Followers",    value: store.followers,   icon: Users,   color: "text-pink-500",  bg: "bg-pink-50" },
+          { label: "Listing Views",  value: myListings.reduce((total, item) => total + (item.views || 0), 0),  icon: Eye,     color: "text-[#4A5CE8]", bg: "bg-blue-50" },
+          { label: "Item Watchers", value: myListings.reduce((total, item) => total + (item.watchers || 0), 0),   icon: Users,   color: "text-pink-500",  bg: "bg-pink-50" },
           { label: "Active Items", value: myListings.filter(l => l.status === "active").length, icon: Package, color: "text-[#F26B21]", bg: "bg-orange-50" },
           { label: "Rating",       value: ratingText,        icon: Star,    color: "text-amber-500", bg: "bg-amber-50" },
         ].map(({ label, value, icon: Icon, color, bg }) => (
@@ -3110,7 +3141,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
       </div>
 
       {/* Store Health + Mini Chart */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-2 gap-4">
         {/* Store Health */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-3">
@@ -3140,7 +3171,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
                 <span className={`text-xs ${done ? "text-gray-700" : "text-gray-400"}`}>{label}</span>
                 {!done && (
                   <button
-                    onClick={() => { setEditTab("contact"); setView("edit"); }}
+                    onClick={() => { if (label === "Cover photo set") { setCoverPickerOpen(true); } else { setEditTab(label === "Social link added" ? "social" : label === "Contact email added" ? "contact" : "basic"); setView("edit"); } }}
                     className="ml-auto text-[10px] text-[#4A5CE8] font-bold hover:underline"
                   >Fix →</button>
                 )}
@@ -3149,35 +3180,11 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
           </div>
         </div>
 
-        {/* 7-day mini chart */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <div className="flex items-center gap-2 mb-1">
-            <BarChart2 className="w-4 h-4 text-[#4A5CE8]" />
-            <p className="font-bold text-gray-900 text-sm">Views This Week</p>
-          </div>
-          <p className="text-xs text-gray-400 mb-4">Last 7 days activity</p>
-          <div className="flex items-end gap-1.5 h-20">
-            {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day, i) => {
-              const heights = [0, 0, 0, 0, 0, 0, 0];
-              return (
-                <div key={day} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full rounded-t-md bg-[#4A5CE8]/15 relative overflow-hidden" style={{ height: 60 }}>
-                    <div
-                      className="absolute bottom-0 left-0 right-0 bg-[#4A5CE8] rounded-t-md transition-all"
-                      style={{ height: `${heights[i]}%` }}
-                    />
-                  </div>
-                  <span className="text-[9px] text-gray-400 font-medium">{day.slice(0,1)}</span>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-xs text-gray-400 text-center mt-3 italic">Start selling to see activity</p>
-        </div>
+        <div className="rounded-2xl p-6 text-white" style={{background:"linear-gradient(135deg,#0d9488,#2563eb)"}}><TrendingUp className="w-7 h-7 !text-white mb-4"/><h3 className="font-black text-lg !text-white">Build buyer confidence</h3><p className="text-sm !text-white/85 mt-2 leading-relaxed">Complete verification, keep listings accurate and reply promptly to buyer questions.</p><div className="flex flex-wrap gap-2 mt-5"><button onClick={() => onNavigate("verification")} className="px-4 py-2 rounded-xl bg-black/20 !text-white text-xs font-bold">Get verified</button><Link href={storeUrl} className="px-4 py-2 rounded-xl bg-black/20 !text-white text-xs font-bold">Reviews & seller profile</Link></div></div>
       </div>
 
       {/* Quick Actions + Recent Listings */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-2 gap-4">
         {/* Quick Actions */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <div className="flex items-center gap-2 mb-4">
@@ -3186,9 +3193,9 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
           </div>
           <div className="space-y-1">
             {([
-              { label: "Add New Listing",  icon: Plus,      color: "bg-emerald-100 text-emerald-600", action: () => window.open("/sell/quick", "_blank") },
+              { label: "Add New Listing",  icon: Plus,      color: "bg-emerald-100 text-emerald-600", action: () => window.open("/sell/direct", "_blank") },
               { label: "Bundle Deal",      icon: Package,   color: "bg-blue-100 text-blue-600",       action: () => window.open("/bundle", "_blank") },
-              { label: "Promote Store",    icon: Megaphone, color: "bg-purple-100 text-purple-600",   action: () => onNavigate("promotions") },
+              { label: "Promote Listings",    icon: Megaphone, color: "bg-purple-100 text-purple-600",   action: () => onNavigate("promotions") },
               { label: "View Analytics",   icon: BarChart2, color: "bg-sky-100 text-sky-600",         action: () => onNavigate("sales") },
               { label: "Manage Sales",     icon: Tag,       color: "bg-orange-100 text-orange-600",   action: () => onNavigate("sales") },
               { label: "Edit Store Info",  icon: Edit,      color: "bg-gray-100 text-gray-600",       action: () => { setEditTab("basic"); setView("edit"); } },
@@ -3220,7 +3227,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
                 <Package className="w-5 h-5 text-gray-300" />
               </div>
               <p className="text-xs font-semibold text-gray-400 mb-2">No listings yet</p>
-              <button onClick={() => window.open("/sell/quick", "_blank")}
+              <button onClick={() => window.open("/sell/direct", "_blank")}
                 className="text-xs text-[#4A5CE8] font-bold hover:underline flex items-center gap-1">
                 <Plus className="w-3 h-3" /> Add your first item
               </button>
@@ -3280,7 +3287,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-white sticky top-0 z-10">
                 <div>
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Store Preview</p>
-                  <p className="text-sm font-black text-gray-900 mt-0.5">How buyers see your store</p>
+                  <p className="text-sm font-black text-gray-900 mt-0.5">Your branding and listing preview</p>
                 </div>
                 <button
                   onClick={() => setPreviewOpen(false)}
@@ -3293,7 +3300,8 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
               {/* Scrollable content */}
               <div className="flex-1 overflow-y-auto">
                 {/* Store banner */}
-                <div className="h-28 bg-gradient-to-r from-[#4A5CE8] via-[#3B4FD8] to-[#1A1D2E] relative flex-shrink-0">
+                <div className="h-28 relative flex-shrink-0" style={{ background: store.coverStyle || COVER_PRESETS[0].style }}>
+                  {store.coverImage && <img src={store.coverImage} alt="Store cover" className="absolute inset-0 w-full h-full object-cover"/>}
                   <div className="absolute inset-0 opacity-20"
                     style={{ backgroundImage: "radial-gradient(circle at 30% 50%, #F26B21 0%, transparent 60%)" }} />
                 </div>
@@ -3304,9 +3312,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
                     <div className="w-16 h-16 rounded-2xl bg-white shadow-lg border-2 border-white flex items-center justify-center bg-gradient-to-br from-[#3B4FD8] to-[#1A1D2E]">
                       <span className="text-white font-black text-2xl">{store.name.charAt(0).toUpperCase()}</span>
                     </div>
-                    <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl border-2 border-[#4A5CE8] text-[#4A5CE8] text-sm font-bold hover:bg-blue-50 transition-colors">
-                      <Heart className="w-3.5 h-3.5" /> Follow
-                    </button>
+                    <Link href={storeUrl} className="flex items-center gap-1.5 px-4 py-2 rounded-xl border-2 border-[#4A5CE8] text-[#4A5CE8] text-sm font-bold"><ExternalLink className="w-3.5 h-3.5"/> Seller profile</Link>
                   </div>
 
                   <div className="flex items-center gap-2 mb-1">
@@ -3320,16 +3326,16 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
 
                   <div className="flex items-center gap-1.5 text-xs text-[#4A5CE8]">
                     <Globe className="w-3.5 h-3.5" />
-                    <span>bazunk.co.uk/store/{store.slug}</span>
+                    <span className="break-all">{storeUrl}</span>
                   </div>
                 </div>
 
                 {/* Stats row */}
                 <div className="grid grid-cols-3 gap-px bg-gray-100 border-t border-gray-100">
                   {[
-                    { label: "Items",     value: "0" },
-                    { label: "Followers", value: "0" },
-                    { label: "Sales",     value: "0" },
+                    { label: "Items", value: myListings.filter(item => item.status === "active").length },
+                    { label: "Views", value: myListings.reduce((sum, item) => sum + (item.views || 0), 0) },
+                    { label: "Rating", value: ratingText },
                   ].map(({ label, value }) => (
                     <div key={label} className="bg-white py-4 text-center">
                       <p className="text-xl font-black text-gray-900">{value}</p>
@@ -3342,10 +3348,11 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
                 <div className="px-5 py-5">
                   <div className="flex items-center justify-between mb-3">
                     <p className="font-bold text-gray-900 text-sm">Listings</p>
-                    <span className="text-xs text-gray-400">Sample — add real items via Sell</span>
+                    <span className="text-xs text-gray-400">Your active items</span>
                   </div>
+                  {!myListings.some(item => item.status === "active") && <p className="text-sm text-muted-foreground py-5">No active listings yet. Create your first Direct Sale to get started.</p>}
                   <div className="grid grid-cols-2 gap-3">
-                    {ALL_PRODUCTS.slice(0, 6).map((p) => (
+                    {myListings.filter(item => item.status === "active").slice(0, 6).map((p) => (
                       <div key={p.id} className="bg-gray-50 rounded-2xl overflow-hidden border border-gray-100 hover:border-gray-200 transition-colors">
                         <div className="aspect-square bg-white flex items-center justify-center p-3">
                           <img
@@ -3371,11 +3378,11 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
                     <div className="space-y-1.5 text-xs text-gray-500">
                       <div className="flex items-center gap-2">
                         <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                        <span>Buyer Protection on all orders</span>
+                        <span>View policies and order support in the seller tools</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <CheckCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                        <span>Secure checkout via Bazunk</span>
+                        <span>Listings and reviews appear on your public seller profile</span>
                       </div>
                     </div>
                   </div>
