@@ -35,23 +35,32 @@ const CATEGORY_THEMES = [
   "from-green-700 via-emerald-600 to-lime-500",
 ];
 
-const CATEGORY_PHOTOS: Record<string, string[]> = {
-  appliances: ["/dyson.png", "/samsung-tv.png"],
-  "arts-crafts-sewing": ["/camera.png", "/tshirt.png"],
-  automotive: ["/camera.png"],
-  "baby-products": ["/tshirt.png", "/sneakers.png"],
-  "beauty-personal-care": ["/camera.png"],
-  books: ["/macbook.png"],
-  "cds-vinyl": ["/ps5.png"],
-  "cell-phones": ["/macbook.png", "/camera.png"],
-  "clothing-shoes-jewelry": ["/sneakers.png", "/jeans.png", "/tshirt.png"],
-  electronics: ["/macbook.png", "/camera.png", "/ps5.png"],
-  "eco-friendly": ["/dyson.png"],
-  "health-household": ["/dyson.png"],
-  "home-kitchen": ["/dyson.png", "/samsung-tv.png"],
-  "industrial-scientific": ["/camera.png"],
-  "movies-tv": ["/samsung-tv.png", "/ps5.png"],
+const CATEGORY_ART: Record<string, string> = {
+  electronics: "/category-art/electronics.webp",
+  "home-kitchen": "/category-art/home-kitchen.webp",
+  "clothing-shoes-jewelry": "/category-art/clothing-shoes-jewelry.webp",
+  "health-household": "/category-art/health-household.webp",
+  "toys-games": "/category-art/toys-games.webp",
+  automotive: "/category-art/automotive.webp",
+  "baby-products": "/category-art/baby-products.webp",
+  "sports-outdoors": "/category-art/sports-outdoors.webp",
+  books: "/category-art/books.webp",
+  "cds-vinyl": "/category-art/cds-vinyl.webp",
+  "arts-crafts-sewing": "/category-art/arts-crafts-sewing.webp",
+  "industrial-scientific": "/category-art/industrial-scientific.webp",
+  appliances: "/category-art/home-kitchen.webp",
+  "beauty-personal-care": "/category-art/health-household.webp",
+  "cell-phones": "/category-art/electronics.webp",
+  "eco-friendly": "/category-art/health-household.webp",
+  "movies-tv": "/category-art/electronics.webp",
 };
+
+const CATEGORY_ORDER = [
+  "electronics", "home-kitchen", "clothing-shoes-jewelry",
+  "health-household", "toys-games", "automotive",
+  "baby-products", "sports-outdoors", "books",
+  "cds-vinyl", "arts-crafts-sewing", "industrial-scientific",
+];
 
 function CategoryIcon({ name, className = "w-6 h-6 text-white" }: { name: string; className?: string }) {
   const Icon = (LucideIcons[name as LucideIconName] ?? LucideIcons.Tag) as React.ElementType;
@@ -59,7 +68,7 @@ function CategoryIcon({ name, className = "w-6 h-6 text-white" }: { name: string
 }
 
 export function CategoriesPage() {
-  const [openSlug, setOpenSlug] = useState<string | null>(null);
+  const [openSlug, setOpenSlug] = useState<string | null>("electronics");
   const [search, setSearch] = useState("");
   const [counts, setCounts] = useState<CategoryCount[]>([]);
 
@@ -70,13 +79,23 @@ export function CategoriesPage() {
       .catch(() => {});
   }, []);
 
+  const ordered = [...CATEGORIES].sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a.slug);
+    const bi = CATEGORY_ORDER.indexOf(b.slug);
+    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+
   const filtered = search.trim()
-    ? CATEGORIES.filter(
-        (c) =>
-          c.name.toLowerCase().includes(search.toLowerCase()) ||
-          c.subcategories.some((sub) => sub.name.toLowerCase().includes(search.toLowerCase()))
+    ? ordered.filter((c) =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.subcategories.some((sub) => sub.name.toLowerCase().includes(search.toLowerCase()))
       )
-    : CATEGORIES;
+    : ordered;
+
+  const selected = CATEGORIES.find((c) => c.slug === openSlug) ?? null;
 
   function catCount(slug: string) {
     return counts.filter((l) => l.category === slug).reduce((sum, l) => sum + Number(l.count || 0), 0);
@@ -86,54 +105,57 @@ export function CategoriesPage() {
     return counts.find((l) => l.category === catSlug && l.subcategory === subSlug)?.count ?? 0;
   }
 
+  function themeFor(slug: string) {
+    const i = ordered.findIndex((c) => c.slug === slug);
+    return CATEGORY_THEMES[(i < 0 ? 0 : i) % CATEGORY_THEMES.length];
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-950 dark:bg-[#091426] dark:text-white flex flex-col transition-colors">
+    <div className="min-h-screen bg-[#f7f9fd] text-slate-950 dark:bg-[#071426] dark:text-white flex flex-col transition-colors">
       <Navbar />
 
-      <div className="border-b border-gray-200 bg-white dark:border-white/5 dark:bg-[radial-gradient(circle_at_top_left,_rgba(74,92,232,0.18),_transparent_38%)] transition-colors">
-        <div className="container mx-auto px-4 py-8 lg:py-10">
-          <div className="grid lg:grid-cols-[1fr_1.1fr] gap-6 items-center">
-            <div>
-              <div className="flex items-center gap-4 mb-2">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#263d8f] to-[#142552] border border-blue-400/20 flex items-center justify-center shadow-lg shadow-blue-950/30">
-                  <Grid3X3 className="w-8 h-8 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-3xl lg:text-4xl font-black tracking-tight">Categories</h1>
-                  <p className="text-gray-600 dark:text-slate-200 font-medium mt-1">Explore all categories and find exactly what you're looking for.</p>
-                </div>
+      <div className="border-b border-slate-200 bg-white dark:border-white/[0.06] dark:bg-[#071426]">
+        <div className="container mx-auto px-4 py-5 lg:py-7">
+          <div className="grid lg:grid-cols-[0.78fr_1.22fr] gap-5 items-center">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#6548ff] to-[#4936d9] flex items-center justify-center shadow-lg shadow-indigo-900/20">
+                <Grid3X3 className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl lg:text-4xl font-black tracking-tight text-slate-950 dark:text-white">Categories</h1>
+                <p className="text-slate-600 dark:text-slate-300 font-medium mt-1">
+                  Explore all categories and find exactly what you're looking for.
+                </p>
               </div>
             </div>
 
             <Link
               href="/sell"
-              className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#4263f4] via-[#6547ef] to-[#e743c4] p-5 lg:p-6 shadow-xl shadow-purple-950/20 group"
+              className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#5b56f5] via-[#7845f4] to-[#ed42c7] px-5 py-4 shadow-xl shadow-purple-950/15 group"
             >
-              <div className="absolute -right-8 -bottom-10 w-40 h-40 rounded-full bg-cyan-300/20" />
-              <div className="absolute right-20 -top-10 w-24 h-24 rounded-full bg-pink-300/20" />
+              <div className="absolute right-0 inset-y-0 w-[38%] bg-[radial-gradient(circle_at_center,_rgba(255,210,60,.45),_transparent_58%)]" />
               <div className="relative flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center">
-                  <Tag className="w-7 h-7" />
+                <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
+                  <Tag className="w-7 h-7 text-white" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xl lg:text-2xl font-black">Private Sellers Sell for FREE</p>
-                  <p className="text-white/80 text-sm mt-1">No final value fees. Keep 100% of your sale price.</p>
+                <div className="flex-1">
+                  <p className="text-xl lg:text-2xl font-black text-white">Private Sellers Sell for <span className="text-3xl">£0</span></p>
+                  <p className="text-white text-sm font-semibold mt-0.5">No listing fees. No final value fees. Keep 100% of your sale price.</p>
                 </div>
-                <span className="hidden sm:inline-flex bg-white text-indigo-700 font-bold rounded-xl px-4 py-2.5 items-center gap-1 group-hover:translate-x-1 transition-transform">
+                <span className="hidden sm:inline-flex bg-white text-indigo-700 font-black rounded-xl px-5 py-3 items-center gap-1 shadow-lg group-hover:translate-x-1 transition-transform">
                   Start Selling <ChevronRight className="w-4 h-4" />
                 </span>
               </div>
             </Link>
           </div>
 
-          <div className="relative max-w-lg mt-7">
+          <div className="relative max-w-md mt-5">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search categories or subcategories..."
-              className="pl-11 h-11 rounded-xl border-gray-300 bg-white text-gray-950 placeholder:text-gray-500 dark:border-white/15 dark:bg-white/[0.08] dark:text-white dark:placeholder:text-slate-300 focus-visible:ring-[#4A5CE8]"
-              data-testid="input-category-search"
+              placeholder="Search categories..."
+              className="pl-11 h-10 rounded-xl border-slate-200 bg-slate-50 text-slate-950 dark:border-white/10 dark:bg-white/[0.06] dark:text-white"
             />
           </div>
         </div>
@@ -141,129 +163,127 @@ export function CategoriesPage() {
 
       <AdSlot slotKey="categories_top" />
 
-      <main className="flex-1 container mx-auto px-4 py-8">
-        {filtered.length === 0 ? (
-          <div className="text-center py-20 text-gray-600 dark:text-slate-300">
-            <p className="text-lg font-medium">No categories match "{search}"</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+      <main className="flex-1 container mx-auto px-4 py-7">
+        <div className={`grid gap-5 items-start ${selected ? "xl:grid-cols-[minmax(0,3fr)_minmax(330px,1.2fr)]" : ""}`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((category, index) => {
               const isOpen = openSlug === category.slug;
               const totalListings = catCount(category.slug);
-              const theme = CATEGORY_THEMES[index % CATEGORY_THEMES.length];
-
+              const art = CATEGORY_ART[category.slug];
               return (
-                <motion.div
+                <motion.button
+                  type="button"
                   key={category.slug}
-                  initial={{ opacity: 0, y: 14 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(index * 0.025, 0.3) }}
-                  className={`rounded-2xl overflow-hidden border transition-all duration-300 ${
-                    isOpen
-                      ? "border-gray-300 shadow-2xl shadow-black/10 bg-white dark:border-white/20 dark:shadow-black/30 dark:bg-[#0e1c32]"
-                      : "border-gray-200 shadow-lg shadow-black/5 bg-white hover:-translate-y-0.5 hover:border-gray-300 dark:border-white/[0.08] dark:shadow-black/10 dark:bg-[#0e1a2e] dark:hover:border-white/15"
-                  }`}
+                  transition={{ delay: Math.min(index * 0.02, 0.22) }}
+                  onClick={() => setOpenSlug(isOpen ? null : category.slug)}
+                  className={`relative overflow-hidden min-h-[145px] rounded-2xl text-left bg-gradient-to-br ${themeFor(category.slug)}
+                    border ${isOpen ? "border-white/60 ring-2 ring-white/20" : "border-white/10"}
+                    shadow-lg shadow-slate-950/10 hover:-translate-y-0.5 hover:shadow-xl transition-all`}
                   data-testid={`card-category-${category.slug}`}
                 >
-                  <button
-                    className={`relative overflow-hidden w-full text-left bg-gradient-to-br ${theme} p-5 min-h-[128px]`}
-                    onClick={() => setOpenSlug(isOpen ? null : category.slug)}
-                    data-testid={`button-expand-${category.slug}`}
-                  >
-                    <div className="absolute -right-8 -bottom-12 w-36 h-36 rounded-full bg-white/10" />
-                    <div className="absolute right-12 -top-12 w-24 h-24 rounded-full bg-white/[0.06]" />
-
-                    <div className="absolute inset-y-0 right-3 w-[48%] pointer-events-none overflow-hidden">
-                      {(CATEGORY_PHOTOS[category.slug] ?? ["/camera.png"]).slice(0, 3).map((src, photoIndex) => (
-                        <img
-                          key={`${category.slug}-${src}`}
-                          src={src}
-                          alt=""
-                          aria-hidden="true"
-                          className={`absolute bottom-[-6px] object-contain drop-shadow-2xl ${
-                            photoIndex === 0 ? "right-0 h-[82%] w-[72%]" :
-                            photoIndex === 1 ? "right-[38%] h-[58%] w-[52%]" :
-                            "right-[8%] h-[45%] w-[42%]"
-                          }`}
-                        />
-                      ))}
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-white/5" />
-                    </div>
-
-                    <div className="relative flex items-start justify-between gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-black/10 border border-white/15 backdrop-blur-sm flex items-center justify-center shadow-sm">
-                        <CategoryIcon name={category.icon} />
-                      </div>
-                      <motion.div
-                        animate={{ rotate: isOpen ? 180 : 0 }}
-                        className="w-9 h-9 rounded-full bg-white/20 border border-white/15 flex items-center justify-center"
-                      >
-                        <ChevronDown className="w-5 h-5" />
-                      </motion.div>
-                    </div>
-
-                    <div className="relative mt-4 max-w-[70%] drop-shadow-md">
-                      <p className="font-black text-lg leading-tight text-white drop-shadow-sm">{category.name}</p>
-                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs font-bold text-white">
-                        <span>{category.subcategories.length} subcategories</span>
-                        {totalListings > 0 && (
-                          <>
-                            <span className="text-white/40">•</span>
-                            <span className="font-semibold">{totalListings} listing{totalListings !== 1 ? "s" : ""}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-
-                  <AnimatePresence initial={false}>
-                    {isOpen && (
-                      <motion.div
-                        key="subcats"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.22, ease: "easeInOut" }}
-                        className="overflow-hidden"
-                      >
-                        <div className="px-4 pt-3 pb-4">
-                          <ul className="space-y-1">
-                            {category.subcategories.map((sub) => {
-                              const sc = subCount(category.slug, sub.slug);
-                              return (
-                                <li key={sub.slug}>
-                                  <Link
-                                    href={`/browse?category=${category.slug}&sub=${sub.slug}`}
-                                    className="flex items-center justify-between gap-3 text-sm font-semibold text-gray-800 hover:text-[#4A5CE8] py-2 px-2.5 rounded-lg hover:bg-indigo-50 dark:text-white dark:hover:text-white dark:hover:bg-white/[0.09] transition-colors group"
-                                    data-testid={`link-subcategory-${sub.slug}`}
-                                  >
-                                    <div className="flex items-center gap-2.5 min-w-0">
-                                      <CategoryIcon name={category.icon} className="w-3.5 h-3.5 text-gray-500 group-hover:text-[#4A5CE8] dark:text-slate-300 dark:group-hover:text-indigo-200" />
-                                      <span className="truncate">{sub.name}</span>
-                                    </div>
-                                    {sc > 0 && <span className="text-[11px] font-bold text-gray-500 dark:text-slate-300 flex-shrink-0">{sc}</span>}
-                                  </Link>
-                                </li>
-                              );
-                            })}
-                          </ul>
-
-                          <Link
-                            href={`/browse?category=${category.slug}`}
-                            className="mt-3 flex items-center justify-center gap-1.5 w-full rounded-xl border border-gray-200 bg-gray-50 hover:bg-indigo-50 text-xs font-extrabold text-gray-900 dark:border-white/15 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-white py-2.5 transition-colors"
-                          >
-                            View all {category.name} <ChevronRight className="w-3.5 h-3.5" />
-                          </Link>
-                        </div>
-                      </motion.div>
+                  <div className="absolute inset-x-0 bottom-0 h-[72%] overflow-hidden pointer-events-none">
+                    {art && (
+                      <img
+                        src={art}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 w-full h-full object-cover object-bottom"
+                      />
                     )}
-                  </AnimatePresence>
-                </motion.div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-transparent" />
+                  </div>
+
+                  <div className="relative z-10 p-4 flex items-start gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-black/10 border border-white/20 flex items-center justify-center backdrop-blur-sm">
+                      <CategoryIcon name={category.icon} />
+                    </div>
+                    <div className="min-w-0 flex-1 pt-0.5 drop-shadow-md">
+                      <p className="text-[16px] leading-tight font-black text-white">{category.name}</p>
+                      <p className="mt-1 text-[12px] font-extrabold text-white">
+                        {category.subcategories.length} subcategories
+                        {totalListings > 0 && <> <span className="text-white/70">•</span> {totalListings.toLocaleString()} listing{totalListings !== 1 ? "s" : ""}</>}
+                      </p>
+                    </div>
+                    <div className="w-9 h-9 rounded-full bg-white/35 border border-white/20 flex items-center justify-center flex-shrink-0">
+                      <ChevronRight className={`w-5 h-5 text-slate-900 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                    </div>
+                  </div>
+                </motion.button>
               );
             })}
           </div>
-        )}
+
+          <AnimatePresence mode="wait">
+            {selected && (
+              <motion.aside
+                key={selected.slug}
+                initial={{ opacity: 0, x: 16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 16 }}
+                className="xl:sticky xl:top-28 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-white/10 dark:bg-[#0a1a2e]"
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-white/10">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-300">
+                    <span>Categories</span><ChevronRight className="w-3 h-3"/><span className="font-black text-slate-900 dark:text-white">{selected.name}</span>
+                  </div>
+                  <button onClick={() => setOpenSlug(null)} className="text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white text-xl leading-none">×</button>
+                </div>
+
+                <div className={`relative overflow-hidden bg-gradient-to-br ${themeFor(selected.slug)} px-5 py-5 min-h-[115px]`}>
+                  {CATEGORY_ART[selected.slug] && (
+                    <img src={CATEGORY_ART[selected.slug]} alt="" aria-hidden="true" className="absolute right-0 bottom-0 h-full w-[58%] object-cover object-bottom opacity-95" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/5" />
+                  <div className="relative z-10 flex items-center gap-3 max-w-[65%]">
+                    <div className="w-12 h-12 rounded-xl bg-black/10 border border-white/20 flex items-center justify-center">
+                      <CategoryIcon name={selected.icon} />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black text-white drop-shadow">{selected.name}</h2>
+                      <p className="text-xs font-extrabold text-white mt-1">
+                        {selected.subcategories.length} subcategories
+                        {catCount(selected.slug) > 0 && <> • {catCount(selected.slug).toLocaleString()} listings</>}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  {selected.subcategories.map((sub) => {
+                    const sc = subCount(selected.slug, sub.slug);
+                    return (
+                      <Link
+                        key={sub.slug}
+                        href={`/browse?category=${selected.slug}&sub=${sub.slug}`}
+                        className="group flex items-center gap-3 px-4 py-3 border-b border-slate-100 hover:bg-indigo-50 dark:border-white/[0.07] dark:hover:bg-white/[0.06]"
+                      >
+                        <div className={`relative w-14 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br ${themeFor(selected.slug)}`}>
+                          {CATEGORY_ART[selected.slug] && <img src={CATEGORY_ART[selected.slug]} alt="" className="w-full h-full object-cover object-bottom" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black text-sm text-slate-950 dark:text-white truncate">{sub.name}</p>
+                          <p className="text-xs font-semibold text-slate-500 dark:text-slate-300">{sc.toLocaleString()} listing{sc !== 1 ? "s" : ""}</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-500" />
+                      </Link>
+                    );
+                  })}
+                </div>
+
+                <div className="p-4">
+                  <Link
+                    href={`/browse?category=${selected.slug}`}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 py-3 text-sm font-black text-slate-950 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.09] dark:text-white"
+                  >
+                    View all {selected.name} <ChevronRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </motion.aside>
+            )}
+          </AnimatePresence>
+        </div>
       </main>
 
       <Footer />
