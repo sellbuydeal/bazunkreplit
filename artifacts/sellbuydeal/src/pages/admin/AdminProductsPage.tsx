@@ -4,6 +4,7 @@ import {
   Search, Plus, Pencil, Trash2, RefreshCw, Package, CheckCircle, XCircle,
   X, ChevronDown, Upload, Download, Loader2, ImageIcon, Tag, Save, AlertTriangle,
 } from "lucide-react";
+import { AdminListingPromotion } from "@/components/AdminListingPromotion";
 import { AdminLayout } from "./AdminLayout";
 import { useAdmin } from "@/context/AdminContext";
 import { CATEGORIES } from "@/data/categories";
@@ -298,6 +299,7 @@ function ProductsTab({ authFetch, categories }: { authFetch: (url: string, opts?
                             <CheckCircle className="w-3.5 h-3.5" />
                           </button>
                         )}
+                        <AdminListingPromotion listingId={p.id} title={p.title} status={p.status} />
                         <button onClick={() => openEdit(p)} title="Edit"
                           className="w-7 h-7 rounded-lg bg-[#4A5CE8]/10 hover:bg-[#4A5CE8]/20 text-[#4A5CE8] flex items-center justify-center transition-colors">
                           <Pencil className="w-3.5 h-3.5" />

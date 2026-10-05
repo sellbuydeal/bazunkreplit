@@ -8,6 +8,8 @@ import { sendSystemMessage } from "../lib/systemMessages.js";
 import { requireAdmin } from "../middlewares/adminAuth.js";
 import { getAllPromoConfigs, getPromoConfig, PROMO_DEFAULTS } from "../lib/promoConfig.js";
 
+import { canGrantListingPromotion, validateAdminPromotion } from "../lib/adminListingPromotion.js";
+
 const router = Router();
 
 const SELLER_TOOLS = new Set(["follower-notify", "scheduled-listing", "advanced-analytics", "social-share"]);
@@ -293,6 +295,47 @@ router.get("/promotions/related", async (req, res) => {
   } catch (err) {
     logger.error({ err }, "Failed to fetch related listings");
     res.status(500).json({ error: "Failed to fetch related listings" });
+  }
+});
+
+// Admin grants use the existing listing promotion records without debiting credits.
+router.get("/admin/listings/:id/promotions", requireAdmin, async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id < 1) { res.status(400).json({ error: "Invalid listing ID" }); return; }
+  try {
+    const listing = await db.execute(sql`SELECT id FROM listings WHERE id = ${id}`);
+    if (!listing.rows.length) { res.status(404).json({ error: "Listing not found" }); return; }
+    const configs = await getAllPromoConfigs();
+    const active = await db.execute(sql`SELECT id, type, expires_at FROM listing_promotions WHERE listing_id = ${id} AND expires_at > NOW() ORDER BY expires_at DESC`);
+    res.json({ options: Object.values(configs).filter(canGrantListingPromotion).map(c => ({ type: c.type, label: c.label, daysValid: Math.min(365, Math.max(1, c.daysValid)) })), active: active.rows });
+  } catch (err) {
+    logger.error({ err, id }, "Failed to load listing promotions");
+    res.status(500).json({ error: "Unable to load promotions. Please retry." });
+  }
+});
+
+router.post("/admin/listings/:id/promotions", requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  const input = validateAdminPromotion(req.body);
+  if (!Number.isSafeInteger(id) || id < 1 || !input) { res.status(400).json({ error: "Choose a promotion and a whole number of days from 1 to 365." }); return; }
+  try {
+    const config = await getPromoConfig(input.type);
+    if (!config || !canGrantListingPromotion(config)) { res.status(400).json({ error: "This timed listing promotion is not available." }); return; }
+    const promotion = await db.transaction(async tx => {
+      // Serialize changes for this listing so repeated grants do not create duplicates.
+      const listing = await tx.execute(sql`SELECT id FROM listings WHERE id = ${id} FOR UPDATE`);
+      if (!listing.rows.length) return null;
+      await tx.execute(sql`DELETE FROM listing_promotions WHERE listing_id = ${id} AND type = ${input.type}`);
+      const inserted = await tx.execute(sql`INSERT INTO listing_promotions (listing_id, type, expires_at) VALUES (${id}, ${input.type}, NOW() + ${input.days} * INTERVAL '1 day') RETURNING id, type, expires_at`);
+      return inserted.rows[0];
+    });
+    if (!promotion) { res.status(404).json({ error: "Listing not found" }); return; }
+    logger.info({ listingId: id, type: input.type, days: input.days, chargedCredits: 0 }, "Admin granted listing promotion");
+    res.json({ ok: true, promotion });
+  } catch (err) {
+    logger.error({ err, id }, "Failed to grant listing promotion");
+    res.status(500).json({ error: "Promotion was not saved. Please retry." });
   }
 });
 

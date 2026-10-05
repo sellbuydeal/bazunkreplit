@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Search, RefreshCw, ExternalLink, ShoppingCart, Loader2, Package } from "lucide-react";
+import { AdminListingPromotion } from "@/components/AdminListingPromotion";
 import { AdminLayout } from "./AdminLayout";
 import { useAdmin } from "@/context/AdminContext";
 
@@ -119,19 +120,19 @@ export function AdminListingsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50">
-                {["ID", "Title", "Category", "Price", "Seller", "Status", "Source listing"].map(h => (
+                {["ID", "Title", "Category", "Price", "Seller", "Status", "Source listing", "Promotion"].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={7} className="text-center py-16">
+                <tr><td colSpan={8} className="text-center py-16">
                   <Loader2 className="w-5 h-5 animate-spin mx-auto text-gray-300" />
                 </td></tr>
               )}
               {!loading && listings.length === 0 && (
-                <tr><td colSpan={7} className="py-16 text-center">
+                <tr><td colSpan={8} className="py-16 text-center">
                   <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
                   <p className="text-sm text-gray-400 font-medium">No listings found</p>
                 </td></tr>
@@ -202,6 +203,7 @@ export function AdminListingsPage() {
                         <span className="text-[10px] text-gray-300">—</span>
                       )}
                     </td>
+                    <td className="px-4 py-3"><AdminListingPromotion listingId={l.id} title={l.title} status={l.status} /></td>
                   </tr>
                 );
               })}
