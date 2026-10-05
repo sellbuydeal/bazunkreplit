@@ -28,7 +28,7 @@ export function RewardsTeaser() {
   useEffect(() => {
     fetch("/api/rewards/games")
       .then(r => (r.ok ? r.json() : []))
-      .then((rows: TeaserGame[]) => setGames(rows.filter(g => g.enabled)))
+      .then((rows: TeaserGame[]) => setGames(rows.filter(g => g.enabled && g.id !== "mystery-box")))
       .catch(() => {});
   }, []);
 
