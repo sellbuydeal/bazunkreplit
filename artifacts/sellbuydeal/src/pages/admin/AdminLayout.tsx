@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { CircleDollarSign, LayoutDashboard, Users, Settings, CreditCard, ShoppingCart, LogOut, ShieldCheck, Package, Shield, RotateCcw, Gavel, Zap, LifeBuoy, Gift, Megaphone, List, ArrowDownToLine, FileText, Star, Activity, ScrollText, ServerCog, Flag } from "lucide-react";
 import { useAdmin } from "@/context/AdminContext";
@@ -29,8 +30,11 @@ const NAV = [
 ];
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { logout } = useAdmin();
+  const { logout, isAdmin } = useAdmin();
   const [location, setLocation] = useLocation();
+
+  useEffect(() => { if (!isAdmin) setLocation("/admin", { replace: true }); }, [isAdmin, setLocation]);
+  if (!isAdmin) return <div className="p-6">Your admin session has ended. Returning to sign-in…</div>;
 
   return (
     <div className="min-h-screen flex bg-gray-100">

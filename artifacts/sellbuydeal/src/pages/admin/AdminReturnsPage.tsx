@@ -37,7 +37,7 @@ type Return = {
 };
 
 export function AdminReturnsPage() {
-  const { token } = useAdmin();
+  const { authFetch } = useAdmin();
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState<Record<string, string>>({});
   const [returns, setReturns] = useState<Return[]>([]);
@@ -50,7 +50,7 @@ export function AdminReturnsPage() {
     setLoading(true);
     setLoadError("");
     try {
-      const res = await fetch("/api/admin/returns", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await authFetch("/api/admin/returns");
       if (!res.ok) throw new Error("Could not load returns. Please retry.");
       const data = await res.json();
       if (!Array.isArray(data) || !data.every(r => r && typeof r === "object" && typeof r.id === "string")) throw new Error("Invalid returns response. Please retry.");
@@ -80,9 +80,9 @@ export function AdminReturnsPage() {
     setUpdating(ret.id);
     setSaveError(prev => ({ ...prev, [ret.id]: "" }));
     try {
-      const res = await fetch(`/api/admin/returns/${ret.id}`, {
+      const res = await authFetch(`/api/admin/returns/${ret.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: f.status, adminNotes: f.notes, refundAmount: f.refund }),
       });
       if (!res.ok) {

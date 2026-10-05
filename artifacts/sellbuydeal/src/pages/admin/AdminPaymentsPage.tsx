@@ -57,13 +57,15 @@ export function AdminPaymentsPage() {
       if (!paymentsRes.ok) throw new Error("Unable to load payment amounts. Please retry.");
       const d = await paymentsRes.json();
       setPayments(d.payments); setTotals(d.totals ?? {}); setUnavailable(d.unavailable ?? 0);
-      if (settingsRes.ok) {
+      if (!settingsRes.ok) throw new Error("Unable to load fee settings. Please retry.");
+      {
         const d = await settingsRes.json() as Record<string, string>;
+        if (!d || typeof d !== "object" || Array.isArray(d) || !Object.values(d).every(v => typeof v === "string")) throw new Error("Invalid fee settings response. Please retry.");
         const rates: Record<string, string> = {};
         Object.entries(d).forEach(([k, v]) => { if (k.startsWith("fee_rate_")) rates[k] = v; });
         setFeeRates(rates);
       }
-    } catch { setError("Unable to load payments. Please retry."); setPayments([]); setTotals({}); setUnavailable(0); } finally { setLoading(false); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Unable to load payments and fee settings. Please retry."); setPayments([]); setTotals({}); setUnavailable(0); } finally { setLoading(false); }
   }
 
   function money(amountMinor: number, currency: string) {
@@ -94,7 +96,7 @@ export function AdminPaymentsPage() {
       </div>
 
       <p className="text-xs text-gray-500 mb-4">Gross live Stripe payments for the purchases shown (up to 50), before refunds and processing fees. Bonus credits and test payments are excluded from totals.</p>
-      {error && <p role="alert" className="text-sm text-red-600 mb-4">{error}</p>}
+      {error && <div role="alert" className="text-sm text-red-600 mb-4">{error} <button onClick={load} className="underline font-bold">Retry</button></div>}
       {unavailable > 0 && <p role="status" className="text-sm text-amber-700 mb-4">Totals are incomplete: Stripe amounts could not be verified for {unavailable} purchase(s). Refresh to retry.</p>}
       {/* Sub-tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5 max-w-xs">
@@ -161,7 +163,8 @@ export function AdminPaymentsPage() {
         </div>
       )}
 
-      {payTab === "fees" && (
+      {payTab === "fees" && loading && <p className="text-sm text-gray-500">Loading fee settings…</p>}
+      {payTab === "fees" && !loading && !error && (
         <div className="space-y-4">
           <div className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3 text-sm text-blue-700 flex items-start gap-2">
             <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />

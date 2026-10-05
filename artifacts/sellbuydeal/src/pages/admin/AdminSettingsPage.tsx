@@ -149,6 +149,8 @@ export function AdminSettingsPage() {
   const [, setLocation] = useLocation();
   const [settings, setSettings] = useState<Settings>(DEFAULTS);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [tab, setTabState] = useState<Tab>(() => {
@@ -180,39 +182,36 @@ export function AdminSettingsPage() {
   useEffect(() => { load(); }, []);
 
   async function load() {
-    setLoading(true);
+    setLoading(true); setLoadError(""); setSaveError(""); setSaved(false); setFeesSaved(false);
     try {
-      const res = await authFetch("/api/admin/settings");
-      if (res.ok) {
-        const d = await res.json();
-        setSettings({ ...DEFAULTS, ...d });
-        const loaded: Record<string, string> = { ...defaultFeeRates, fee_rate_default: "8", fee_listing_free: "true", buyer_protection_percent: "5", buyer_protection_fixed_gbp: "0.70", buyer_protection_fixed_usd: "1.00", buyer_protection_fixed_eur: "1.00" };
-        Object.entries(d as Record<string, string>).forEach(([k, v]) => {
-          if (k.startsWith("fee_")) loaded[k] = v;
-        });
-        setFeeRates(loaded);
-      }
-      const feeRes = await authFetch("/api/admin/fee-settings");
-      if (feeRes.ok) {
-        const persisted = await feeRes.json() as Record<string, string>;
-        setFeeRates(prev => ({ ...prev, ...persisted }));
-      }
-    } finally { setLoading(false); }
+      const [res, feeRes] = await Promise.all([authFetch("/api/admin/settings"), authFetch("/api/admin/fee-settings")]);
+      if (!res.ok || !feeRes.ok) throw new Error("Settings could not be loaded. Please retry.");
+      const [d, persisted] = await Promise.all([res.json(), feeRes.json()]);
+      const valid = (value: unknown): value is Record<string, string> => !!value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every(v => typeof v === "string");
+      if (!valid(d) || !valid(persisted)) throw new Error("The settings response was invalid. Please retry.");
+      const loaded: Record<string, string> = { ...defaultFeeRates, fee_rate_default: "8", fee_listing_free: "true", buyer_protection_percent: "5", buyer_protection_fixed_gbp: "0.70", buyer_protection_fixed_usd: "1.00", buyer_protection_fixed_eur: "1.00" };
+      Object.entries(d).forEach(([k, v]) => { if (k.startsWith("fee_") || k.startsWith("buyer_protection_")) loaded[k] = v; });
+      setSettings({ ...DEFAULTS, ...d });
+      setFeeRates({ ...loaded, ...persisted });
+    } catch (e) { setLoadError(e instanceof Error ? e.message : "Settings could not be loaded. Please retry."); }
+    finally { setLoading(false); }
   }
 
   async function save() {
-    setSaving(true);
+    if (loading || loadError) return;
+    setSaving(true); setSaveError(""); setSaved(false);
     try {
       const res = await authFetch("/api/admin/settings", { method: "PUT", body: JSON.stringify(settings) });
       if (!res.ok) throw new Error(`Save failed (${res.status})`);
       window.dispatchEvent(new Event("bazunk-settings-updated"));
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } finally { setSaving(false); }
+    } catch (e) { setSaveError(e instanceof Error ? e.message : "Settings could not be saved. Please retry."); } finally { setSaving(false); }
   }
 
   async function saveFeeRates(e: React.FormEvent) {
     e.preventDefault();
+    if (loading || loadError) return;
     setFeesSaving(true);
     setFeesError(null);
     try {
@@ -316,8 +315,11 @@ export function AdminSettingsPage() {
         })}
       </div>
 
+      {saveError && <p role="alert" className="mb-4 bg-red-50 text-red-700 p-3 rounded-xl">{saveError} Your edits are retained; use Save Changes to retry.</p>}
       {loading ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-6 animate-pulse h-72" />
+      ) : loadError ? (
+        <div role="alert" className="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700"><p>{loadError}</p><button onClick={load} className="mt-3 underline font-bold">Retry loading settings</button></div>
       ) : (
         <div className="space-y-4">
 
