@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Search, Grid3X3 } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, Grid3X3, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -17,9 +17,27 @@ interface CategoryCount {
   count: number;
 }
 
-function CategoryIcon({ name }: { name: string }) {
+const CATEGORY_THEMES = [
+  "from-blue-600 via-blue-500 to-indigo-500",
+  "from-orange-500 via-amber-500 to-orange-400",
+  "from-fuchsia-600 via-pink-500 to-purple-500",
+  "from-emerald-600 via-green-500 to-teal-400",
+  "from-rose-500 via-pink-500 to-rose-400",
+  "from-violet-600 via-purple-500 to-fuchsia-500",
+  "from-lime-600 via-green-500 to-emerald-500",
+  "from-amber-500 via-yellow-500 to-orange-400",
+  "from-red-600 via-rose-500 to-orange-500",
+  "from-cyan-600 via-sky-500 to-blue-500",
+  "from-indigo-600 via-blue-600 to-violet-500",
+  "from-purple-600 via-violet-500 to-fuchsia-500",
+  "from-sky-600 via-cyan-500 to-teal-500",
+  "from-slate-600 via-blue-600 to-indigo-500",
+  "from-green-700 via-emerald-600 to-lime-500",
+];
+
+function CategoryIcon({ name, className = "w-6 h-6 text-white" }: { name: string; className?: string }) {
   const Icon = (LucideIcons[name as LucideIconName] ?? LucideIcons.Tag) as React.ElementType;
-  return <Icon className="w-5 h-5 text-white" />;
+  return <Icon className={className} />;
 }
 
 export function CategoriesPage() {
@@ -38,44 +56,65 @@ export function CategoriesPage() {
     ? CATEGORIES.filter(
         (c) =>
           c.name.toLowerCase().includes(search.toLowerCase()) ||
-          c.subcategories.some((s) =>
-            s.name.toLowerCase().includes(search.toLowerCase())
-          )
+          c.subcategories.some((sub) => sub.name.toLowerCase().includes(search.toLowerCase()))
       )
     : CATEGORIES;
 
   function catCount(slug: string) {
     return counts.filter((l) => l.category === slug).reduce((sum, l) => sum + Number(l.count || 0), 0);
   }
+
   function subCount(catSlug: string, subSlug: string) {
     return counts.find((l) => l.category === catSlug && l.subcategory === subSlug)?.count ?? 0;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-[#091426] text-white flex flex-col">
       <Navbar />
 
-      {/* Page header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-10">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4A5CE8] to-[#7C3AED] flex items-center justify-center">
-              <Grid3X3 className="w-5 h-5 text-white" />
+      <div className="border-b border-white/5 bg-[radial-gradient(circle_at_top_left,_rgba(74,92,232,0.18),_transparent_38%)]">
+        <div className="container mx-auto px-4 py-8 lg:py-10">
+          <div className="grid lg:grid-cols-[1fr_1.1fr] gap-6 items-center">
+            <div>
+              <div className="flex items-center gap-4 mb-2">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#263d8f] to-[#142552] border border-blue-400/20 flex items-center justify-center shadow-lg shadow-blue-950/30">
+                  <Grid3X3 className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl lg:text-4xl font-black tracking-tight">Categories</h1>
+                  <p className="text-slate-400 mt-1">Explore all categories and find exactly what you're looking for.</p>
+                </div>
+              </div>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900">All Categories</h1>
-          </div>
-          <p className="text-gray-500 mb-6 ml-[52px]">
-            Browse all {CATEGORIES.length} categories and their subcategories
-          </p>
 
-          {/* Search inside page */}
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Link
+              href="/sell"
+              className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#4263f4] via-[#6547ef] to-[#e743c4] p-5 lg:p-6 shadow-xl shadow-purple-950/20 group"
+            >
+              <div className="absolute -right-8 -bottom-10 w-40 h-40 rounded-full bg-cyan-300/20" />
+              <div className="absolute right-20 -top-10 w-24 h-24 rounded-full bg-pink-300/20" />
+              <div className="relative flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center">
+                  <Tag className="w-7 h-7" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xl lg:text-2xl font-black">Private Sellers Sell for FREE</p>
+                  <p className="text-white/80 text-sm mt-1">No final value fees. Keep 100% of your sale price.</p>
+                </div>
+                <span className="hidden sm:inline-flex bg-white text-indigo-700 font-bold rounded-xl px-4 py-2.5 items-center gap-1 group-hover:translate-x-1 transition-transform">
+                  Start Selling <ChevronRight className="w-4 h-4" />
+                </span>
+              </div>
+            </Link>
+          </div>
+
+          <div className="relative max-w-lg mt-7">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter categories..."
-              className="pl-9 rounded-full border-gray-200 bg-gray-50 focus-visible:ring-[#4A5CE8]"
+              placeholder="Search categories or subcategories..."
+              className="pl-11 h-11 rounded-xl border-white/10 bg-white/[0.06] text-white placeholder:text-slate-500 focus-visible:ring-[#4A5CE8]"
               data-testid="input-category-search"
             />
           </div>
@@ -84,74 +123,65 @@ export function CategoriesPage() {
 
       <AdSlot slotKey="categories_top" />
 
-      {/* Categories grid */}
-      <main className="flex-1 container mx-auto px-4 py-10">
+      <main className="flex-1 container mx-auto px-4 py-8">
         {filtered.length === 0 ? (
-          <div className="text-center py-20 text-gray-400">
+          <div className="text-center py-20 text-slate-400">
             <p className="text-lg font-medium">No categories match "{search}"</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
             {filtered.map((category, index) => {
               const isOpen = openSlug === category.slug;
               const totalListings = catCount(category.slug);
+              const theme = CATEGORY_THEMES[index % CATEGORY_THEMES.length];
+
               return (
                 <motion.div
                   key={category.slug}
-                  initial={{ opacity: 0, y: 16 }}
+                  initial={{ opacity: 0, y: 14 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.03 }}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                  transition={{ delay: Math.min(index * 0.025, 0.3) }}
+                  className={`rounded-2xl overflow-hidden border transition-all duration-300 ${
+                    isOpen
+                      ? "border-white/20 shadow-2xl shadow-black/30 bg-[#0e1c32]"
+                      : "border-white/[0.08] shadow-lg shadow-black/10 bg-[#0e1a2e] hover:-translate-y-0.5 hover:border-white/15"
+                  }`}
                   data-testid={`card-category-${category.slug}`}
                 >
-                  {/* Category header row */}
                   <button
-                    className="w-full flex items-center gap-4 p-5 hover:bg-gray-50 transition-colors text-left"
-                    onClick={() =>
-                      setOpenSlug(isOpen ? null : category.slug)
-                    }
+                    className={`relative overflow-hidden w-full text-left bg-gradient-to-br ${theme} p-5 min-h-[128px]`}
+                    onClick={() => setOpenSlug(isOpen ? null : category.slug)}
                     data-testid={`button-expand-${category.slug}`}
                   >
-                    {/* Icon */}
-                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[#4A5CE8] to-[#7C3AED] flex items-center justify-center flex-shrink-0 shadow-sm">
-                      <CategoryIcon name={category.icon} />
+                    <div className="absolute -right-8 -bottom-12 w-36 h-36 rounded-full bg-white/10" />
+                    <div className="absolute right-12 -top-12 w-24 h-24 rounded-full bg-white/[0.06]" />
+
+                    <div className="relative flex items-start justify-between gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-black/10 border border-white/15 backdrop-blur-sm flex items-center justify-center shadow-sm">
+                        <CategoryIcon name={category.icon} />
+                      </div>
+                      <motion.div
+                        animate={{ rotate: isOpen ? 180 : 0 }}
+                        className="w-9 h-9 rounded-full bg-white/20 border border-white/15 flex items-center justify-center"
+                      >
+                        <ChevronDown className="w-5 h-5" />
+                      </motion.div>
                     </div>
 
-                    {/* Name + counts */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 text-sm leading-tight">
-                        {category.name}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <p className="text-xs text-gray-400">
-                          {category.subcategories.length} subcategories
-                        </p>
+                    <div className="relative mt-4">
+                      <p className="font-black text-lg leading-tight text-white">{category.name}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-white/80">
+                        <span>{category.subcategories.length} subcategories</span>
                         {totalListings > 0 && (
                           <>
-                            <span className="text-gray-200">·</span>
-                            <Link
-                              href={`/browse?category=${category.slug}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-xs text-[#4A5CE8] font-medium hover:underline"
-                            >
-                              {totalListings} listing{totalListings !== 1 ? "s" : ""}
-                            </Link>
+                            <span className="text-white/40">•</span>
+                            <span className="font-semibold">{totalListings} listing{totalListings !== 1 ? "s" : ""}</span>
                           </>
                         )}
                       </div>
                     </div>
-
-                    {/* Chevron */}
-                    <motion.div
-                      animate={{ rotate: isOpen ? 180 : 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="flex-shrink-0"
-                    >
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
-                    </motion.div>
                   </button>
 
-                  {/* Subcategories dropdown */}
                   <AnimatePresence initial={false}>
                     {isOpen && (
                       <motion.div
@@ -162,7 +192,7 @@ export function CategoriesPage() {
                         transition={{ duration: 0.22, ease: "easeInOut" }}
                         className="overflow-hidden"
                       >
-                        <div className="border-t border-gray-100 px-5 py-3 bg-gray-50/60">
+                        <div className="px-4 pt-3 pb-4">
                           <ul className="space-y-1">
                             {category.subcategories.map((sub) => {
                               const sc = subCount(category.slug, sub.slug);
@@ -170,23 +200,26 @@ export function CategoriesPage() {
                                 <li key={sub.slug}>
                                   <Link
                                     href={`/browse?category=${category.slug}&sub=${sub.slug}`}
-                                    className="flex items-center justify-between gap-2 text-sm text-gray-600 hover:text-[#4A5CE8] py-1.5 px-2 rounded-lg hover:bg-white transition-colors group"
+                                    className="flex items-center justify-between gap-3 text-sm text-slate-300 hover:text-white py-2 px-2.5 rounded-lg hover:bg-white/[0.07] transition-colors group"
                                     data-testid={`link-subcategory-${sub.slug}`}
                                   >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-[#4A5CE8]/40 group-hover:bg-[#4A5CE8] transition-colors flex-shrink-0" />
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <CategoryIcon name={category.icon} className="w-3.5 h-3.5 text-slate-500 group-hover:text-indigo-300" />
                                       <span className="truncate">{sub.name}</span>
                                     </div>
-                                    {sc > 0 && (
-                                      <span className="text-[10px] text-gray-400 bg-white border border-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0">
-                                        {sc}
-                                      </span>
-                                    )}
+                                    {sc > 0 && <span className="text-[11px] text-slate-500 flex-shrink-0">{sc}</span>}
                                   </Link>
                                 </li>
                               );
                             })}
                           </ul>
+
+                          <Link
+                            href={`/browse?category=${category.slug}`}
+                            className="mt-3 flex items-center justify-center gap-1.5 w-full rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-xs font-bold text-white py-2.5 transition-colors"
+                          >
+                            View all {category.name} <ChevronRight className="w-3.5 h-3.5" />
+                          </Link>
                         </div>
                       </motion.div>
                     )}
