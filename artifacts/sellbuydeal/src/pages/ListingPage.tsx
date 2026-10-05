@@ -143,8 +143,11 @@ function FollowSellerButton({ sellerEmail }: { sellerEmail: string }) {
 function SellerCard({ sellerName, sellerUsername, sellerEmail, location, verified }: { sellerName: string; sellerUsername?: string; sellerEmail?: string; location: string; verified: boolean }) {
   const initial = sellerName.charAt(0).toUpperCase();
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      <h3 className="text-sm font-bold text-gray-900 mb-4">Seller Information</h3>
+    <div className="bg-white rounded-2xl border border-violet-200 shadow-sm p-5 min-w-0">
+      <div className="-mx-5 -mt-5 mb-5 rounded-t-2xl bg-gradient-to-r from-[#4A5CE8] to-[#7C3AED] px-5 py-4 text-white">
+        <h3 className="text-sm font-bold flex items-center gap-2"><Users className="w-4 h-4" /> Meet the seller</h3>
+        <p className="mt-1 text-xs text-white/80">Profile, reviews and seller updates</p>
+      </div>
       <div className="flex items-center gap-3 mb-4">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#4A5CE8] to-[#7C3AED] flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
           {initial}
@@ -711,11 +714,15 @@ export function ListingPage() {
           </div>
 
           {/* Right: Price + actions + seller */}
-          <div className="space-y-4">
+          <div className="space-y-5 min-w-0 self-start" data-testid="listing-purchase-panel">
 
-            {/* Price card */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sticky top-24">
-              <h1 className="text-base font-semibold text-gray-800 leading-snug mb-3">{product.title}</h1>
+            {/* Price card: stays in normal page flow to avoid covering seller details. */}
+            <div className="bg-white rounded-2xl border border-orange-200 shadow-sm p-5 min-w-0">
+              <div className="-mx-5 -mt-5 mb-5 rounded-t-2xl bg-gradient-to-r from-[#F26B21] to-[#EAA008] px-5 py-4 text-white">
+                <p className="text-sm font-black flex items-center gap-2"><ShoppingCart className="w-4 h-4" /> Make it yours</p>
+                <p className="mt-1 text-xs text-white/90">Buy now or agree a price with the seller</p>
+              </div>
+              <h1 className="text-base font-semibold text-gray-800 leading-snug mb-3 break-words">{product.title}</h1>
 
               {(() => {
                 const priceDelta = product.variants
@@ -726,7 +733,7 @@ export function ListingPage() {
                   : 0;
                 const totalPrice = product.price + priceDelta;
                 return (
-                  <div className="flex items-baseline gap-2 mb-4">
+                  <div className="flex flex-wrap items-baseline gap-2 mb-5 rounded-xl bg-orange-50 border border-orange-100 px-4 py-3">
                     <span className="text-3xl font-bold text-gray-900">{formatPrice(totalPrice)}</span>
                   </div>
                 );
@@ -759,7 +766,7 @@ export function ListingPage() {
               {/* Make an Offer */}
               <button
                 onClick={() => setOfferOpen(true)}
-                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm border-2 border-[#4A5CE8] text-[#4A5CE8] hover:bg-[#4A5CE8]/5 transition-colors mb-2.5"
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm border-2 border-[#4A5CE8] bg-[#4A5CE8]/10 text-[#4A5CE8] hover:bg-[#4A5CE8]/20 transition-colors mb-2.5"
                 data-testid="button-make-offer"
               >
                 <Tag className="w-4 h-4" /> Make an Offer
@@ -769,7 +776,7 @@ export function ListingPage() {
               <button
                 onClick={handleMessageSeller}
                 disabled={startingMessage}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm border border-gray-200 text-gray-700 hover:border-gray-300 transition-colors mb-4 disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors mb-4 disabled:opacity-60"
                 data-testid="button-message-seller"
               >
                 <MessageSquare className="w-4 h-4" /> {startingMessage ? "Opening chat…" : "Message Seller"}
@@ -788,6 +795,10 @@ export function ListingPage() {
                 <Heart className={`w-4 h-4 ${product && isWatched(product.id) ? "fill-red-500" : ""}`} />
                 {watchToast === "added" ? "✓ Added to Watchlist!" : watchToast === "removed" ? "Removed" : product && isWatched(product.id) ? "Saved to Watchlist" : "Add to Watchlist"}
               </button>
+
+              <p className="mt-4 rounded-xl bg-blue-50 border border-blue-100 px-3 py-2.5 text-xs leading-relaxed text-blue-900">
+                Pay securely through Bazunk. Any Buyer Protection fee and your final total are shown at checkout before payment.
+              </p>
 
               {/* Meta */}
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 text-xs text-gray-400">
