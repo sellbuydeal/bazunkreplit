@@ -210,6 +210,15 @@ export function Navbar() {
             <Link href="/" className="flex items-center flex-shrink-0" data-testid="link-logo">
               <img src="/bazunk-logo-header.png" alt="Bazunk" className="h-11 md:h-12 xl:h-14 w-auto object-contain" />
             </Link>
+            <Link
+              href="/"
+              aria-label="Home"
+              title="Home"
+              data-testid="link-home-icon"
+              className="hidden md:flex w-8 h-8 items-center justify-center rounded-full text-gray-500 hover:text-[#4A5CE8] hover:bg-[#4A5CE8]/10 transition-colors flex-shrink-0"
+            >
+              <Home className="w-4 h-4" />
+            </Link>
           </div>
 
           {/* Desktop nav */}
