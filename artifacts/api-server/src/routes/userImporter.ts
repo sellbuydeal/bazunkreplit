@@ -4,9 +4,44 @@ import { sql } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 import { fetchAmazonDetails, buildAmazonDescription } from "../lib/amazon.js";
 import { rapidApiErrorMessage } from "../lib/rapidapi.js";
-import { rapidKeyForRequest } from "../lib/userRapidApi.js";
+import { requestEmail, rapidKeyForRequest } from "../lib/userRapidApi.js";
 
+import { validateOwnEbayItems } from "../lib/freeEbayImport.js";
+import { randomUUID } from "node:crypto";
+import { toGbp } from "../fxRates.js";
 const router = Router();
+
+// Free seller-owned inventory: no external fetch, RapidAPI key or refresh metadata.
+router.post("/user/import-ebay-own", async (req, res) => {
+  try {
+    const email = await requestEmail(req);
+    if (!email) { res.status(401).json({ error: "Sign in to import your listings." }); return; }
+    if (req.body.ownsItems !== true) { res.status(400).json({ error: "Confirm these are your own listings and inventory." }); return; }
+    let items: ReturnType<typeof validateOwnEbayItems>;
+    try { items = validateOwnEbayItems(req.body.products); } catch (e) { res.status(400).json({ error: e instanceof Error ? e.message : "Invalid listings" }); return; }
+    const category = String(req.body.category ?? "");
+    const subcategory = String(req.body.subcategory ?? "");
+    if (!/^[a-z0-9-]{1,80}$/.test(category) || (subcategory && !/^[a-z0-9-]{1,80}$/.test(subcategory))) { res.status(400).json({ error: "Choose a Bazunk category." }); return; }
+    const pricedItems = await Promise.all(items.map(async item => ({ ...item, priceGbp: (await toGbp(item.price, item.currency)).toFixed(2) })));
+    const result = await db.transaction(async tx => {
+      // Serialise batches for this seller so retries and duplicate clicks cannot create duplicates.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${email}))`);
+      const user = await tx.execute(sql`SELECT name FROM users WHERE lower(email)=${email} LIMIT 1`).then(r => r.rows[0] as any);
+      let imported = 0, skipped = 0;
+      for (const item of pricedItems) {
+        const marker = '%"own_ebay_item_id":"' + item.itemId + '"%';
+        const exists = await tx.execute(sql`SELECT id FROM listings WHERE lower(seller_email)=${email} AND specifications LIKE ${marker} LIMIT 1`);
+        if (exists.rows.length) { skipped++; continue; }
+        const specs = JSON.stringify({ source: "eBay own listings", import_mode: "one_time", sync_enabled: false, own_ebay_item_id: item.itemId, inventory: item.quantity });
+        await tx.execute(sql`INSERT INTO listings(public_id,title,price,price_gbp,currency,category,subcategory,description,condition,image,seller_email,seller_name,specifications,status,created_at,updated_at)
+          VALUES(${'BZK-OWN-EBY-'+randomUUID()},${item.title},${item.price},${item.priceGbp},${item.currency},${category},${subcategory || null},${item.description || item.title},${item.condition},${item.image},${email},${user?.name || email.split("@")[0]},${specs},'active',NOW(),NOW())`);
+        imported++;
+      }
+      return { imported, skipped };
+    });
+    res.json(result);
+  } catch (err) { logger.error({ err }, "Own eBay import failed"); res.status(500).json({ error: "Import failed. Retry the batch; existing imports will be skipped." }); }
+});
 
 // GET /api/user/search-amazon — live Amazon UK search (any signed-in user)
 router.get("/user/search-amazon", async (req, res) => {
