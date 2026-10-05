@@ -12,12 +12,12 @@ const GUARANTEES = [
   {
     icon: AlertCircle,
     title: 'Not As Described',
-    desc: "If the item differs significantly from the listing, you're covered for a return and full refund.",
+    desc: "If the item differs significantly from the listing, submit evidence so we can review your claim and any eligible return or refund.",
     color: 'bg-blue-500',
   },
   {
     icon: RotateCcw,
-    title: '30-Day Returns',
+    title: 'Return Support',
     desc: 'Change your mind? Check the seller’s return policy and request an eligible return from your dashboard.',
     color: 'bg-purple-500',
   },
@@ -25,9 +25,9 @@ const GUARANTEES = [
 
 const HOW_IT_WORKS = [
   { step: '1', title: 'Pay Securely', desc: 'Pay securely through Bazunk at checkout.' },
-  { step: '2', title: 'Item Arrives', desc: 'You have 48 hours after delivery to confirm everything is as expected.' },
-  { step: '3', title: 'Issue? Open a Dispute', desc: 'File a claim from your dashboard. Our team resolves disputes within 48 hours.' },
-  { step: '4', title: 'Fast Resolution', desc: 'Receive your refund directly back to your original payment method.' },
+  { step: '2', title: 'Item Arrives', desc: 'Check your item on arrival and report any problems promptly through your dashboard.' },
+  { step: '3', title: 'Issue? Open a Dispute', desc: 'File a claim from your dashboard. Our team reviews the information from both parties and works towards a fair resolution. Review times vary with the details of each case.' },
+  { step: '4', title: 'Review & Resolution', desc: 'We will explain the outcome of the review. Any approved refund is returned to your original payment method; processing times may vary.' },
 ];
 
 export default function BuyerProtectionPage() {
@@ -59,7 +59,7 @@ export default function BuyerProtectionPage() {
         <div className="max-w-4xl mx-auto text-center relative z-10">
           <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold px-5 py-2 rounded-full text-sm mb-6">
             <Shield className="w-4 h-4" />
-            100% Buyer Protection
+            Buyer Protection & Support
           </div>
           <h1 className="text-5xl md:text-6xl font-black mb-6 leading-tight">
             Shop With Complete<br />
@@ -88,7 +88,7 @@ export default function BuyerProtectionPage() {
       {/* Guarantees */}
       <div className="max-w-5xl mx-auto px-6 py-16">
         <h2 className="text-3xl font-black text-center mb-3">What You're Protected Against</h2>
-        <p className="text-white/50 text-center mb-10">Every order automatically qualifies — no sign-up needed.</p>
+        <p className="text-white/50 text-center mb-10">Support is available for eligible purchases completed through Bazunk checkout, subject to the protection terms.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {GUARANTEES.map(g => (
             <div key={g.title} className="bg-white/5 border border-white/10 rounded-2xl p-6 flex gap-5 hover:border-white/20 transition-colors">
@@ -127,38 +127,16 @@ export default function BuyerProtectionPage() {
         </div>
       </div>
 
-      {/* Comparison */}
-      <div className="max-w-3xl mx-auto px-6 py-16">
-        <h2 className="text-3xl font-black text-center mb-3">Better Than the Competition</h2>
-        <p className="text-white/50 text-center mb-10">We don't just match eBay and Amazon — we go further.</p>
-        <div className="overflow-hidden rounded-2xl border border-white/10">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-white/5 border-b border-white/10">
-                <th className="text-left px-5 py-4 text-white/40 font-bold">Protection Feature</th>
-                <th className="px-4 py-4 text-[#F26B21] font-black">Bazunk</th>
-                <th className="px-4 py-4 text-white/40 font-bold">eBay</th>
-                <th className="px-4 py-4 text-white/40 font-bold">Amazon</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['Eligible returns guarantee', true, true, true],
-                ['Dispute support', true, false, false],
-                ['Guided return support', true, false, false],
-                ['Buyer cashback on disputes', true, false, false],
-              ].map(([feat, sbd, ebay, amz], i) => (
-                <tr key={i as number} className="border-b border-white/5 last:border-0 hover:bg-white/3">
-                  <td className="px-5 py-4 text-white/70 font-medium">{feat as string}</td>
-                  <td className="px-4 py-4 text-center text-emerald-400 font-bold">{sbd ? '✓' : '–'}</td>
-                  <td className="px-4 py-4 text-center text-white/30">{ebay ? '✓' : '–'}</td>
-                  <td className="px-4 py-4 text-center text-white/30">{amz ? '✓' : '–'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <section className="max-w-3xl mx-auto px-6 py-16">
+        <h2 className="text-3xl font-black text-center mb-3">Support Through the Process</h2>
+        <p className="text-white/60 text-center mb-8">Clear steps, evidence-based review and help with eligible claims.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {['Help reporting an order issue', 'Review of buyer and seller evidence', 'Guidance on eligible returns', 'Updates on your claim and its outcome'].map((feature) => (
+            <div key={feature} className="rounded-2xl border border-white/10 bg-white/5 p-5 text-white/80">{feature}</div>
+          ))}
         </div>
-      </div>
+        <p className="mt-6 text-sm text-white/50 text-center">Eligibility, outcomes and timing depend on the circumstances of the claim. <Link href="/terms" className="underline text-emerald-400">Read the protection terms</Link></p>
+      </section>
 
       {/* Support CTA */}
       <div className="bg-emerald-900/20 border-t border-emerald-500/20 py-12 px-6 text-center">
@@ -166,7 +144,7 @@ export default function BuyerProtectionPage() {
           <Phone className="w-7 h-7 text-white" />
         </div>
         <h3 className="text-2xl font-black mb-2">Need Help With an Order?</h3>
-        <p className="text-white/50 mb-6">Our UK-based support team is here 7 days a week.</p>
+        <p className="text-white/50 mb-6">Contact our support team for help with an order or an existing claim.</p>
         <div className="flex flex-wrap justify-center gap-4">
           <Link href="/dashboard?section=disputes" className="bg-[#F26B21] text-white font-black px-8 py-3 rounded-full hover:bg-[#e05a10] transition-colors">
             Open a Dispute

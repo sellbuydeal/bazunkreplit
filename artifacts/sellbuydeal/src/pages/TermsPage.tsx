@@ -39,7 +39,7 @@ const SECTIONS = [
   },
   {
     title: "8. Intellectual Property",
-    body: `All Platform content, logos, and trademarks are the property of Bazunk Ltd. You retain ownership of content you upload but grant us a non-exclusive licence to display it on the Platform. You may not reproduce or redistribute our proprietary content without written permission.`,
+    body: `All Platform content, logos, and trademarks are the property of Bazunk LLC. You retain ownership of content you upload but grant us a non-exclusive licence to display it on the Platform. You may not reproduce or redistribute our proprietary content without written permission.`,
   },
   {
     title: "9. Limitation of Liability",
@@ -51,7 +51,7 @@ const SECTIONS = [
   },
   {
     title: "11. Contact",
-    body: `For questions about these Terms, please visit our Support Centre or write to: Bazunk Ltd, 123 Commerce Street, London, EC1A 1BB, United Kingdom.`,
+    body: `For questions about these Terms, please visit our Support Centre or write to: Bazunk LLC, 2709 N Hayden Island Dr, STE 872346, Portland, Oregon, 97217, USA.`,
   },
 ];
 
@@ -74,14 +74,14 @@ export function TermsPage() {
               Terms of Service
             </motion.h1>
           </div>
-          <p className="text-sm text-gray-400">Last updated: 1 January 2025 · Effective immediately</p>
+          <p className="text-sm text-gray-400">Last updated: 5 October 2026 · Effective immediately</p>
         </div>
       </section>
 
       <div className="container mx-auto px-4 py-10 max-w-3xl flex-1">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 space-y-7">
           <p className="text-sm text-gray-500 leading-relaxed border-l-4 border-[#4A5CE8] pl-4 bg-blue-50 py-3 rounded-r-xl">
-            Please read these Terms of Service carefully before using the Bazunk platform. These terms constitute a legally binding agreement between you and Bazunk Ltd.
+            Please read these Terms of Service carefully before using the Bazunk platform. These terms constitute a legally binding agreement between you and Bazunk LLC.
           </p>
 
           {SECTIONS.map((section, i) => (

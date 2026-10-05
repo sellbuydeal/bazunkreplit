@@ -7,7 +7,7 @@ import { Footer } from "@/components/Footer";
 const SECTIONS = [
   {
     title: "1. Who We Are",
-    body: `Bazunk Ltd ("we", "us", "our") is a marketplace platform registered in England and Wales. This Privacy Policy explains how we collect, use, and protect your personal data when you use our services at bazunk.com.`,
+    body: `Bazunk LLC ("we", "us", "our") operates the Bazunk marketplace. Our mailing address is 2709 N Hayden Island Dr, STE 872346, Portland, Oregon, 97217, USA. This Privacy Policy explains how we collect, use, and protect your personal data when you use our services at bazunk.com.`,
   },
   {
     title: "2. Data We Collect",
@@ -78,7 +78,7 @@ export function PrivacyPage() {
               Privacy Policy
             </motion.h1>
           </div>
-          <p className="text-sm text-gray-400">Last updated: 1 January 2025 · UK GDPR compliant</p>
+          <p className="text-sm text-gray-400">Last updated: 5 October 2026</p>
         </div>
       </section>
 
