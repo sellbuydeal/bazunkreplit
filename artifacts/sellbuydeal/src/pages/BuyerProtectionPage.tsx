@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Shield, Clock, RotateCcw, AlertCircle, Phone, ArrowLeft } from 'lucide-react';
 import { Link } from 'wouter';
 
@@ -30,6 +31,15 @@ const HOW_IT_WORKS = [
 ];
 
 export default function BuyerProtectionPage() {
+  useEffect(() => {
+    const scrollToFees = () => {
+      if (window.location.hash === "#fees") document.getElementById("fees")?.scrollIntoView();
+    };
+    scrollToFees();
+    window.addEventListener("hashchange", scrollToFees);
+    return () => window.removeEventListener("hashchange", scrollToFees);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#1A1D2E] text-white">
       {/* Hero Section */}
@@ -73,7 +83,7 @@ export default function BuyerProtectionPage() {
         </div>
       </div>
 
-      <section className="max-w-5xl mx-auto px-6 pt-10"><div className="grid md:grid-cols-2 gap-4"><div className="border rounded-2xl p-6"><h2 className="font-black text-xl">Buying from a personal seller</h2><p className="mt-2">Personal sellers pay no selling commission. Buyers pay Buyer Protection: 5% + 70p by default in GBP, with one fixed fee per checkout. Your exact fee is shown before payment.</p></div><div className="border rounded-2xl p-6"><h2 className="font-black text-xl">Buying from a business</h2><p className="mt-2">Buyer Protection is included with no extra buyer fee. Business sellers pay a selling fee, 8% by default, including protection and support. Admin-configured category rates can differ.</p><Link href="/terms" className="inline-block mt-3 underline">Seller protection terms</Link></div></div></section>
+      <section id="fees" className="max-w-5xl mx-auto px-6 pt-10 scroll-mt-24"><div className="grid md:grid-cols-2 gap-4"><div className="border rounded-2xl p-6"><h2 className="font-black text-xl">Buying from a personal seller</h2><p className="mt-2">Personal sellers pay no selling commission. Buyers pay Buyer Protection: 5% + 70p by default in GBP, with one fixed fee per checkout. Your exact fee is shown before payment.</p></div><div className="border rounded-2xl p-6"><h2 className="font-black text-xl">Buying from a business</h2><p className="mt-2">Buyer Protection is included with no extra buyer fee. Business sellers pay a selling fee, 8% by default, including protection and support. Admin-configured category rates can differ.</p><Link href="/terms" className="inline-block mt-3 underline">Seller protection terms</Link></div></div></section>
 
       {/* Guarantees */}
       <div className="max-w-5xl mx-auto px-6 py-16">

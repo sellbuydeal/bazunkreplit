@@ -63,7 +63,7 @@ export function Footer() {
             <ul className="space-y-2.5">
               <li><Link href="/sell" className={linkClass}>Start Selling</Link></li>
               <li><Link href="/dashboard" className={linkClass}>Seller Dashboard</Link></li>
-              <li><Link href="/credits" className={linkClass}>Selling Fees</Link></li>
+              <li><Link href="/buyer-protection#fees" className={linkClass}>Selling Fees</Link></li>
             </ul>
           </div>
 
