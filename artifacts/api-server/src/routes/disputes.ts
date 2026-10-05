@@ -9,189 +9,53 @@ import { recordCreditEconomy } from "../lib/creditEconomy.js";
 import { sendSystemMessage } from "../lib/systemMessages.js";
 
 const router = Router();
+const VALID_REASONS=["item_not_received","not_as_described","damaged","wrong_item","other"];
+const CLOSED=["resolved_refund","resolved_no_action","closed"];
 
-const VALID_REASONS = ["item_not_received", "not_as_described", "damaged", "wrong_item", "other"];
-const VALID_STATUSES = ["open", "under_review", "resolved_refund", "resolved_no_action", "closed"];
+async function ensureWorkflow(){
+ await db.execute(sql`CREATE TABLE IF NOT EXISTS dispute_messages (id TEXT PRIMARY KEY, dispute_id TEXT NOT NULL, author_email TEXT, author_role TEXT NOT NULL, body TEXT NOT NULL, evidence_url TEXT, created_at TIMESTAMPTZ DEFAULT NOW())`);
+ await db.execute(sql`CREATE INDEX IF NOT EXISTS dispute_messages_dispute_idx ON dispute_messages(dispute_id,created_at)`);
+ for(const q of [
+  sql`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS return_required BOOLEAN NOT NULL DEFAULT FALSE`,
+  sql`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS return_label_url TEXT`,
+  sql`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS return_instructions TEXT`,
+  sql`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS return_tracking TEXT`,
+  sql`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS return_carrier TEXT`,
+  sql`ALTER TABLE disputes ADD COLUMN IF NOT EXISTS return_received_at TIMESTAMPTZ`
+ ]) await db.execute(q);
+}
+async function getDispute(id:string){await ensureWorkflow();return (await db.execute(sql`SELECT * FROM disputes WHERE id=${id}`)).rows[0] as any;}
+async function addMessage(id:string,role:string,email:string|null,body:string,evidenceUrl:string|null=null){
+ if(!body.trim()&&!evidenceUrl) return;
+ await db.execute(sql`INSERT INTO dispute_messages(id,dispute_id,author_email,author_role,body,evidence_url) VALUES(${randomUUID()},${id},${email},${role},${body.trim()},${evidenceUrl})`);
+}
+async function notify(email:string,subject:string,body:string){if(email) await sendSystemMessage(email,{category:"Dispute update",subject,body});}
 
-// Orders a buyer can still dispute: their own, not cancelled, bought in the last 30 days,
-// and with no dispute already open.
-router.get("/disputes/eligible-orders", async (req, res) => {
-  const email = req.query["email"] as string | undefined;
-  if (!email) {
-    res.status(400).json({ error: "email query param required" });
-    return;
-  }
-  const rows = await db.execute(sql`
-    SELECT o.id, o.item_title, o.seller_email, o.price, o.created_at,
-           GREATEST(0, 30 - FLOOR(EXTRACT(EPOCH FROM (NOW() - o.created_at)) / 86400))::int AS days_left
-    FROM orders o
-    WHERE o.buyer_email = ${email}
-      AND o.status <> 'cancelled'
-      AND o.created_at >= NOW() - INTERVAL '30 days'
-      AND NOT EXISTS (SELECT 1 FROM disputes d WHERE d.order_id = o.id AND d.status <> 'closed')
-    ORDER BY o.created_at DESC
-  `);
-  res.json(rows.rows);
+router.get("/disputes/eligible-orders",async(req,res)=>{const email=String(req.query.email||"");if(!email)return res.status(400).json({error:"email query param required"});await ensureWorkflow();const r=await db.execute(sql`SELECT o.id,o.item_title,o.seller_email,o.price,o.created_at,GREATEST(0,30-FLOOR(EXTRACT(EPOCH FROM(NOW()-o.created_at))/86400))::int days_left FROM orders o WHERE LOWER(o.buyer_email)=LOWER(${email}) AND o.status<>'cancelled' AND o.created_at>=NOW()-INTERVAL '30 days' AND NOT EXISTS(SELECT 1 FROM disputes d WHERE d.order_id=o.id AND d.status<>'closed') ORDER BY o.created_at DESC`);res.json(r.rows)});
+router.post("/disputes",async(req,res)=>{await ensureWorkflow();const {buyerEmail,orderId,reason,description}=req.body||{};if(!buyerEmail||!orderId||!reason||!description)return res.status(400).json({error:"Please choose an order and describe the issue."});if(!VALID_REASONS.includes(reason))return res.status(400).json({error:"Invalid reason"});const o=(await db.execute(sql`SELECT id,buyer_email,seller_email,item_title,status,(created_at>=NOW()-INTERVAL '30 days') in_window FROM orders WHERE id=${orderId}`)).rows[0] as any;if(!o||String(o.buyer_email).toLowerCase()!==String(buyerEmail).toLowerCase())return res.status(404).json({error:"We couldn't find that order on your account."});if(o.status==="cancelled"||!o.in_window)return res.status(400).json({error:"This order cannot be disputed."});const ex=await db.execute(sql`SELECT 1 FROM disputes WHERE order_id=${orderId} AND status<>'closed' LIMIT 1`);if(ex.rows.length)return res.status(409).json({error:"A dispute is already open for this order."});const id=randomUUID();await db.execute(sql`INSERT INTO disputes(id,order_id,buyer_email,seller_email,item_title,reason,description,status,created_at,updated_at) VALUES(${id},${orderId},${buyerEmail},${o.seller_email},${o.item_title},${reason},${description},'open',NOW(),NOW())`);await addMessage(id,"buyer",buyerEmail,description);res.status(201).json({id})});
+router.get("/disputes",async(req,res)=>{await ensureWorkflow();const email=String(req.query.email||"");if(!email)return res.status(400).json({error:"email query param required"});const r=await db.execute(sql`SELECT * FROM disputes WHERE LOWER(buyer_email)=LOWER(${email}) OR LOWER(COALESCE(seller_email,''))=LOWER(${email}) ORDER BY created_at DESC`);res.json(r.rows)});
+router.get("/disputes/:id/thread",async(req,res)=>{const d=await getDispute(req.params.id);const email=String(req.query.email||"").toLowerCase();if(!d||![String(d.buyer_email).toLowerCase(),String(d.seller_email||"").toLowerCase()].includes(email))return res.status(403).json({error:"Not allowed"});const r=await db.execute(sql`SELECT * FROM dispute_messages WHERE dispute_id=${req.params.id} ORDER BY created_at ASC`);res.json(r.rows)});
+router.post("/disputes/:id/message",async(req,res)=>{const d=await getDispute(req.params.id);const email=String(req.body?.email||"").toLowerCase(),body=String(req.body?.message||"").trim(),evidence=String(req.body?.evidenceUrl||"").trim();const buyer=String(d?.buyer_email||"").toLowerCase(),seller=String(d?.seller_email||"").toLowerCase();if(!d||![buyer,seller].includes(email))return res.status(403).json({error:"Not allowed"});if(!body&&!evidence)return res.status(400).json({error:"Write a message or provide an evidence link."});await addMessage(d.id,email===buyer?"buyer":"seller",email,body,evidence||null);await db.execute(sql`UPDATE disputes SET status=CASE WHEN status IN('awaiting_buyer','awaiting_seller') THEN 'under_review' ELSE status END,updated_at=NOW() WHERE id=${d.id}`);res.json({ok:true})});
+router.post("/disputes/:id/return-tracking",async(req,res)=>{const d=await getDispute(req.params.id);const email=String(req.body?.email||"").toLowerCase();if(!d||email!==String(d.buyer_email).toLowerCase())return res.status(403).json({error:"Only the buyer can add return tracking."});const tracking=String(req.body?.tracking||"").trim(),carrier=String(req.body?.carrier||"").trim();if(!tracking)return res.status(400).json({error:"Tracking number is required."});await db.execute(sql`UPDATE disputes SET return_tracking=${tracking},return_carrier=${carrier||null},status='return_in_transit',updated_at=NOW() WHERE id=${d.id}`);await addMessage(d.id,"buyer",email,`Return sent${carrier?` with ${carrier}`:""}. Tracking: ${tracking}`);await notify(d.seller_email,"Return on the way",`The buyer has returned “${d.item_title}”. Tracking: ${tracking}`);res.json({ok:true})});
+router.patch("/disputes/:id/seller-response",async(req,res)=>{const {sellerEmail,response}=req.body||{};await db.execute(sql`UPDATE disputes SET seller_response=${response},updated_at=NOW() WHERE id=${req.params.id} AND LOWER(seller_email)=LOWER(${sellerEmail})`);await addMessage(req.params.id,"seller",sellerEmail,response);res.json({ok:true})});
+
+router.get("/admin/disputes",requireAdmin,async(_req,res)=>{await ensureWorkflow();const r=await db.execute(sql`SELECT d.*,o.price order_price,o.buyer_protection_fee,o.status order_status,(o.stripe_session_id IS NOT NULL) has_stripe_payment,(SELECT COUNT(*)::int FROM dispute_messages m WHERE m.dispute_id=d.id) message_count FROM disputes d LEFT JOIN orders o ON o.id=d.order_id ORDER BY d.created_at DESC`);res.json(r.rows)});
+router.get("/admin/disputes/:id/thread",requireAdmin,async(req,res)=>{await ensureWorkflow();const r=await db.execute(sql`SELECT * FROM dispute_messages WHERE dispute_id=${req.params.id} ORDER BY created_at ASC`);res.json(r.rows)});
+router.post("/admin/disputes/:id/action",requireAdmin,async(req,res)=>{const id=req.params.id,d=await getDispute(id);if(!d)return res.status(404).json({error:"Dispute not found"});const action=String(req.body?.action||""),notes=String(req.body?.notes||"").trim(),message=String(req.body?.message||notes).trim(),amount=Number(req.body?.amount||0),credits=Number(req.body?.credits||0),labelUrl=String(req.body?.labelUrl||"").trim(),instructions=String(req.body?.instructions||"").trim();const order=d.order_id?(await db.execute(sql`SELECT * FROM orders WHERE id=${d.order_id}`)).rows[0] as any:null;
+ try{
+  if(action==="message_buyer"||action==="request_evidence"){if(!message)return res.status(400).json({error:"Write a message for the buyer."});await addMessage(id,"admin",null,message);await db.execute(sql`UPDATE disputes SET status='awaiting_buyer',updated_at=NOW() WHERE id=${id}`);await notify(d.buyer_email,action==="request_evidence"?"Bazunk needs evidence for your dispute":"New message about your dispute",message);}
+  else if(action==="message_seller"){if(!message)return res.status(400).json({error:"Write a message for the seller."});await addMessage(id,"admin",null,message);await db.execute(sql`UPDATE disputes SET status='awaiting_seller',updated_at=NOW() WHERE id=${id}`);await notify(d.seller_email,"Bazunk needs information about a dispute",message);}
+  else if(action==="require_return"){if(!message&&!instructions)return res.status(400).json({error:"Add return instructions."});const text=instructions||message;await db.execute(sql`UPDATE disputes SET return_required=TRUE,return_instructions=${text},status='return_required',updated_at=NOW() WHERE id=${id}`);await addMessage(id,"admin",null,`Return required. ${text}`);await notify(d.buyer_email,"Return required before refund",`Please return “${d.item_title}” before a refund can be issued. ${text}`);}
+  else if(action==="issue_label"){if(!labelUrl)return res.status(400).json({error:"Enter the return-label URL supplied by your carrier."});const text=instructions||"Use the return label below and add tracking once posted.";await db.execute(sql`UPDATE disputes SET return_required=TRUE,return_label_url=${labelUrl},return_instructions=${text},status='return_required',updated_at=NOW() WHERE id=${id}`);await addMessage(id,"admin",null,`Bazunk supplied a return label. ${text}`,labelUrl);await notify(d.buyer_email,"Your return label is ready",`${text}\n\nReturn label: ${labelUrl}`);}
+  else if(action==="confirm_return"){await db.execute(sql`UPDATE disputes SET return_received_at=NOW(),status='returned',updated_at=NOW() WHERE id=${id}`);await addMessage(id,"admin",null,message||"Return received and confirmed. Refund can now be processed.");await notify(d.buyer_email,"Return received",`The return for “${d.item_title}” has been confirmed as received. Bazunk can now process the resolution.`);}
+  else if(action==="mark_review"){await db.execute(sql`UPDATE disputes SET status='under_review',resolution_notes=${notes||null},updated_at=NOW() WHERE id=${id}`);}
+  else if(action==="no_action"){await db.execute(sql`UPDATE disputes SET status='resolved_no_action',resolution_notes=${notes||null},resolved_at=NOW(),updated_at=NOW() WHERE id=${id}`);await notify(d.buyer_email,"Dispute resolved",`Bazunk closed your dispute without a refund.${notes?`\n\n${notes}`:""}`);}
+  else if(action==="close"){await db.execute(sql`UPDATE disputes SET status='closed',resolution_notes=${notes||null},resolved_at=NOW(),updated_at=NOW() WHERE id=${id}`);}
+  else if(action==="credits"){if(!Number.isInteger(credits)||credits<=0)return res.status(400).json({error:"Enter a whole number of credits greater than 0."});const u=await db.execute(sql`UPDATE users SET credits=credits+${credits} WHERE LOWER(email)=LOWER(${d.buyer_email}) RETURNING credits`);if(!u.rows.length)return res.status(404).json({error:"Buyer account was not found."});await recordCreditEconomy({email:d.buyer_email,kind:"refund",credits,reason:`Dispute goodwill credit: ${d.item_title}`,referenceType:"dispute_credit",referenceId:id,metadata:{orderId:d.order_id}});await db.execute(sql`UPDATE disputes SET status='closed',resolution_notes=${notes||`Awarded ${credits} Bazunk credits`},resolved_at=NOW(),updated_at=NOW() WHERE id=${id}`);await notify(d.buyer_email,`${credits} Bazunk credits added`,`Bazunk added ${credits} credits following your dispute.`);}
+  else if(action==="refund_full"||action==="refund_partial"){if(!order?.stripe_session_id)return res.status(400).json({error:"This order has no Stripe payment."});if(d.return_required&&!d.return_received_at)return res.status(409).json({error:"This dispute requires a return. Confirm the item has been received before refunding, or remove the return requirement."});const stripe=await getUncachableStripeClient();const session:any=await stripe.checkout.sessions.retrieve(order.stripe_session_id,{expand:["payment_intent.latest_charge"]});const pi:any=session.payment_intent,charge:any=pi?.latest_charge;if(!pi?.id||!charge)return res.status(400).json({error:"No refundable Stripe payment was found."});const currency=String(session.currency||"gbp").toLowerCase(),remaining=Math.max(0,(Number(charge.amount||0)-Number(charge.amount_refunded||0))/100),requested=action==="refund_full"?remaining:amount;if(!Number.isFinite(requested)||requested<=0)return res.status(400).json({error:"Enter a refund amount greater than 0."});if(requested>remaining+.0001)return res.status(400).json({error:`Only ${currency.toUpperCase()} ${remaining.toFixed(2)} remains refundable.`});const zero=["bif","clp","djf","gnf","jpy","kmf","krw","mga","pyg","rwf","ugx","vnd","vuv","xaf","xof","xpf"].includes(currency);const refund=await stripe.refunds.create({payment_intent:pi.id,amount:Math.round(requested*(zero?1:100)),metadata:{bazunk_order_id:String(order.id),bazunk_dispute_id:id}});const full=requested>=remaining-.005;if(full)await db.execute(sql`UPDATE orders SET status='refunded',updated_at=NOW() WHERE id=${order.id}`);await db.execute(sql`UPDATE disputes SET status='resolved_refund',refund_amount=${requested.toFixed(2)},resolution_notes=${notes||null},resolved_at=NOW(),updated_at=NOW() WHERE id=${id}`);await addMessage(id,"admin",null,`${full?"Full":"Partial"} refund issued: ${currency.toUpperCase()} ${requested.toFixed(2)}.${notes?` ${notes}`:""}`);await notify(d.buyer_email,"Refund issued",`Bazunk issued a ${full?"full":"partial"} refund of ${currency.toUpperCase()} ${requested.toFixed(2)}.`);await recordAdminAudit({req,category:"disputes",action:full?"dispute.refund_full":"dispute.refund_partial",targetType:"dispute",targetId:id,summary:`${full?"Full":"Partial"} refund ${currency.toUpperCase()} ${requested.toFixed(2)}`,before:{status:d.status},after:{status:"resolved_refund",refundAmount:requested,refundId:refund.id},metadata:{orderId:order.id}});return res.json({ok:true});}
+  else return res.status(400).json({error:"Unknown dispute action."});
+  await recordAdminAudit({req,category:"disputes",action:`dispute.${action}`,targetType:"dispute",targetId:id,summary:`Dispute action: ${action}`,before:{status:d.status},after:{notes,credits:action==="credits"?credits:undefined},metadata:{orderId:d.order_id}});res.json({ok:true});
+ }catch(e:any){res.status(500).json({error:e?.message||"Dispute action failed"})}
 });
-
-router.post("/disputes", async (req, res) => {
-  const { buyerEmail, orderId, reason, description } = req.body as Record<string, string>;
-  if (!buyerEmail || !orderId || !reason || !description) {
-    res.status(400).json({ error: "Please choose an order and describe the issue." });
-    return;
-  }
-  if (!VALID_REASONS.includes(reason)) {
-    res.status(400).json({ error: "Invalid reason" });
-    return;
-  }
-
-  // The order must exist, belong to this buyer, and have been bought within the last 30 days.
-  // The item and seller always come from the order itself, never from the form.
-  const order = (await db.execute(sql`
-    SELECT id, buyer_email, seller_email, item_title, status,
-           (created_at >= NOW() - INTERVAL '30 days') AS in_window
-    FROM orders WHERE id = ${orderId}
-  `)).rows[0] as Record<string, unknown> | undefined;
-
-  if (!order || order.buyer_email !== buyerEmail) {
-    res.status(404).json({ error: "We couldn't find that order on your account." });
-    return;
-  }
-  if (order.status === "cancelled") {
-    res.status(400).json({ error: "This order was cancelled, so it can't be disputed." });
-    return;
-  }
-  if (!order.in_window) {
-    res.status(400).json({ error: "Disputes must be opened within 30 days of purchase, and this order is older than that." });
-    return;
-  }
-  const existing = await db.execute(sql`SELECT 1 FROM disputes WHERE order_id = ${orderId} AND status <> 'closed' LIMIT 1`);
-  if (existing.rows.length > 0) {
-    res.status(409).json({ error: "A dispute is already open for this order." });
-    return;
-  }
-
-  const id = randomUUID();
-  await db.execute(sql`
-    INSERT INTO disputes (id, order_id, buyer_email, seller_email, item_title, reason, description, status, created_at, updated_at)
-    VALUES (${id}, ${orderId}, ${buyerEmail}, ${(order.seller_email as string | null) ?? null}, ${order.item_title as string}, ${reason}, ${description}, 'open', NOW(), NOW())
-  `);
-  res.status(201).json({ id });
-});
-
-router.get("/disputes", async (req, res) => {
-  const email = req.query["email"] as string | undefined;
-  if (!email) {
-    res.status(400).json({ error: "email query param required" });
-    return;
-  }
-  const rows = await db.execute(sql`
-    SELECT * FROM disputes
-    WHERE buyer_email = ${email} OR seller_email = ${email}
-    ORDER BY created_at DESC
-  `);
-  res.json(rows.rows);
-});
-
-router.patch("/disputes/:id/seller-response", async (req, res) => {
-  const { id } = req.params;
-  const { sellerEmail, response } = req.body as Record<string, string>;
-  if (!sellerEmail || !response) {
-    res.status(400).json({ error: "sellerEmail and response are required" });
-    return;
-  }
-  await db.execute(sql`
-    UPDATE disputes SET seller_response = ${response}, updated_at = NOW()
-    WHERE id = ${id} AND seller_email = ${sellerEmail}
-  `);
-  res.json({ ok: true });
-});
-
-router.get("/admin/disputes", requireAdmin, async (_req, res) => {
-  const rows = await db.execute(sql`
-    SELECT d.*, o.price AS order_price, o.buyer_protection_fee, o.status AS order_status,
-           CASE WHEN o.stripe_session_id IS NULL THEN false ELSE true END AS has_stripe_payment
-    FROM disputes d LEFT JOIN orders o ON o.id = d.order_id
-    ORDER BY d.created_at DESC
-  `);
-  res.json(rows.rows);
-});
-
-// Execute a real dispute resolution action. Money-moving actions happen server-side only.
-router.post("/admin/disputes/:id/action", requireAdmin, async (req, res) => {
-  const { id } = req.params;
-  const action = String(req.body?.action ?? "");
-  const notes = String(req.body?.notes ?? "").trim();
-  const amount = Number(req.body?.amount ?? 0);
-  const credits = Number(req.body?.credits ?? 0);
-
-  const dispute = (await db.execute(sql`SELECT * FROM disputes WHERE id=${id}`)).rows[0] as any;
-  if (!dispute) { res.status(404).json({ error: "Dispute not found" }); return; }
-  const order = dispute.order_id ? (await db.execute(sql`SELECT * FROM orders WHERE id=${dispute.order_id}`)).rows[0] as any : null;
-  if (["resolved_refund", "resolved_no_action", "closed"].includes(String(dispute.status)) && ["refund_full", "refund_partial", "credits"].includes(action)) {
-    res.status(409).json({ error: "This dispute is already resolved. Reopen it or move it to Under Review before issuing another financial remedy." }); return;
-  }
-
-  try {
-    if (action === "mark_review") {
-      await db.execute(sql`UPDATE disputes SET status='under_review', resolution_notes=${notes || null}, updated_at=NOW() WHERE id=${id}`);
-    } else if (action === "no_action") {
-      await db.execute(sql`UPDATE disputes SET status='resolved_no_action', resolution_notes=${notes || null}, resolved_at=NOW(), updated_at=NOW() WHERE id=${id}`);
-      await sendSystemMessage(dispute.buyer_email, { category:"Dispute update", subject:`Dispute resolved: ${dispute.item_title}`, body:`Bazunk reviewed your dispute and closed it without a refund.${notes ? `\n\n${notes}` : ""}` });
-    } else if (action === "close") {
-      await db.execute(sql`UPDATE disputes SET status='closed', resolution_notes=${notes || null}, resolved_at=NOW(), updated_at=NOW() WHERE id=${id}`);
-    } else if (action === "credits") {
-      if (!Number.isFinite(credits) || credits <= 0 || !Number.isInteger(credits)) { res.status(400).json({ error:"Enter a whole number of credits greater than 0." }); return; }
-      const updated = await db.execute(sql`UPDATE users SET credits=credits+${credits} WHERE LOWER(email)=LOWER(${dispute.buyer_email}) RETURNING credits`);
-      if (!updated.rows.length) { res.status(404).json({ error:"Buyer account was not found." }); return; }
-      await recordCreditEconomy({ email:dispute.buyer_email, kind:"refund", credits, reason:`Dispute goodwill credit: ${dispute.item_title}`, referenceType:"dispute_credit", referenceId:id, metadata:{orderId:dispute.order_id} });
-      await db.execute(sql`UPDATE disputes SET status='closed', resolution_notes=${notes || `Awarded ${credits} Bazunk credits`}, resolved_at=NOW(), updated_at=NOW() WHERE id=${id}`);
-      await sendSystemMessage(dispute.buyer_email, { category:"Dispute update", subject:`${credits} Bazunk credits added`, body:`Bazunk has added ${credits} credits to your account following your dispute for “${dispute.item_title}”.${notes ? `\n\n${notes}` : ""}` });
-    } else if (action === "refund_full" || action === "refund_partial") {
-      if (!order?.stripe_session_id) { res.status(400).json({ error:"This order has no Stripe payment, so an automatic card refund cannot be issued." }); return; }
-      const stripe = await getUncachableStripeClient();
-      const session:any = await stripe.checkout.sessions.retrieve(order.stripe_session_id,{expand:["payment_intent.latest_charge"]});
-      const pi:any = session.payment_intent; const charge:any = pi?.latest_charge;
-      if (!pi?.id || !charge) { res.status(400).json({ error:"No refundable Stripe payment was found." }); return; }
-      const currency=String(session.currency||"gbp").toLowerCase();
-      const remaining=Math.max(0,(Number(charge.amount||0)-Number(charge.amount_refunded||0))/100);
-      const requested=action === "refund_full" ? remaining : amount;
-      if (!Number.isFinite(requested) || requested <= 0) { res.status(400).json({ error:"Enter a refund amount greater than 0." }); return; }
-      if (requested > remaining + 0.0001) { res.status(400).json({ error:`Only ${currency.toUpperCase()} ${remaining.toFixed(2)} remains refundable.` }); return; }
-      const zero=["bif","clp","djf","gnf","jpy","kmf","krw","mga","pyg","rwf","ugx","vnd","vuv","xaf","xof","xpf"].includes(currency);
-      const refund=await stripe.refunds.create({payment_intent:pi.id,amount:Math.round(requested*(zero?1:100)),metadata:{bazunk_order_id:String(order.id),bazunk_dispute_id:id}});
-      const isFull=requested >= remaining - 0.005;
-      if (isFull) await db.execute(sql`UPDATE orders SET status='refunded',updated_at=NOW() WHERE id=${order.id}`);
-      await db.execute(sql`UPDATE disputes SET status='resolved_refund', refund_amount=${requested.toFixed(2)}, resolution_notes=${notes || null}, resolved_at=NOW(), updated_at=NOW() WHERE id=${id}`);
-      await sendSystemMessage(dispute.buyer_email, { category:"Dispute update", subject:`Refund issued: ${dispute.item_title}`, body:`Bazunk issued a ${isFull ? "full" : "partial"} refund of ${currency.toUpperCase()} ${requested.toFixed(2)} to your original payment method.${notes ? `\n\n${notes}` : ""}` });
-      await recordAdminAudit({req,category:"disputes",action:isFull?"dispute.refund_full":"dispute.refund_partial",targetType:"dispute",targetId:id,summary:`${isFull?"Full":"Partial"} refund ${currency.toUpperCase()} ${requested.toFixed(2)} for dispute ${id}`,before:{status:dispute.status},after:{status:"resolved_refund",refundAmount:requested,refundId:refund.id},metadata:{orderId:order.id}});
-      res.json({ok:true, amount:requested, currency:currency.toUpperCase(), refundId:refund.id}); return;
-    } else { res.status(400).json({ error:"Unknown dispute action." }); return; }
-
-    await recordAdminAudit({req,category:"disputes",action:`dispute.${action}`,targetType:"dispute",targetId:id,summary:`Dispute action: ${action}`,before:{status:dispute.status},after:{notes,credits:action==="credits"?credits:undefined},metadata:{orderId:dispute.order_id}});
-    res.json({ok:true});
-  } catch (err:any) { res.status(500).json({ error:err?.message || "Dispute action failed" }); }
-});
-
-router.patch("/admin/disputes/:id", requireAdmin, async (req, res) => {
-  const { id } = req.params;
-  const { status, resolutionNotes, refundAmount, adminEmail } = req.body as Record<string, string>;
-  if (!status || !VALID_STATUSES.includes(status)) {
-    res.status(400).json({ error: "Valid status is required" });
-    return;
-  }
-  const resolvedAt = ["resolved_refund", "resolved_no_action", "closed"].includes(status) ? sql`NOW()` : sql`NULL`;
-  await db.execute(sql`
-    UPDATE disputes
-    SET status = ${status},
-        resolution_notes = ${resolutionNotes ?? null},
-        refund_amount = ${refundAmount ?? null},
-        admin_email = ${adminEmail ?? null},
-        resolved_at = ${resolvedAt},
-        updated_at = NOW()
-    WHERE id = ${id}
-  `);
-  res.json({ ok: true });
-});
-
+router.patch("/admin/disputes/:id",requireAdmin,async(req,res)=>{const {status,resolutionNotes,refundAmount,adminEmail}=req.body||{};await db.execute(sql`UPDATE disputes SET status=${status},resolution_notes=${resolutionNotes??null},refund_amount=${refundAmount??null},admin_email=${adminEmail??null},updated_at=NOW() WHERE id=${req.params.id}`);res.json({ok:true})});
 export default router;
