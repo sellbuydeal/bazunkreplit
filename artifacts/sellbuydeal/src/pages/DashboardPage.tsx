@@ -3948,250 +3948,21 @@ function ReturnsSection() {
 
 // ─── Disputes ─────────────────────────────────────────────────────────────────
 
-type DisputeRecord = {
-  id: string; order_id: string | null; item_title: string; reason: string;
-  description: string; status: string; resolution_notes: string | null;
-  refund_amount: string | null; seller_response: string | null; created_at: string;
-};
-
-function DisputesSection() {
-  const { user } = useAuth();
-  const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [form, setForm] = useState({ itemTitle: "", orderId: "", reason: "item_not_received", description: "" });
-  const [formError, setFormError] = useState("");
-  const [eligible, setEligible] = useState<Array<{ id: string; item_title: string; created_at: string; days_left: number }>>([]);
-
-  async function loadEligible() {
-    if (!user?.email) return;
-    try {
-      const res = await fetch(`/api/disputes/eligible-orders?email=${encodeURIComponent(user.email)}`);
-      if (res.ok) setEligible(await res.json());
-    } catch {
-      /* keep the list as it is */
-    }
-  }
-
-  async function load() {
-    if (!user?.email) return;
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/disputes?email=${encodeURIComponent(user.email)}`);
-      if (res.ok) setDisputes(await res.json());
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { load(); loadEligible(); }, [user?.email]);
-
-  async function submit() {
-    if (!form.orderId) { setFormError("Please choose the order you are disputing."); return; }
-    if (!form.description.trim()) { setFormError("Please describe the issue."); return; }
-    setFormError("");
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/disputes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          buyerEmail: user?.email,
-          orderId: form.orderId,
-          reason: form.reason,
-          description: form.description.trim(),
-        }),
-      });
-      if (res.ok) {
-        setSubmitted(true);
-        setShowForm(false);
-        setForm({ itemTitle: "", orderId: "", reason: "item_not_received", description: "" });
-        await load();
-        await loadEligible();
-      } else {
-        const data = await res.json().catch(() => ({} as { error?: string }));
-        setFormError(data?.error ?? "Something went wrong. Please try again.");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6" style={{ minHeight: 400 }}>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="font-black text-gray-900 text-lg">Disputes</h2>
-          <p className="text-sm text-gray-400 mt-0.5">Open a dispute if something went wrong with your order.</p>
-        </div>
-        {!showForm && (
-          <button
-            onClick={() => { setShowForm(true); setSubmitted(false); void loadEligible(); }}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#4A5CE8] text-white text-sm font-bold hover:opacity-90 transition-opacity"
-          >
-            <Plus className="w-4 h-4" /> Open Dispute
-          </button>
-        )}
-      </div>
-
-      {submitted && (
-        <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 mb-5">
-          <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-bold text-emerald-800">Dispute submitted</p>
-            <p className="text-xs text-emerald-600 mt-0.5">We've received your dispute. The seller has 48 hours to respond before our team steps in.</p>
-          </div>
-        </div>
-      )}
-
-      {showForm && (
-        <div className="bg-gray-50 rounded-2xl border border-gray-100 p-5 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-gray-900 text-sm">New Dispute</h3>
-            <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
-          </div>
-
-          {formError && (
-            <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 rounded-xl px-3 py-2 mb-3">
-              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {formError}
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Order *</label>
-              {eligible.length === 0 ? (
-                <p className="text-sm text-gray-500 bg-white border border-gray-200 rounded-xl px-3 py-2.5">
-                  You have no orders from the last 30 days that can be disputed.
-                </p>
-              ) : (
-                <select
-                  value={form.orderId}
-                  onChange={(e) => setForm((f) => ({ ...f, orderId: e.target.value }))}
-                  className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] bg-white"
-                >
-                  <option value="">Choose the order you are disputing...</option>
-                  {eligible.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.item_title} - {o.id} - {new Date(o.created_at).toLocaleDateString("en-GB")} ({o.days_left} days left)
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Reason *</label>
-              <select
-                value={form.reason}
-                onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] bg-white"
-              >
-                {DISPUTE_REASONS.map((r) => (
-                  <option key={r.value} value={r.value}>{r.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Describe the issue *</label>
-              <textarea
-                rows={4}
-                value={form.description}
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                placeholder="Tell us what happened, including any relevant dates and details…"
-                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] resize-none"
-              />
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={submit}
-                disabled={submitting || eligible.length === 0}
-                className="flex-1 py-3 rounded-xl bg-[#4A5CE8] text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {submitting ? "Submitting…" : "Submit Dispute"}
-              </button>
-              <button
-                onClick={() => setShowForm(false)}
-                className="px-4 py-3 rounded-xl border border-gray-200 text-gray-500 font-semibold text-sm hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 flex items-start gap-2 text-xs text-gray-400">
-            <Shield className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-emerald-400" />
-            Disputes must be opened within 30 days of purchase. Our team typically resolves cases within 5 business days.
-          </div>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="text-center py-12 text-gray-400 text-sm">Loading…</div>
-      ) : disputes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center mb-4">
-            <Shield className="w-8 h-8 text-emerald-400" />
-          </div>
-          <p className="font-bold text-gray-700">No disputes</p>
-          <p className="text-sm text-gray-400 mt-1 max-w-xs">All your orders are going smoothly. If something goes wrong, open a dispute and we'll help resolve it.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {disputes.map((d) => {
-            const meta = DISPUTE_STATUS_META[d.status] ?? DISPUTE_STATUS_META["open"];
-            const isOpen = expanded === d.id;
-            const reasonLabel = DISPUTE_REASONS.find((r) => r.value === d.reason)?.label ?? d.reason;
-            return (
-              <div key={d.id} className="rounded-2xl border border-gray-100 overflow-hidden">
-                <button
-                  onClick={() => setExpanded(isOpen ? null : d.id)}
-                  className="w-full flex items-center gap-3 p-4 text-left hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-gray-900 text-sm truncate">{d.item_title}</p>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${meta.color}`}>{meta.label}</span>
-                    </div>
-                    <p className="text-xs text-gray-400 mt-0.5">{reasonLabel} · {new Date(d.created_at).toLocaleDateString("en-GB")}</p>
-                  </div>
-                  <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-90" : ""}`} />
-                </button>
-                {isOpen && (
-                  <div className="border-t border-gray-100 px-4 py-4 space-y-3">
-                    <div className="bg-gray-50 rounded-xl p-3">
-                      <p className="text-xs text-gray-400 mb-1">Your description</p>
-                      <p className="text-sm text-gray-700">{d.description}</p>
-                    </div>
-                    {d.seller_response && (
-                      <div className="bg-blue-50 rounded-xl p-3">
-                        <p className="text-xs text-blue-400 mb-1">Seller's response</p>
-                        <p className="text-sm text-blue-800">{d.seller_response}</p>
-                      </div>
-                    )}
-                    {d.resolution_notes && (
-                      <div className="bg-emerald-50 rounded-xl p-3">
-                        <p className="text-xs text-emerald-500 mb-1">Resolution</p>
-                        <p className="text-sm text-emerald-800">{d.resolution_notes}</p>
-                        {d.refund_amount && (
-                          <p className="text-sm font-bold text-emerald-700 mt-1">Refund: £{parseFloat(d.refund_amount).toFixed(2)}</p>
-                        )}
-                      </div>
-                    )}
-                    {d.order_id && (
-                      <p className="text-xs text-gray-400">Order ID: <span className="font-mono text-gray-600">{d.order_id}</span></p>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+type DisputeRecord = { id:string; order_id:string|null; item_title:string; reason:string; description:string; status:string; resolution_notes:string|null; refund_amount:string|null; seller_response:string|null; created_at:string; return_required?:boolean; return_label_url?:string|null; return_instructions?:string|null; return_tracking?:string|null; return_carrier?:string|null; return_received_at?:string|null; buyer_email?:string; seller_email?:string|null };
+type DisputeMessage={id:string;author_role:string;author_email?:string|null;body:string;evidence_url?:string|null;created_at:string};
+function DisputesSection(){
+ const{user}=useAuth();const[disputes,setDisputes]=useState<DisputeRecord[]>([]),[loading,setLoading]=useState(true),[showForm,setShowForm]=useState(false),[submitting,setSubmitting]=useState(false),[submitted,setSubmitted]=useState(false),[expanded,setExpanded]=useState<string|null>(null),[form,setForm]=useState({orderId:"",reason:"item_not_received",description:""}),[formError,setFormError]=useState(""),[eligible,setEligible]=useState<Array<{id:string;item_title:string;created_at:string;days_left:number}>>([]),[threads,setThreads]=useState<Record<string,DisputeMessage[]>>({}),[reply,setReply]=useState<Record<string,string>>({}),[evidence,setEvidence]=useState<Record<string,string>>({}),[tracking,setTracking]=useState<Record<string,string>>({}),[carrier,setCarrier]=useState<Record<string,string>>({}),[caseError,setCaseError]=useState<Record<string,string>>({});
+ async function loadEligible(){if(!user?.email)return;const r=await fetch(`/api/disputes/eligible-orders?email=${encodeURIComponent(user.email)}`);if(r.ok)setEligible(await r.json())}async function load(){if(!user?.email)return;setLoading(true);try{const r=await fetch(`/api/disputes?email=${encodeURIComponent(user.email)}`);if(r.ok)setDisputes(await r.json())}finally{setLoading(false)}}async function loadThread(id:string){if(!user?.email)return;const r=await fetch(`/api/disputes/${id}/thread?email=${encodeURIComponent(user.email)}`);if(r.ok){const data=await r.json();setThreads(x=>({...x,[id]:data}))}}useEffect(()=>{load();loadEligible()},[user?.email]);
+ async function submit(){if(!form.orderId||!form.description.trim()){setFormError("Choose an order and describe the issue.");return}setSubmitting(true);try{const r=await fetch('/api/disputes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({buyerEmail:user?.email,...form})});const j=await r.json().catch(()=>({}));if(!r.ok){setFormError(j.error||'Could not open dispute');return}setSubmitted(true);setShowForm(false);setForm({orderId:'',reason:'item_not_received',description:''});await load();await loadEligible()}finally{setSubmitting(false)}}
+ async function send(d:DisputeRecord){const r=await fetch(`/api/disputes/${d.id}/message`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:user?.email,message:reply[d.id]||'',evidenceUrl:evidence[d.id]||''})});const j=await r.json().catch(()=>({}));if(!r.ok){setCaseError(x=>({...x,[d.id]:j.error||'Could not send'}));return}setReply(x=>({...x,[d.id]:''}));setEvidence(x=>({...x,[d.id]:''}));await loadThread(d.id);await load()}
+ async function addTracking(d:DisputeRecord){const r=await fetch(`/api/disputes/${d.id}/return-tracking`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:user?.email,tracking:tracking[d.id]||'',carrier:carrier[d.id]||''})});const j=await r.json().catch(()=>({}));if(!r.ok){setCaseError(x=>({...x,[d.id]:j.error||'Could not save tracking'}));return}await load();await loadThread(d.id)}
+ const labels:any={open:'Open',under_review:'Under review',awaiting_buyer:'Bazunk needs your reply',awaiting_seller:'Waiting for seller',return_required:'Return required',return_in_transit:'Return in transit',returned:'Return received',resolved_refund:'Refund issued',resolved_no_action:'Resolved – no refund',closed:'Closed'};
+ return <div className="bg-white rounded-2xl border border-gray-100 p-6" style={{minHeight:400}}><div className="flex items-center justify-between mb-6"><div><h2 className="font-black text-gray-900 text-lg">Disputes</h2><p className="text-sm text-gray-400">Manage evidence, messages, returns, tracking and resolutions.</p></div>{!showForm&&<button onClick={()=>{setShowForm(true);setSubmitted(false);loadEligible()}} className="px-4 py-2 rounded-xl bg-[#4A5CE8] text-white text-sm font-bold">+ Open Dispute</button>}</div>{submitted&&<div className="bg-emerald-50 p-3 rounded-xl mb-4 text-sm text-emerald-800">Dispute submitted. Bazunk will contact you here if evidence or a return is needed.</div>}
+ {showForm&&<div className="bg-gray-50 rounded-2xl p-5 mb-6 space-y-3">{formError&&<p className="text-red-600 text-sm">{formError}</p>}<select value={form.orderId} onChange={e=>setForm(f=>({...f,orderId:e.target.value}))} className="w-full border rounded-xl p-3 bg-white"><option value="">Choose order…</option>{eligible.map(o=><option key={o.id} value={o.id}>{o.item_title} – {o.id}</option>)}</select><select value={form.reason} onChange={e=>setForm(f=>({...f,reason:e.target.value}))} className="w-full border rounded-xl p-3 bg-white">{DISPUTE_REASONS.map(r=><option key={r.value} value={r.value}>{r.label}</option>)}</select><textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} placeholder="Describe the problem…" className="w-full border rounded-xl p-3"/><div className="flex gap-2"><button disabled={submitting} onClick={submit} className="bg-[#4A5CE8] text-white px-4 py-2 rounded-xl font-bold">Submit</button><button onClick={()=>setShowForm(false)} className="border px-4 py-2 rounded-xl">Cancel</button></div></div>}
+ {loading?<p>Loading…</p>:disputes.length===0?<div className="text-center py-16 text-gray-400"><Shield className="w-10 h-10 mx-auto"/><p>No disputes</p></div>:<div className="space-y-3">{disputes.map(d=>{const is=expanded===d.id;return <div key={d.id} className="border rounded-2xl overflow-hidden"><button onClick={()=>{setExpanded(is?null:d.id);if(!is)loadThread(d.id)}} className="w-full p-4 text-left flex items-center gap-3"><div className="flex-1"><b>{d.item_title}</b><p className="text-xs text-gray-400">{new Date(d.created_at).toLocaleDateString('en-GB')}</p></div><span className="text-xs font-bold bg-blue-50 text-blue-700 px-2 py-1 rounded-full">{labels[d.status]||d.status}</span><ChevronRight className={`w-4 ${is?'rotate-90':''}`}/></button>{is&&<div className="border-t p-4 space-y-4"><div className="bg-gray-50 p-3 rounded-xl"><small>Your original report</small><p className="text-sm">{d.description}</p></div>
+ <div><b className="text-sm">Case conversation</b><div className="max-h-60 overflow-y-auto bg-gray-50 rounded-xl p-3 mt-2 space-y-2">{(threads[d.id]||[]).map(m=><div key={m.id} className="bg-white p-2 rounded-lg text-sm"><b className="capitalize">{m.author_role==='admin'?'Bazunk':m.author_role}</b><p>{m.body}</p>{m.evidence_url&&<a href={m.evidence_url} target="_blank" rel="noreferrer" className="text-blue-600 underline">Open evidence / return label</a>}</div>)}</div><textarea value={reply[d.id]||''} onChange={e=>setReply(x=>({...x,[d.id]:e.target.value}))} placeholder="Reply to Bazunk…" className="w-full border rounded-xl p-3 mt-2"/><input value={evidence[d.id]||''} onChange={e=>setEvidence(x=>({...x,[d.id]:e.target.value}))} placeholder="Evidence/photo link (optional)" className="w-full border rounded-xl p-3 mt-2"/><button onClick={()=>send(d)} className="bg-[#4A5CE8] text-white px-4 py-2 rounded-xl mt-2 font-bold text-sm">Send to case</button></div>
+ {d.return_required&&<div className="border border-orange-200 bg-orange-50 rounded-xl p-4"><b>Return required</b><p className="text-sm mt-1">{d.return_instructions||'Follow the return instructions from Bazunk.'}</p>{d.return_label_url&&<a href={d.return_label_url} target="_blank" rel="noreferrer" className="inline-block text-blue-600 underline mt-2">Open return label</a>}{!d.return_received_at&&<div className="grid md:grid-cols-2 gap-2 mt-3"><input value={carrier[d.id]||''} onChange={e=>setCarrier(x=>({...x,[d.id]:e.target.value}))} placeholder="Carrier (e.g. Royal Mail)" className="border rounded-lg p-2 bg-white"/><input value={tracking[d.id]||''} onChange={e=>setTracking(x=>({...x,[d.id]:e.target.value}))} placeholder="Return tracking number" className="border rounded-lg p-2 bg-white"/><button onClick={()=>addTracking(d)} className="bg-orange-600 text-white rounded-lg px-3 py-2 font-bold text-sm md:col-span-2">I've posted it – submit tracking</button></div>}{d.return_tracking&&<p className="text-sm mt-2"><b>Tracking:</b> {d.return_carrier?`${d.return_carrier} · `:''}{d.return_tracking}</p>}{d.return_received_at&&<p className="text-sm text-emerald-700 mt-2 font-bold">Return confirmed received.</p>}</div>}
+ {d.resolution_notes&&<div className="bg-emerald-50 p-3 rounded-xl"><b>Resolution</b><p className="text-sm">{d.resolution_notes}</p>{d.refund_amount&&<p className="font-bold">Refund: £{Number(d.refund_amount).toFixed(2)}</p>}</div>}{caseError[d.id]&&<p className="text-red-600 text-sm">{caseError[d.id]}</p>}<p className="text-xs text-gray-400">Order ID: {d.order_id}</p></div>}</div>})}</div>}</div>;
 }
 
 const PLATFORMS: LivePlatform[] = ["youtube", "twitch"];
@@ -6236,11 +6007,8 @@ export function DashboardPage() {
                       </button>
                       <button
                         onClick={async () => {
-                          const updated = { ...profileForm, username: profileForm.username.trim().replace(/^@/, "") };
-                          if (!/^[A-Za-z0-9._-]{3,30}$/.test(updated.username)) {
-                            window.alert("Choose a username 3–30 characters long using letters, numbers, dots, underscores or hyphens.");
-                            return;
-                          }
+                          const updated = { ...profileForm };
+                          setSavedProfile(updated);
                           // Always use the actual Clerk email (not the form email) for DB cascade
                           const clerkEmail = user?.email || "";
                           const displayName = updated.name.trim() || savedProfile.name;
@@ -6248,15 +6016,11 @@ export function DashboardPage() {
                             try { localStorage.setItem(`sbd_profile_v1_${clerkEmail}`, JSON.stringify({ name: displayName, username: updated.username })); } catch {}
                             if (displayName || updated.username) {
                               try {
-                                const response = await fetch("/api/listings/seller-name", {
+                                await fetch("/api/listings/seller-name", {
                                   method: "PATCH",
                                   headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ name: displayName || undefined, username: updated.username }),
+                                  body: JSON.stringify({ email: clerkEmail, name: displayName || undefined, username: updated.username || undefined }),
                                 });
-                                const result = await response.json().catch(() => ({}));
-                                if (!response.ok) { window.alert(result.error || "Could not save username."); return; }
-                                setSavedProfile(updated);
-                                window.dispatchEvent(new CustomEvent("bazunk-profile-updated", { detail: { username: updated.username } }));
                               } catch {}
                             }
                           }
@@ -6321,7 +6085,7 @@ export function DashboardPage() {
 
                   {/* Username */}
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 mb-1.5">Public username</label>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5">Username</label>
                     {profileEdit ? (
                       <div className="flex rounded-xl border border-gray-200 overflow-hidden focus-within:border-[#4A5CE8] focus-within:ring-2 focus-within:ring-[#4A5CE8]/10 transition-colors">
                         <span className="px-3 py-2.5 bg-gray-50 border-r border-gray-200 text-sm text-gray-400 font-medium select-none">@</span>
@@ -6337,7 +6101,6 @@ export function DashboardPage() {
                     ) : (
                       <div className="px-4 py-2.5 rounded-xl bg-gray-50 text-sm text-gray-900 font-medium">@{savedProfile.username}</div>
                     )}
-                    <p className="text-xs text-gray-400 mt-1">This is the name buyers see on your listings. Your real name stays private.</p>
                   </div>
 
                   {/* Member since — always read-only */}
