@@ -38,6 +38,8 @@ type Return = {
 
 export function AdminReturnsPage() {
   const { token } = useAdmin();
+  const [loadError, setLoadError] = useState("");
+  const [saveError, setSaveError] = useState<Record<string, string>>({});
   const [returns, setReturns] = useState<Return[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -46,9 +48,17 @@ export function AdminReturnsPage() {
 
   async function load() {
     setLoading(true);
+    setLoadError("");
     try {
       const res = await fetch("/api/admin/returns", { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setReturns(await res.json());
+      if (!res.ok) throw new Error("Could not load returns. Please retry.");
+      const data = await res.json();
+      if (!Array.isArray(data) || !data.every(r => r && typeof r === "object" && typeof r.id === "string")) throw new Error("Invalid returns response. Please retry.");
+      setReturns(data);
+      return true;
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Could not load returns. Please retry.");
+      return false;
     } finally {
       setLoading(false);
     }
@@ -65,16 +75,28 @@ export function AdminReturnsPage() {
   }
 
   async function save(ret: Return) {
+    if (updating) return;
     const f = getForm(ret.id, ret);
     setUpdating(ret.id);
+    setSaveError(prev => ({ ...prev, [ret.id]: "" }));
     try {
-      await fetch(`/api/admin/returns/${ret.id}`, {
+      const res = await fetch(`/api/admin/returns/${ret.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status: f.status, adminNotes: f.notes, refundAmount: f.refund }),
       });
-      await load();
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(typeof data?.error === "string" ? data.error : "Could not save the return decision. Please retry.");
+      }
+      if (!await load()) {
+        setSaveError(prev => ({ ...prev, [ret.id]: "Decision saved, but the updated returns could not be loaded. Refresh to confirm the saved status." }));
+        return;
+      }
+      setFormState(prev => { const next = { ...prev }; delete next[ret.id]; return next; });
       setExpanded(null);
+    } catch (e) {
+      setSaveError(prev => ({ ...prev, [ret.id]: e instanceof Error ? e.message : "Could not save the return decision. Please retry." }));
     } finally {
       setUpdating(null);
     }
@@ -111,9 +133,10 @@ export function AdminReturnsPage() {
           ))}
         </div>
 
+        {loadError && <p role="alert" className="mb-4 bg-red-50 text-red-700 p-3 rounded-xl">{loadError}</p>}
         {loading ? (
           <div className="text-center py-16 text-gray-400">Loading…</div>
-        ) : returns.length === 0 ? (
+        ) : returns.length === 0 && loadError ? null : returns.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <RotateCcw className="w-12 h-12 mx-auto mb-3 text-gray-200" />
             <p className="font-semibold">No return requests yet</p>
@@ -200,9 +223,10 @@ export function AdminReturnsPage() {
                             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] resize-none"
                           />
                         </div>
+                        {saveError[r.id] && <p role="alert" className="bg-red-50 text-red-700 p-3 rounded-xl text-sm">{saveError[r.id]}</p>}
                         <button
                           onClick={() => save(r)}
-                          disabled={updating === r.id}
+                          disabled={updating !== null}
                           className="w-full py-2.5 rounded-xl bg-[#4A5CE8] text-white font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
                         >
                           {updating === r.id ? "Saving…" : "Save Decision"}
