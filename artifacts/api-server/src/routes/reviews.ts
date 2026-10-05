@@ -290,7 +290,7 @@ router.get("/orders/seller", async (req, res) => {
     const email = await authenticatedEmail(req);
     if (!email) { res.status(401).json({ error: "Please sign in to view your sales" }); return; }
     const rows = await db.execute(sql`
-      SELECT o.id, o.item_title, o.item_image, o.price, o.status, o.tracking_number, o.carrier, o.address,
+      SELECT o.id, o.item_title, o.item_image, o.price, o.status, o.seller_fee, o.seller_fee_rate, o.seller_type, COALESCE(o.seller_net,o.price-o.seller_fee) seller_net, o.buyer_protection_fee, o.delivery_fee, o.buyer_total, o.stripe_transfer_id, o.payout_status, o.refunded_total, o.tracking_number, o.carrier, o.address,
              o.created_at, o.shipped_at, split_part(o.buyer_email, '@', 1) AS buyer_name, o.buyer_email,
              (SELECT r.rating FROM reviews r WHERE r.order_id = o.id AND r.role = 'seller_to_buyer') AS my_review_rating,
              (SELECT r.rating FROM reviews r WHERE r.order_id = o.id AND r.role = 'buyer_to_seller') AS buyer_review_rating

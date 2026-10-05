@@ -1,3 +1,6 @@
+import { getAuth, clerkClient } from "@clerk/express";
+import { percentage, minor } from "../lib/marketplaceFees.js";
+import { quoteCart, saveFeeSnapshot, QuoteError } from "../lib/checkoutQuote.js";
 import { isBanned } from "../lib/banned.js";
 import { Router } from "express";
 import { sql } from "drizzle-orm";
@@ -150,144 +153,60 @@ router.post("/stripe/checkout", async (req, res) => {
   }
 });
 
+router.post("/stripe/seller-fee-estimate",async(req,res)=>{
+  try {
+    const auth=getAuth(req);if(!auth.isAuthenticated || !auth.userId){res.status(401).json({error:"Sign in to calculate seller fees."});return;}
+    const account=await clerkClient.users.getUser(auth.userId);
+    const email=account.primaryEmailAddress?.emailAddress;
+    if(!email){res.status(401).json({error:"Account email required."});return;}
+    const row=(await db.execute(sql`SELECT seller_type FROM users WHERE LOWER(email)=LOWER(${email}) LIMIT 1`)).rows[0] as any;
+    const sellerType=String(row?.seller_type??"private");
+    const settings=(await db.execute(sql`SELECT key,value FROM site_settings WHERE key LIKE 'fee_rate_%'`)).rows as any[];
+    const fees=Object.fromEntries(settings.map(r=>[r.key,r.value]));
+    const rate=sellerType==="private"?0:percentage(fees[`fee_rate_${String(req.body.category??"").toLowerCase()}`],percentage(fees.fee_rate_default,8));
+    const amount=minor(req.body.amount??0),fee=Math.round(amount*rate/100);
+    res.json({sellerType,rate,sellerFee:fee/100,sellerNet:(amount-fee)/100,currency:"GBP"});
+  }catch(err){res.status(400).json({error:"Could not calculate seller fees."});}
+});
+
+router.post("/stripe/quote-cart", async (req,res) => {
+  try {
+    const quote=await quoteCart(req.body.items);
+    res.setHeader("Cache-Control","no-store");
+    res.json({currency:quote.currency,subtotal:quote.subtotalMinor/100,privateSubtotal:quote.privateSubtotalMinor/100,buyerProtectionFee:quote.buyerProtectionMinor/100,delivery:quote.deliveryMinor/100,total:quote.totalMinor/100,protectionPercent:quote.protectionPercent,fixedProtection:quote.fixedMinor/100,items:[...new Map(quote.units.map(u=>[u.id,{id:u.id,title:u.title,price:u.priceMinor/100,sellerType:u.sellerType}])).values()]});
+  } catch(err) { res.status(err instanceof QuoteError ? err.status : 500).json({error:err instanceof QuoteError ? err.message : "Could not calculate checkout fees."}); }
+});
+
 router.post("/stripe/checkout-cart", async (req, res) => {
   try {
-    const body = req.body as Record<string, unknown>;
-    const email = body.email as string;
-    const name = body.name as string | undefined;
-    const items = body.items as Array<{ id?: number; title: string; price: number; quantity: number; currency?: string; priceGbp?: number }>;
-    const total = parseFloat(body.total as string);
-    const creditsApplied = parseFloat((body.creditsApplied as string) ?? "0") || 0;
-    const deliveryGbp = parseFloat((body.deliveryGbp as string) ?? "0") || 0;
-
-    if (!email || !items?.length) {
-      res.status(400).json({ error: "email and items are required" }); return;
+    const body=req.body as Record<string,unknown>;
+    const email=String(body.email??"").trim().toLowerCase();
+    const name=typeof body.name==="string" ? body.name : undefined;
+    if(!/^\S+@\S+\.\S+$/.test(email)) throw new QuoteError("A valid email is required.");
+    // Credits and demo promo codes were never discounted by Stripe. Do not charge
+    // a full cash price while also subtracting credits from the buyer's balance.
+    if(Number(body.creditsApplied??0)>0 || body.promoCode) throw new QuoteError("Marketplace credits and promotion codes are not supported for this checkout.");
+    const quote=await quoteCart(body.items);
+    if(body.expectedTotal==null || Math.round(Number(body.expectedTotal)*100)!==quote.totalMinor)
+      throw new QuoteError("Your cart price or fees changed. Refresh the fee breakdown before paying.",409);
+    await storage.upsertUser(email,name);
+    const snapshotId=await saveFeeSnapshot(quote);
+    const grouped=new Map<number,{title:string;priceMinor:number;quantity:number}>();
+    for(const unit of quote.units) {
+      const prev=grouped.get(unit.id);if(prev) prev.quantity++;else grouped.set(unit.id,{title:unit.title,priceMinor:unit.priceMinor,quantity:1});
     }
-
-    await storage.upsertUser(email, name);
-
-    if (total <= 0) {
-      res.json({ freeOrder: true });
-      return;
-    }
-
-    // Determine charge currency — use uniform item currency, else fall back to GBP
-    const itemCurrencies = items.map((i) => (i.currency ?? "GBP").toUpperCase());
-    const allSame = itemCurrencies.every((c) => c === itemCurrencies[0]);
-    const chargeCurrency = allSame ? itemCurrencies[0] : "GBP";
-
-    // Build line items, converting amounts to charge currency as needed
-    const lineItems = await Promise.all(
-      items.map(async (item) => {
-        const itemCurrency = (item.currency ?? "GBP").toUpperCase();
-        let chargeAmount: number;
-        if (itemCurrency === chargeCurrency) {
-          chargeAmount = item.price;
-        } else {
-          const gbp = item.priceGbp ?? await convertAmount(item.price, itemCurrency, "GBP");
-          chargeAmount = chargeCurrency === "GBP" ? gbp : await convertAmount(gbp, "GBP", chargeCurrency);
-        }
-        return {
-          price_data: {
-            currency: chargeCurrency.toLowerCase(),
-            unit_amount: smallestUnit(chargeAmount, chargeCurrency),
-            product_data: { name: item.title },
-          },
-          quantity: item.quantity,
-        };
-      })
-    );
-
-
-    // Buyer Protection is calculated server-side so clients cannot remove or alter it.
-    const bpRows = (await db.execute(sql`SELECT key, value FROM site_settings WHERE key LIKE 'buyer_protection_%'`)).rows as Array<Record<string, unknown>>;
-    const bpSettings = Object.fromEntries(bpRows.map((r) => [String(r.key), Number(r.value)]));
-    const bpPercent = Number.isFinite(bpSettings.buyer_protection_percent) ? bpSettings.buyer_protection_percent : 6;
-    const fixedByCurrency: Record<string, number> = {
-      GBP: Number.isFinite(bpSettings.buyer_protection_fixed_gbp) ? bpSettings.buyer_protection_fixed_gbp : 0.70,
-      USD: Number.isFinite(bpSettings.buyer_protection_fixed_usd) ? bpSettings.buyer_protection_fixed_usd : 1.00,
-      EUR: Number.isFinite(bpSettings.buyer_protection_fixed_eur) ? bpSettings.buyer_protection_fixed_eur : 1.00,
-    };
-    let protectedSubtotal = 0;
-    for (const item of items) {
-      const itemCurrency = (item.currency ?? "GBP").toUpperCase();
-      let unit = item.price;
-      if (itemCurrency !== chargeCurrency) {
-        const gbp = item.priceGbp ?? await convertAmount(item.price, itemCurrency, "GBP");
-        unit = chargeCurrency === "GBP" ? gbp : await convertAmount(gbp, "GBP", chargeCurrency);
-      }
-      protectedSubtotal += unit * item.quantity;
-    }
-    let fixedProtection = fixedByCurrency[chargeCurrency];
-    if (fixedProtection == null) {
-      fixedProtection = await convertAmount(fixedByCurrency.GBP, "GBP", chargeCurrency);
-    }
-    const buyerProtectionFee = Math.max(0, protectedSubtotal * (bpPercent / 100) + fixedProtection);
-    if (buyerProtectionFee > 0) {
-      lineItems.push({
-        price_data: {
-          currency: chargeCurrency.toLowerCase(),
-          unit_amount: smallestUnit(buyerProtectionFee, chargeCurrency),
-          product_data: { name: "Bazunk Buyer Protection" },
-        },
-        quantity: 1,
-      });
-    }
-
-    // Delivery — always provided in GBP, convert if needed
-    if (deliveryGbp > 0) {
-      const deliveryCharge = chargeCurrency === "GBP"
-        ? deliveryGbp
-        : await convertAmount(deliveryGbp, "GBP", chargeCurrency);
-      lineItems.push({
-        price_data: {
-          currency: chargeCurrency.toLowerCase(),
-          unit_amount: smallestUnit(deliveryCharge, chargeCurrency),
-          product_data: { name: "Delivery" },
-        },
-        quantity: 1,
-      });
-    }
-
-    const stripe = await getUncachableStripeClient();
-
-    let user = await storage.getUser(email);
-    let stripeCustomerId = user?.stripeCustomerId;
-    if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({ email, name: name ?? undefined });
-      await storage.setStripeCustomerId(email, customer.id);
-      stripeCustomerId = customer.id;
-    }
-
-    const origin = resolveOrigin(req);
-
-    const session = await stripe.checkout.sessions.create({
-      customer: stripeCustomerId,
-      client_reference_id: email,
-      line_items: lineItems,
-      mode: "payment",
-      metadata: {
-        email,
-        type: "cart",
-        // "listingId:qty,..." — fulfilment looks up seller/price from the listings table
-        items: items
-          .filter((i) => Number.isInteger(i.id))
-          .map((i) => `${i.id}:${i.quantity}`)
-          .join(",")
-          .slice(0, 500),
-        creditsApplied: creditsApplied.toFixed(2),
-        chargeCurrency,
-        buyerProtectionFee: buyerProtectionFee.toFixed(2),
-        buyerProtectionPercent: bpPercent.toFixed(2),
-      },
-      success_url: `${origin}/checkout?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/checkout`,
-    });
-
-    res.json({ url: session.url });
-  } catch (err) {
-    logger.error({ err }, "Failed to create cart checkout session");
-    res.status(500).json({ error: "Failed to create checkout session", message: String(err) });
+    const lineItems=[...grouped.values()].map(item=>({price_data:{currency:"gbp",unit_amount:item.priceMinor,product_data:{name:item.title}},quantity:item.quantity}));
+    if(quote.buyerProtectionMinor) lineItems.push({price_data:{currency:"gbp",unit_amount:quote.buyerProtectionMinor,product_data:{name:"Buyer Protection — personal seller items"}},quantity:1});
+    if(quote.deliveryMinor) lineItems.push({price_data:{currency:"gbp",unit_amount:quote.deliveryMinor,product_data:{name:"Delivery"}},quantity:1});
+    const stripe=await getUncachableStripeClient();
+    let user=await storage.getUser(email);let stripeCustomerId=user?.stripeCustomerId;
+    if(!stripeCustomerId) {const customer=await stripe.customers.create({email,name});await storage.setStripeCustomerId(email,customer.id);stripeCustomerId=customer.id;}
+    const origin=resolveOrigin(req);
+    const session=await stripe.checkout.sessions.create({customer:stripeCustomerId,client_reference_id:email,line_items:lineItems,mode:"payment",metadata:{email,type:"cart",feeQuoteId:snapshotId,feePolicy:quote.policy,chargeCurrency:"GBP",creditsApplied:"0",buyerProtectionFee:(quote.buyerProtectionMinor/100).toFixed(2),buyerProtectionPercent:String(quote.protectionPercent)},success_url:`${origin}/checkout?session_id={CHECKOUT_SESSION_ID}`,cancel_url:`${origin}/checkout`});
+    res.json({url:session.url});
+  } catch(err) {
+    logger.error({err},"Failed to create cart checkout session");
+    res.status(err instanceof QuoteError ? err.status : 500).json({error:err instanceof QuoteError ? err.message : "Failed to create checkout session"});
   }
 });
 
@@ -305,16 +224,8 @@ router.post("/stripe/confirm-cart-payment", async (req, res) => {
       const result = await fulfillCartSession(sessionId, email);
       if (result.status === "not_paid") { res.status(400).json({ error: "Payment not completed" }); return; }
       if (result.status === "email_mismatch") { res.status(403).json({ error: "Email mismatch" }); return; }
-    } else if (freeOrder) {
-      if (creditsApplied > 0) {
-        await storage.addCredits(email, -creditsApplied);
-        await recordCreditEconomy({ email, kind: "spent", credits: -creditsApplied, reason: "Marketplace order paid with credits", referenceType: "checkout" });
-      }
-      const cartItems = body.items as Array<{ title: string; price: number; quantity: number }> | undefined;
-      if (cartItems?.length) {
-        void sendOrderConfirmation({ email, name: body.name as string | undefined, items: cartItems, total: 0 });
-      }
-    }
+    } else { res.status(400).json({error:"A paid checkout session is required."}); return; }
+
 
     res.json({ success: true });
   } catch (err) {

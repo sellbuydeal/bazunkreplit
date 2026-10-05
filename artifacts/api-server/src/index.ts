@@ -206,6 +206,9 @@ async function runAppMigrations() {
   await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS line_no INTEGER`, "orders.line_no");
   await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS buyer_protection_fee NUMERIC(10,2) NOT NULL DEFAULT 0`, "orders.buyer_protection_fee");
   await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_fee NUMERIC(10,2) NOT NULL DEFAULT 0`, "orders.seller_fee");
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_type TEXT; ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_fee_rate NUMERIC(6,2); ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_net NUMERIC(10,2); ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_fee NUMERIC(10,2) NOT NULL DEFAULT 0; ALTER TABLE orders ADD COLUMN IF NOT EXISTS buyer_total NUMERIC(10,2); ALTER TABLE orders ADD COLUMN IF NOT EXISTS fee_policy TEXT`, "orders.fee_snapshot");
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS stripe_transfer_id TEXT; ALTER TABLE orders ADD COLUMN IF NOT EXISTS payout_status TEXT NOT NULL DEFAULT 'awaiting_release'; ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_total NUMERIC(10,2) NOT NULL DEFAULT 0`, "orders.settlement");
+  await run(sql`CREATE TABLE IF NOT EXISTS checkout_fee_snapshots (id TEXT PRIMARY KEY, payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`, "checkout_fee_snapshots");
   await run(
     sql`CREATE UNIQUE INDEX IF NOT EXISTS orders_session_line_uniq ON orders (stripe_session_id, line_no)`,
     "orders_session_line_uniq",
@@ -484,32 +487,43 @@ async function runAppMigrations() {
     CREATE INDEX IF NOT EXISTS idx_vwl_created_at   ON verification_webhook_logs (created_at DESC)
   `, "idx_vwl_created_at");
 
-  // Seed default fee rates (5% for all categories) — DO NOTHING if already set
+  await run(sql`DO $$ BEGIN
+    PERFORM pg_advisory_xact_lock(hashtext('bazunk-fee-policy-v1'));
+    IF NOT EXISTS (SELECT 1 FROM site_settings WHERE key='fee_policy_private_business_v1') THEN
+      UPDATE site_settings SET value='5',updated_at=NOW() WHERE key='buyer_protection_percent';
+      UPDATE site_settings SET value='0.70',updated_at=NOW() WHERE key='buyer_protection_fixed_gbp';
+      UPDATE site_settings SET value='8',updated_at=NOW() WHERE key='fee_rate_default';
+      UPDATE site_settings SET value='8',updated_at=NOW() WHERE key LIKE 'fee_rate_%' AND value='5';
+      INSERT INTO site_settings(key,value,updated_at) VALUES('fee_policy_private_business_v1','applied',NOW());
+    END IF;
+  END $$`, "site_settings.fee_policy_private_business_v1");
+
+  // Seed default fee rates (8% for business categories) — DO NOTHING if already set
   await run(sql`
     INSERT INTO site_settings (key, value, updated_at) VALUES
-      ('fee_rate_default',              '5', NOW()),
+      ('fee_rate_default',              '8', NOW()),
       ('fee_listing_free',           'true', NOW()),
-      ('buyer_protection_percent',      '6', NOW()),
+      ('buyer_protection_percent',      '5', NOW()),
       ('buyer_protection_fixed_gbp',   '0.70', NOW()),
       ('buyer_protection_fixed_usd',   '1.00', NOW()),
       ('buyer_protection_fixed_eur',   '1.00', NOW()),
-      ('fee_rate_electronics',           '5', NOW()),
-      ('fee_rate_cell-phones',           '5', NOW()),
-      ('fee_rate_clothing-shoes-jewelry','5', NOW()),
-      ('fee_rate_automotive',            '5', NOW()),
-      ('fee_rate_home-garden',           '5', NOW()),
-      ('fee_rate_sports-outdoors',       '5', NOW()),
-      ('fee_rate_toys-games',            '5', NOW()),
-      ('fee_rate_books',                 '5', NOW()),
-      ('fee_rate_cds-vinyl',             '5', NOW()),
-      ('fee_rate_beauty-personal-care',  '5', NOW()),
-      ('fee_rate_baby-products',         '5', NOW()),
-      ('fee_rate_health-household',      '5', NOW()),
-      ('fee_rate_arts-crafts-sewing',    '5', NOW()),
-      ('fee_rate_appliances',            '5', NOW()),
-      ('fee_rate_eco-friendly',          '5', NOW()),
-      ('fee_rate_digital',               '5', NOW()),
-      ('fee_rate_adult',                 '5', NOW())
+      ('fee_rate_electronics',           '8', NOW()),
+      ('fee_rate_cell-phones',           '8', NOW()),
+      ('fee_rate_clothing-shoes-jewelry','8', NOW()),
+      ('fee_rate_automotive',            '8', NOW()),
+      ('fee_rate_home-garden',           '8', NOW()),
+      ('fee_rate_sports-outdoors',       '8', NOW()),
+      ('fee_rate_toys-games',            '8', NOW()),
+      ('fee_rate_books',                 '8', NOW()),
+      ('fee_rate_cds-vinyl',             '8', NOW()),
+      ('fee_rate_beauty-personal-care',  '8', NOW()),
+      ('fee_rate_baby-products',         '8', NOW()),
+      ('fee_rate_health-household',      '8', NOW()),
+      ('fee_rate_arts-crafts-sewing',    '8', NOW()),
+      ('fee_rate_appliances',            '8', NOW()),
+      ('fee_rate_eco-friendly',          '8', NOW()),
+      ('fee_rate_digital',               '8', NOW()),
+      ('fee_rate_adult',                 '8', NOW())
     ON CONFLICT (key) DO NOTHING
   `, "site_settings.seed");
 
@@ -627,7 +641,7 @@ async function runAppMigrations() {
     ON CONFLICT DO NOTHING
   `, "product_categories.seed_digital_adult");
 
-  // One-off tidy: AliExpress imports made before the importer used the Quick Sell category list
+  // One-off tidy: AliExpress imports made before the importer used the Direct Sale category list
   // carry the old short names (fashion, home, gaming …). Map them onto the site's real category slugs.
   // Safe to run on every start: once mapped, nothing matches again. "other" has no equivalent and is left alone.
   await run(sql`

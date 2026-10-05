@@ -9,6 +9,7 @@ interface SaleRow {
   id: string; item_title: string; item_image: string | null; price: string; status: string;
   tracking_number: string | null; carrier: string | null; address: string | null;
   created_at: string; shipped_at: string | null; buyer_name: string; buyer_email: string;
+  seller_fee?: string; seller_fee_rate?: string; seller_type?: string; seller_net?: string; payout_status?: string; stripe_transfer_id?: string; refunded_total?: string;
   my_review_rating: number | null; buyer_review_rating: number | null;
 }
 
@@ -84,7 +85,7 @@ export function SellerSales() {
           <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-4"><TrendingUp className="w-8 h-8 text-gray-200" /></div>
           <p className="font-semibold text-gray-700 mb-1">No sales yet</p>
           <p className="text-sm text-gray-400 mb-5">List your first item to start selling</p>
-          <Link href="/sell/quick" className="px-6 py-2.5 rounded-xl bg-[#F26B21] text-white font-bold text-sm hover:opacity-90">Create a Listing</Link>
+          <Link href="/sell/direct" className="px-6 py-2.5 rounded-xl bg-[#F26B21] text-white font-bold text-sm hover:opacity-90">Create a Listing</Link>
         </div>
       )}
 
@@ -111,6 +112,9 @@ export function SellerSales() {
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className="font-bold text-gray-900 text-sm">£{parseFloat(s.price).toFixed(2)}</p>
+                  <p className="text-xs text-gray-500">Selling fee: £{Number(s.seller_fee ?? 0).toFixed(2)}{Number(s.seller_fee)>0 ? " · protection & support included" : " · no seller commission"}</p>
+                  <p className="text-xs font-bold text-emerald-600">Net sale amount: £{Number(s.seller_net ?? (Number(s.price)-Number(s.seller_fee??0))).toFixed(2)}</p>
+                  <p className="text-xs text-gray-500">{s.payout_status === "paid" ? "Transferred to your Stripe account" : "Awaiting payout release"}</p>
                   <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">

@@ -84,23 +84,23 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 ];
 
 const FEE_CATEGORIES: { name: string; slug: string; defaultRate: string }[] = [
-  { name: "Electronics", slug: "electronics", defaultRate: "5" },
-  { name: "Phones & Tablets", slug: "cell-phones", defaultRate: "5" },
-  { name: "Fashion, Clothing & Jewellery", slug: "clothing-shoes-jewelry", defaultRate: "5" },
-  { name: "Automotive", slug: "automotive", defaultRate: "5" },
-  { name: "Home & Garden", slug: "home-garden", defaultRate: "5" },
-  { name: "Sports & Outdoors", slug: "sports-outdoors", defaultRate: "5" },
-  { name: "Toys & Games", slug: "toys-games", defaultRate: "5" },
-  { name: "Books", slug: "books", defaultRate: "5" },
-  { name: "CDs, Vinyl & Music", slug: "cds-vinyl", defaultRate: "5" },
-  { name: "Beauty & Personal Care", slug: "beauty-personal-care", defaultRate: "5" },
-  { name: "Baby Products", slug: "baby-products", defaultRate: "5" },
-  { name: "Health & Household", slug: "health-household", defaultRate: "5" },
-  { name: "Arts, Crafts & Sewing", slug: "arts-crafts-sewing", defaultRate: "5" },
-  { name: "Appliances", slug: "appliances", defaultRate: "5" },
-  { name: "Eco-Friendly", slug: "eco-friendly", defaultRate: "5" },
-  { name: "Digital", slug: "digital", defaultRate: "5" },
-  { name: "Adult", slug: "adult", defaultRate: "5" },
+  { name: "Electronics", slug: "electronics", defaultRate: "8" },
+  { name: "Phones & Tablets", slug: "cell-phones", defaultRate: "8" },
+  { name: "Fashion, Clothing & Jewellery", slug: "clothing-shoes-jewelry", defaultRate: "8" },
+  { name: "Automotive", slug: "automotive", defaultRate: "8" },
+  { name: "Home & Garden", slug: "home-garden", defaultRate: "8" },
+  { name: "Sports & Outdoors", slug: "sports-outdoors", defaultRate: "8" },
+  { name: "Toys & Games", slug: "toys-games", defaultRate: "8" },
+  { name: "Books", slug: "books", defaultRate: "8" },
+  { name: "CDs, Vinyl & Music", slug: "cds-vinyl", defaultRate: "8" },
+  { name: "Beauty & Personal Care", slug: "beauty-personal-care", defaultRate: "8" },
+  { name: "Baby Products", slug: "baby-products", defaultRate: "8" },
+  { name: "Health & Household", slug: "health-household", defaultRate: "8" },
+  { name: "Arts, Crafts & Sewing", slug: "arts-crafts-sewing", defaultRate: "8" },
+  { name: "Appliances", slug: "appliances", defaultRate: "8" },
+  { name: "Eco-Friendly", slug: "eco-friendly", defaultRate: "8" },
+  { name: "Digital", slug: "digital", defaultRate: "8" },
+  { name: "Adult", slug: "adult", defaultRate: "8" },
 ];
 
 const AD_SLOTS = [
@@ -171,7 +171,7 @@ export function AdminSettingsPage() {
   const defaultFeeRates = Object.fromEntries(
     FEE_CATEGORIES.map(c => [`fee_rate_${c.slug}`, c.defaultRate])
   );
-  const [feeRates, setFeeRates] = useState<Record<string, string>>({ ...defaultFeeRates, fee_rate_default: "5", fee_listing_free: "true", buyer_protection_percent: "6", buyer_protection_fixed_gbp: "0.70", buyer_protection_fixed_usd: "1.00", buyer_protection_fixed_eur: "1.00" });
+  const [feeRates, setFeeRates] = useState<Record<string, string>>({ ...defaultFeeRates, fee_rate_default: "8", fee_listing_free: "true", buyer_protection_percent: "5", buyer_protection_fixed_gbp: "0.70", buyer_protection_fixed_usd: "1.00", buyer_protection_fixed_eur: "1.00" });
   const [feesSaving, setFeesSaving] = useState(false);
   const [feesSaved, setFeesSaved] = useState(false);
   const [feesError, setFeesError] = useState<string | null>(null);
@@ -186,7 +186,7 @@ export function AdminSettingsPage() {
       if (res.ok) {
         const d = await res.json();
         setSettings({ ...DEFAULTS, ...d });
-        const loaded: Record<string, string> = { ...defaultFeeRates, fee_rate_default: "5", fee_listing_free: "true", buyer_protection_percent: "6", buyer_protection_fixed_gbp: "0.70", buyer_protection_fixed_usd: "1.00", buyer_protection_fixed_eur: "1.00" };
+        const loaded: Record<string, string> = { ...defaultFeeRates, fee_rate_default: "8", fee_listing_free: "true", buyer_protection_percent: "5", buyer_protection_fixed_gbp: "0.70", buyer_protection_fixed_usd: "1.00", buyer_protection_fixed_eur: "1.00" };
         Object.entries(d as Record<string, string>).forEach(([k, v]) => {
           if (k.startsWith("fee_")) loaded[k] = v;
         });
@@ -590,8 +590,8 @@ export function AdminSettingsPage() {
                 <div>
                   <p className="font-bold">Buyer Protection & Business Seller Fees</p>
                   <p className="text-xs text-blue-500 mt-0.5">
-                    Private sellers pay <strong>no listing fee and no selling commission</strong>. Buyers pay Buyer Protection at checkout.
-                    Registered businesses and sole traders can also have a seller fee, configured by category below.
+                    Private sellers pay <strong>no listing fee and no selling commission</strong>. Buyers pay Buyer Protection only on private-seller items, once per checkout.
+                    Business / sole-trader fees include protection and support, with no extra buyer protection fee. Category overrides remain available below.
                   </p>
                 </div>
               </div>
@@ -599,11 +599,11 @@ export function AdminSettingsPage() {
               <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-emerald-100 bg-emerald-50">
                   <h2 className="font-bold text-gray-900">Buyer Protection Fee</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">Mandatory buyer fee added automatically at checkout. Private sellers keep 100% of their item price.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Default UK rate: 5% + 70p on private-seller items only. The fixed fee applies once per checkout. Private sellers keep 100% of the item price.</p>
                 </div>
                 <div className="p-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {[["buyer_protection_percent","Percentage","%"],["buyer_protection_fixed_gbp","UK fixed","£"],["buyer_protection_fixed_usd","US fixed","$"],["buyer_protection_fixed_eur","EU fixed","€"]].map(([key,label,unit]) => (
-                    <label key={key} className="text-xs font-bold text-gray-500">{label}<div className="flex items-center gap-2 mt-1"><span>{unit}</span><input type="number" min="0" step="0.01" value={feeRates[key] ?? (key === "buyer_protection_percent" ? "6" : key === "buyer_protection_fixed_gbp" ? "0.70" : "1.00")} onChange={e => setFeeRate(key,e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" /></div></label>
+                    <label key={key} className="text-xs font-bold text-gray-500">{label}<div className="flex items-center gap-2 mt-1"><span>{unit}</span><input type="number" min="0" step="0.01" value={feeRates[key] ?? (key === "buyer_protection_percent" ? "5" : key === "buyer_protection_fixed_gbp" ? "0.70" : "1.00")} onChange={e => setFeeRate(key,e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" /></div></label>
                   ))}
                 </div>
               </div>
@@ -611,19 +611,19 @@ export function AdminSettingsPage() {
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100">
                   <h2 className="font-bold text-gray-900">Business seller default fee</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Only for registered business / sole-trader sellers when no category override exists</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Default 8%, deducted from business / sole-trader sales. Includes protection and support; no additional buyer protection charge. Category overrides take precedence.</p>
                 </div>
                 <div className="px-6 py-5">
                   <div className="flex items-center gap-3 max-w-xs">
                     <input
                       type="number" min="0" max="30" step="0.5"
-                      value={feeRates["fee_rate_default"] ?? "5"}
+                      value={feeRates["fee_rate_default"] ?? "8"}
                       onChange={e => setFeeRate("fee_rate_default", e.target.value)}
                       className="w-28 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]"
                     />
                     <span className="text-sm font-semibold text-gray-500">% business seller fee</span>
                     <button type="button" onClick={() => {
-                      const v = feeRates["fee_rate_default"] ?? "5";
+                      const v = feeRates["fee_rate_default"] ?? "8";
                       setFeeRates(prev => ({ ...prev, ...Object.fromEntries(FEE_CATEGORIES.map(c => [`fee_rate_${c.slug}`, v])) }));
                       setFeesSaved(false);
                     }} className="whitespace-nowrap px-4 py-2.5 rounded-xl border border-[#4A5CE8] text-[#4A5CE8] font-bold text-xs hover:bg-indigo-50">

@@ -53,7 +53,7 @@ const CONDITION_COLORS: Record<string, string> = {
 };
 
 export function CheckoutPage() {
-  const { items, subtotal, clearCart } = useCart();
+  const { items, clearCart } = useCart();
   const { user, refreshBalance } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -67,34 +67,30 @@ export function CheckoutPage() {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [guestEmail, setGuestEmail] = useState("");
-  const [protection, setProtection] = useState({ percent: 6, gbp: 0.70, usd: 1, eur: 1 });
-
-  useEffect(() => {
-    fetch("/api/settings/public").then(r => r.json()).then((d: Record<string,string>) => setProtection({
-      percent: Number(d.buyer_protection_percent ?? 6),
-      gbp: Number(d.buyer_protection_fixed_gbp ?? 0.70),
-      usd: Number(d.buyer_protection_fixed_usd ?? 1),
-      eur: Number(d.buyer_protection_fixed_eur ?? 1),
-    })).catch(() => {});
-  }, []);
-
-  const userCredits = user?.balance ?? 0;
-  const appliedPromo = promoCode ? PROMO_CODES[promoCode] : null;
-
-  const promoDiscount = useMemo(() => {
-    if (!appliedPromo) return 0;
-    if (appliedPromo.type === "percent") return subtotal * (appliedPromo.value / 100);
-    return Math.min(appliedPromo.value, subtotal);
-  }, [appliedPromo, subtotal]);
-
-  const delivery = subtotal >= 50 ? 0 : 3.99;
-  const buyerProtectionFee = subtotal > 0 ? subtotal * (protection.percent / 100) + protection.gbp : 0;
-  // Credits apply to item subtotal only — a minimum of £0.50 must always be charged
-  // via card to cover Stripe processing fees. Credits cannot pay marketplace or card fees.
-  const MIN_CARD_CHARGE = 0.50;
-  const rawCredits = useCredits ? Math.min(userCredits, Math.max(0, subtotal - promoDiscount)) : 0;
-  const creditsApplied = Math.min(rawCredits, Math.max(0, subtotal - promoDiscount + delivery + buyerProtectionFee - MIN_CARD_CHARGE));
-  const total = Math.max(MIN_CARD_CHARGE, subtotal - promoDiscount - creditsApplied + delivery + buyerProtectionFee);
+  type Quote = { currency:string; subtotal:number; privateSubtotal:number; buyerProtectionFee:number; delivery:number; total:number; protectionPercent:number; fixedProtection:number; items:{id:number;price:number;title:string;sellerType:string}[] };
+  const [quote,setQuote]=useState<Quote|null>(null);
+  const [quoteError,setQuoteError]=useState("");
+  const [quoteLoading,setQuoteLoading]=useState(true);
+  const [quoteRevision,setQuoteRevision]=useState(0);
+  const cartKey=JSON.stringify(items.map(item=>({id:item.product.id,quantity:item.quantity})));
+  const [quotedKey,setQuotedKey]=useState("");
+  useEffect(()=>{
+    const controller=new AbortController();setQuoteLoading(true);setQuoteError("");setQuote(null);
+    if(!items.length) { setQuoteLoading(false); return; }
+    fetch("/api/stripe/quote-cart",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:JSON.parse(cartKey)}),signal:controller.signal})
+      .then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.error||"Could not calculate fees.");return data;})
+      .then(data=>{setQuote(data);setQuotedKey(cartKey);})
+      .catch(err=>{if(err.name!=="AbortError")setQuoteError(err.message);})
+      .finally(()=>{if(!controller.signal.aborted)setQuoteLoading(false);});
+    return ()=>controller.abort();
+  },[cartKey,quoteRevision]);
+  const subtotal=quote?.subtotal??0;
+  const delivery=quote?.delivery??0;
+  const buyerProtectionFee=quote?.buyerProtectionFee??0;
+  const total=quote?.total??0;
+  const promoDiscount=0,creditsApplied=0;
+  const appliedPromo=null as {label:string;source:string}|null;
+  const userCredits=user?.balance??0;
 
   // Detect return from Stripe checkout
   useEffect(() => {
@@ -148,6 +144,7 @@ export function CheckoutPage() {
       setCheckoutError("Please enter a valid email address to continue.");
       return;
     }
+    if(!quote || quoteLoading || quotedKey!==cartKey) {setCheckoutError("Wait for your fee breakdown before paying.");return;}
     setCheckoutError(null);
     setCheckoutLoading(true);
     setStep("redirecting");
@@ -167,23 +164,19 @@ export function CheckoutPage() {
             currency: i.product.currency ?? "GBP",
             priceGbp: i.product.priceGbp,
           })),
-          total,
-          creditsApplied,
+          expectedTotal:total,
+          creditsApplied:0,
           deliveryGbp: delivery,
         }),
       });
       const data = await res.json() as { url?: string; freeOrder?: boolean; error?: string };
 
-      if (data.freeOrder) {
-        clearCart();
-        refreshBalance();
-        setPlaced(true);
-        return;
-      }
+
       if (data.url) {
         window.location.href = data.url;
         return;
       }
+      if(res.status===409)setQuoteRevision(value=>value+1);
       throw new Error(data.error ?? "Failed to start checkout");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Checkout failed";
@@ -298,117 +291,17 @@ export function CheckoutPage() {
                             <span className="text-xs text-gray-400">Qty: {item.quantity}</span>
                           </div>
                         </div>
-                        <span className="font-bold text-gray-900 text-sm">£{(item.product.price * item.quantity).toFixed(2)}</span>
+                        <span className="font-bold text-gray-900 text-sm">£{((quote?.items.find(row=>row.id===item.product.id)?.price ?? item.product.priceGbp ?? item.product.price) * item.quantity).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Bundle CTA */}
-                <div className="bg-gradient-to-r from-[#4A5CE8] to-[#7C3AED] rounded-2xl p-4 mb-4 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-                    <Layers className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-white font-bold text-sm">Create a Bundle & Save More</p>
-                    <p className="text-white/70 text-xs">Group items from the same seller to unlock extra discounts</p>
-                  </div>
-                  <Link href="/bundle" className="flex-shrink-0 px-4 py-2 rounded-xl bg-white text-[#4A5CE8] font-bold text-xs hover:bg-gray-50 transition-colors flex items-center gap-1">
-                    Build Bundle <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-900">
+                  Personal sellers pay no selling fee. Buyer Protection is added only to personal-seller items, with one fixed fee per checkout. Business purchases include protection with no extra buyer fee.
                 </div>
-
-                {/* Credits */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
-                        <Coins className="w-5 h-5 text-amber-500" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-900 text-sm">Bazunk Credits</p>
-                        {userCredits > 0
-                          ? <p className="text-xs text-gray-400">You have <strong className="text-amber-600">{Math.round(userCredits * 100).toLocaleString()} credits</strong> (≈ £{userCredits.toFixed(2)})</p>
-                          : <p className="text-xs text-gray-400">No credits — <Link href="/credits" className="text-[#4A5CE8] underline">buy some</Link></p>
-                        }
-                      </div>
-                    </div>
-                    {userCredits > 0 && (
-                      <div
-                        onClick={() => setUseCredits(!useCredits)}
-                        className={`relative inline-flex h-6 w-11 cursor-pointer rounded-full border-2 border-transparent transition-colors ${useCredits ? "bg-amber-400" : "bg-gray-200"}`}
-                        data-testid="toggle-credits"
-                      >
-                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${useCredits ? "translate-x-5" : "translate-x-0"}`} />
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Credits apply to the item price only. Delivery and Buyer Protection are paid separately at checkout.
-                  </p>
-                  {useCredits && creditsApplied > 0 && (
-                    <div className="mt-2 px-3 py-2 bg-amber-50 rounded-xl text-xs text-amber-700 font-medium flex items-center gap-2">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-amber-500" />
-                      {Math.round(creditsApplied * 100).toLocaleString()} credits (£{creditsApplied.toFixed(2)}) will be applied to your item price
-                    </div>
-                  )}
-                </div>
-
-                {/* Promo codes */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                  <h2 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                    <Gift className="w-4 h-4 text-[#4A5CE8]" /> Promo Code
-                  </h2>
-                  {appliedPromo ? (
-                    <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Tag className="w-4 h-4 text-emerald-500" />
-                        <div>
-                          <p className="text-sm font-bold text-emerald-800">{promoCode}</p>
-                          <p className="text-xs text-emerald-600">{appliedPromo.label}</p>
-                        </div>
-                        <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${appliedPromo.source === "seller" ? "bg-[#F26B21]/10 text-[#F26B21]" : "bg-[#4A5CE8]/10 text-[#4A5CE8]"}`}>
-                          {appliedPromo.source === "seller" ? "Seller Code" : "Site Code"}
-                        </span>
-                      </div>
-                      <button onClick={() => setPromoCode("")} className="text-gray-400 hover:text-red-400 transition-colors" data-testid="button-remove-promo">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={promoInput}
-                          onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoError(""); }}
-                          onKeyDown={(e) => e.key === "Enter" && applyPromo()}
-                          placeholder="Enter code (try SAVE10)"
-                          className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8] uppercase"
-                          data-testid="input-promo-code"
-                        />
-                        <button onClick={applyPromo} className="px-4 py-2.5 rounded-xl bg-[#4A5CE8] text-white font-bold text-sm hover:opacity-90 transition-opacity" data-testid="button-apply-promo">
-                          Apply
-                        </button>
-                      </div>
-                      {promoError && (
-                        <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5" /> {promoError}
-                        </p>
-                      )}
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {(["SAVE10", "SELLER5", "WELCOME20"] as const).map((code) => (
-                          <button key={code} onClick={() => { setPromoInput(code); setPromoError(""); }}
-                            className="text-xs px-2.5 py-1 rounded-full border border-dashed border-[#4A5CE8]/40 text-[#4A5CE8] hover:bg-[#4A5CE8]/5 transition-colors font-medium"
-                            data-testid={`button-suggested-promo-${code}`}>
-                            {code}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-
+                {quoteLoading && <p role="status" className="mt-4 text-sm text-muted-foreground">Calculating your checkout fees…</p>}
+                {quoteError && <div role="alert" className="mt-4 text-sm text-red-600">{quoteError}<button onClick={()=>setQuoteRevision(v=>v+1)} className="ml-3 underline font-bold">Retry fee calculation</button></div>}
                 {!user && (
                   <div className="mt-4">
                     <label className="block text-xs font-semibold text-gray-600 mb-1">Email for your receipt</label>
@@ -425,21 +318,19 @@ export function CheckoutPage() {
 
                 <button
                   onClick={handleContinueToPayment}
-                  disabled={checkoutLoading}
+                  disabled={checkoutLoading || quoteLoading || !quote || quotedKey!==cartKey}
                   className="w-full mt-4 py-4 rounded-xl bg-gradient-to-r from-[#F26B21] to-[#D97706] text-white font-bold text-sm hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-2 disabled:opacity-70"
                   data-testid="button-continue-payment"
                 >
                   {checkoutLoading
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing checkout…</>
-                    : total <= 0
-                    ? <><CheckCircle2 className="w-4 h-4" /> Confirm Free Order</>
                     : <><Lock className="w-4 h-4" /> Pay £{total.toFixed(2)} with Stripe <ChevronRight className="w-4 h-4" /></>
                   }
                 </button>
 
                 {!user && (
                   <p className="text-center text-xs text-gray-400 mt-2">
-                    <Link href="/sign-in" className="text-[#4A5CE8] underline">Sign in</Link> to use credits and track your orders
+                    <Link href="/sign-in" className="text-[#4A5CE8] underline">Sign in</Link> to track your orders
                   </p>
                 )}
               </motion.div>
@@ -489,8 +380,9 @@ export function CheckoutPage() {
                 )}
                 <div className="flex justify-between text-gray-600">
                   <span className="flex items-center gap-1">Buyer Protection <Link href="/buyer-protection" className="text-[#4A5CE8] underline text-xs">Learn more</Link></span>
-                  <span className="font-semibold text-gray-900">£{buyerProtectionFee.toFixed(2)}</span>
+                  <span className="font-semibold text-gray-900">{quoteLoading ? "Calculating…" : !quote ? "Unavailable" : buyerProtectionFee>0 ? `£${buyerProtectionFee.toFixed(2)}` : "Included"}</span>
                 </div>
+                <p className="text-xs text-gray-500">{quote?.privateSubtotal ? `${quote.protectionPercent}% of personal-seller items + £${quote.fixedProtection.toFixed(2)} once per checkout.` : "Protection is included on business-seller purchases."}</p>
                 <div className="flex justify-between text-gray-600">
                   <span>Delivery</span>
                   <span className={`font-semibold ${delivery === 0 ? "text-emerald-600" : "text-gray-900"}`}>
@@ -512,7 +404,7 @@ export function CheckoutPage() {
 
               <div className="mt-4 space-y-2">
                 {[
-                  { icon: Shield,  text: `Buyer Protection (${protection.percent}% + 70p)` },
+                  { icon: Shield,  text: "Buyer Protection on eligible orders" },
                   { icon: Truck,   text: "Shipping arranged by seller" },
                   { icon: Package, text: "Track orders from your Dashboard" },
                 ].map(({ icon: Icon, text }) => (

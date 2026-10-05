@@ -1990,6 +1990,10 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [dashLoading, setDashLoading] = useState(false);
+  const { getToken } = useClerkAuth();
+  const [feeCategory,setFeeCategory]=useState("");
+  const [feeEstimate,setFeeEstimate]=useState<{rate:number;sellerFee:number;sellerNet:number;sellerType:string}|null>(null);
+  const [feeEstimateError,setFeeEstimateError]=useState("");
   const [saleAmount, setSaleAmount] = useState("50");
 
   useEffect(() => {
@@ -2026,29 +2030,16 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
     } finally { setDashLoading(false); }
   }
 
-  const rawSettings = useRawSettings();
-  const amount = parseFloat(saleAmount) || 0;
-  const mktRate = (parseFloat(rawSettings["fee_rate_default"] ?? "5") || 5) / 100;
-  const mktRatePct = Math.round(mktRate * 100);
-  const stripeRate = 0.029;
-  const stripeFlatGbp = 0.30;
-  const crossCurrencyRate = 0.015;
-
-  // Detect if seller lists in a non-GBP currency (triggers Stripe's ~1.5% conversion fee)
-  const sellerCurrency = (() => {
-    try {
-      const stored = localStorage.getItem(COUNTRY_STORAGE_KEY(user.email));
-      if (stored && stored !== "SKIP") return countryToCurrency(stored === "OTHER" ? "US" : stored) as string;
-    } catch { /* */ }
-    return "GBP";
-  })();
-  const isCrossCurrency = sellerCurrency !== "GBP";
-  const crossCurrencyFee = isCrossCurrency ? amount * crossCurrencyRate : 0;
-
-  const mktFee    = amount * mktRate;
-  const stripeFee = amount * stripeRate + stripeFlatGbp;
-  const net       = Math.max(0, amount - mktFee - stripeFee - crossCurrencyFee);
-  const sellerPct = Math.round((1 - mktRate - stripeRate - (isCrossCurrency ? crossCurrencyRate : 0)) * 100);
+  const amount = Math.max(0,parseFloat(saleAmount)||0);
+  useEffect(()=>{
+    const controller=new AbortController();setFeeEstimate(null);setFeeEstimateError("");
+    const timer=setTimeout(async()=>{try{const token=await getToken();const r=await fetch("/api/stripe/seller-fee-estimate",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},body:JSON.stringify({amount,category:feeCategory}),signal:controller.signal});const d=await r.json();if(!r.ok)throw new Error(d.error);setFeeEstimate(d);}catch(e:any){if(e.name!=="AbortError")setFeeEstimateError(e.message||"Could not calculate fees.");}},250);
+    return()=>{clearTimeout(timer);controller.abort();};
+  },[amount,feeCategory,user.email,getToken]);
+  const mktRatePct=feeEstimate?.rate??0;
+  const mktFee=feeEstimate?.sellerFee??0;
+  const net=feeEstimate?.sellerNet??0;
+  const sellerPct=100-mktRatePct;
 
   return (
     <div className="space-y-4 p-5">
@@ -2109,37 +2100,22 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
           <div className="flex items-center justify-between px-5 py-3 text-sm">
             <div>
               <p className="font-semibold text-[#F26B21]">Bazunk marketplace fee</p>
-              <p className="text-xs text-gray-400">Deducted from payout</p>
+              <p className="text-xs text-gray-400">Business fee includes protection and support; private sellers pay 0%</p>
             </div>
-            <span className="font-bold text-[#F26B21]">{mktRatePct}%</span>
+            <span className="font-bold text-[#F26B21]">{feeEstimate ? `${mktRatePct}%` : "Calculating…"}</span>
           </div>
-          <div className="flex items-center justify-between px-5 py-3 text-sm">
-            <div>
-              <p className="font-semibold text-[#4A5CE8]">Stripe processing fee</p>
-              <p className="text-xs text-gray-400">Card processing cost</p>
-            </div>
-            <span className="font-bold text-[#4A5CE8]">2.9% + £0.30</span>
-          </div>
-          {isCrossCurrency && (
-            <div className="flex items-center justify-between px-5 py-3 text-sm bg-amber-50/60">
-              <div>
-                <p className="font-semibold text-amber-700">Currency conversion fee</p>
-                <p className="text-xs text-amber-500">Stripe charges ~1.5% when your listing currency ({sellerCurrency}) differs from GBP payout</p>
-              </div>
-              <span className="font-bold text-amber-600">~1.5%</span>
-            </div>
-          )}
+          <div className="px-5 py-3 text-xs text-gray-500">Bazunk covers platform card-processing costs from its fees. No additional Bazunk processing deduction is made from the item proceeds.</div>
           <div className="flex items-center justify-between px-5 py-3 text-sm bg-emerald-50/50">
             <div>
               <p className="font-bold text-emerald-700">Seller receives (net payout)</p>
-              <p className="text-xs text-emerald-500">Paid automatically to your bank in GBP</p>
+              <p className="text-xs text-emerald-500">Released after admin review to your connected Stripe account. Stripe controls bank payout timing.</p>
             </div>
-            <span className="font-black text-emerald-700">~{sellerPct}%</span>
+            <span className="font-black text-emerald-700">{feeEstimate ? `${sellerPct}%` : "Calculating…"}</span>
           </div>
         </div>
         <div className="px-5 py-3 border-t border-amber-50 bg-amber-50/30 flex items-start gap-2">
           <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-700">Bazunk credits <strong>cannot</strong> be used to offset marketplace fees or Stripe processing fees. These are always deducted in cash from your payout.</p>
+          <p className="text-xs text-amber-700">Personal sellers receive the item price. Business fees include protection and support. Refunds can reduce net proceeds; category rates are controlled by admin.</p>
         </div>
 
         {/* Fee calculator */}
@@ -2157,22 +2133,14 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
             </div>
             <div className="text-xs text-gray-500 flex-shrink-0">sale price</div>
           </div>
-          {amount > 0 && (
+          {feeEstimateError && <p role="alert" className="text-sm text-red-600 mt-3">{feeEstimateError}</p>}
+          <select aria-label="Fee calculator category" value={feeCategory} onChange={e=>setFeeCategory(e.target.value)} className="w-full rounded-lg border px-3 py-2 mt-3 text-sm"><option value="">Default category rate</option>{SITE_CATEGORIES.map(category=><option key={category.slug} value={category.slug}>{category.name}</option>)}</select>
+          {amount > 0 && feeEstimate && (
             <div className="mt-3 space-y-1.5 text-xs">
               <div className="flex justify-between text-gray-500">
                 <span>Marketplace fee ({mktRatePct}%)</span>
                 <span className="text-[#F26B21] font-semibold">−£{mktFee.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-gray-500">
-                <span>Stripe fee (2.9% + £0.30)</span>
-                <span className="text-[#4A5CE8] font-semibold">−£{stripeFee.toFixed(2)}</span>
-              </div>
-              {isCrossCurrency && (
-                <div className="flex justify-between text-amber-600">
-                  <span>Currency conversion (~1.5%) — {sellerCurrency}→GBP payout</span>
-                  <span className="font-semibold">−£{crossCurrencyFee.toFixed(2)}</span>
-                </div>
-              )}
               <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1.5 mt-1">
                 <span>You receive</span>
                 <span className="text-emerald-600">£{net.toFixed(2)}</span>

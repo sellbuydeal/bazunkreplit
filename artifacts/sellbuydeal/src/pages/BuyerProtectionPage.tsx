@@ -5,7 +5,7 @@ const GUARANTEES = [
   {
     icon: Shield,
     title: 'Item Not Received',
-    desc: 'If your order never arrives, we refund you in full. No questions asked.',
+    desc: 'If your order never arrives, you can open a dispute for review.',
     color: 'bg-emerald-500',
   },
   {
@@ -17,7 +17,7 @@ const GUARANTEES = [
   {
     icon: RotateCcw,
     title: '30-Day Returns',
-    desc: 'Change your mind? Return any eligible item within 30 days for a full refund.',
+    desc: 'Change your mind? Check the seller’s return policy and request an eligible return from your dashboard.',
     color: 'bg-purple-500',
   },
 ];
@@ -56,22 +56,24 @@ export default function BuyerProtectionPage() {
             <span className="text-emerald-400">Confidence</span>
           </h1>
           <p className="text-white/60 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">
-            Every purchase on Bazunk is backed by our Buyer Protection guarantee.
-            Your money is safe until you're happy — or we refund you in full.
+            Eligible purchases completed through Bazunk checkout receive Buyer Protection.
+            Report issues through your dashboard so our team can review the evidence and help resolve them.
           </p>
 
           <div className="flex flex-wrap justify-center gap-4 mt-10">
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-5 py-3">
               <Clock className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm font-semibold">48h dispute resolution</span>
+              <span className="text-sm font-semibold">Dispute support</span>
             </div>
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-5 py-3">
               <RotateCcw className="w-4 h-4 text-[#4A5CE8]" />
-              <span className="text-sm font-semibold">30-day returns</span>
+              <span className="text-sm font-semibold">Eligible returns</span>
             </div>
           </div>
         </div>
       </div>
+
+      <section className="max-w-5xl mx-auto px-6 pt-10"><div className="grid md:grid-cols-2 gap-4"><div className="border rounded-2xl p-6"><h2 className="font-black text-xl">Buying from a personal seller</h2><p className="mt-2">Personal sellers pay no selling commission. Buyers pay Buyer Protection: 5% + 70p by default in GBP, with one fixed fee per checkout. Your exact fee is shown before payment.</p></div><div className="border rounded-2xl p-6"><h2 className="font-black text-xl">Buying from a business</h2><p className="mt-2">Buyer Protection is included with no extra buyer fee. Business sellers pay a selling fee, 8% by default, including protection and support. Admin-configured category rates can differ.</p><Link href="/terms" className="inline-block mt-3 underline">Seller protection terms</Link></div></div></section>
 
       {/* Guarantees */}
       <div className="max-w-5xl mx-auto px-6 py-16">
@@ -131,8 +133,8 @@ export default function BuyerProtectionPage() {
             </thead>
             <tbody>
               {[
-                ['30-day returns guarantee', true, true, true],
-                ['48h dispute resolution', true, false, false],
+                ['Eligible returns guarantee', true, true, true],
+                ['Dispute support', true, false, false],
                 ['Guided return support', true, false, false],
                 ['Buyer cashback on disputes', true, false, false],
               ].map(([feat, sbd, ebay, amz], i) => (

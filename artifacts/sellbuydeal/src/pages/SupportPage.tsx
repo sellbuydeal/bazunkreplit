@@ -23,7 +23,7 @@ const CATEGORIES = [
       { q: "Can I track my order?", a: "Once an item ships you'll receive a tracking number by email and inside Dashboard → Orders. Click the order to see live tracking steps from dispatch to delivery." },
       { q: "What payment methods are accepted?", a: "We accept all major credit and debit cards (Visa, Mastercard, Amex), PayPal, and Apple Pay. All transactions are processed over encrypted, PCI-compliant connections." },
       { q: "Can I buy from multiple sellers at once?", a: "Yes — add items from different sellers to your cart and check out together. Each seller's items are grouped and shipped separately, and fees are calculated per seller." },
-      { q: "What is Buyer Protection?", a: "Buyer Protection is added automatically to purchases made through Bazunk. It helps protect eligible purchases if an item doesn't arrive, arrives damaged, or is significantly not as described. In the UK the fee is 6% of the item price + 70p; in the US it is 6% + $1; in the EU it is 6% + €1. See the Buyer Protection page for claim and dispute details." },
+      { q: "What is Buyer Protection?", a: "Buyer Protection is added automatically to purchases made through Bazunk. It helps protect eligible purchases if an item doesn't arrive, arrives damaged, or is significantly not as described. For personal-seller items the default UK fee is 5% of the item price + 70p, charged once per checkout. Business-seller items include Buyer Protection with no additional buyer fee. Checkout shows the current admin-configured amount. See the Buyer Protection page for claim and dispute details." },
     ],
   },
   {
@@ -31,8 +31,8 @@ const CATEGORIES = [
     label: "Selling",
     color: "bg-orange-100 text-orange-600",
     faqs: [
-      { q: "How do I list an item for sale?", a: "Click Sell in the top navigation and choose Quick Sell. Fill in the title, description, price, photos, and condition, then publish. Your listing goes live immediately and is visible to all buyers." },
-      { q: "What are the selling fees?", a: "For private sellers: none. It is free to list and free to sell, so you keep 100% of your item price. Registered businesses and sole traders can have separate business seller fees; buyers also pay the mandatory Buyer Protection fee at checkout." },
+      { q: "How do I list an item for sale?", a: "Click Sell in the top navigation and choose Direct Sale. Fill in the title, description, price, photos, and condition, then publish. Your listing goes live immediately and is visible to all buyers." },
+      { q: "What are the selling fees?", a: "For private sellers: none. It is free to list and free to sell, so you keep 100% of your item price. Registered businesses and sole traders pay an admin-configured selling fee (8% by default), including protection and support. Buyers pay no additional Buyer Protection fee on business purchases." },
       { q: "How do I get paid?", a: "Funds are released to your Bazunk balance 2 business days after the buyer confirms receipt. You can withdraw to your UK bank account or spend your balance on future purchases and promotions." },
       { q: "Can I pause or end a listing early?", a: "Yes. Go to Dashboard → My Listings, find the item, and click the menu icon. You can pause, edit, relist, or permanently remove any listing at any time." },
       { q: "How do I set auto-accept on offers?", a: "Go to Dashboard → Auto-Accept Offers and set a minimum threshold per listing or store-wide. Any offer at or above that price accepts automatically — no manual action needed." },

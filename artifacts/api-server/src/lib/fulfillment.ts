@@ -1,3 +1,4 @@
+import { getFeeSnapshot } from "./checkoutQuote.js";
 import { awardReferralMilestone } from "./referrals.js";
 import { db, creditTransactionsTable } from "@workspace/db";
 import { recordCreditEconomy } from "./creditEconomy.js";
@@ -32,6 +33,9 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
 
   if (session.payment_status !== "paid") return { status: "not_paid", orders: 0 };
 
+  const feeSnapshot = session.metadata?.feeQuoteId ? await getFeeSnapshot(session.metadata.feeQuoteId) : null;
+  if (feeSnapshot && (session.currency !== "gbp" || session.amount_total !== feeSnapshot.totalMinor)) throw new Error("Paid amount differs from fee snapshot");
+
   const buyerEmail = session.client_reference_id ?? session.metadata?.email;
   if (!buyerEmail) throw new Error(`Session ${sessionId} has no buyer email`);
   if (expectedEmail && buyerEmail !== expectedEmail) return { status: "email_mismatch", orders: 0 };
@@ -46,18 +50,22 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
 
   try {
     // metadata.items = "listingId:qty,listingId:qty"
-    const lines = (session.metadata?.items ?? "")
+    const legacyLines = (session.metadata?.items ?? "")
       .split(",")
       .map((s) => s.split(":"))
       .map(([id, q]) => ({ id: Number(id), qty: Math.max(1, Math.min(50, Number(q) || 1)) }))
       .filter((l) => Number.isInteger(l.id) && l.id > 0);
 
+    const counts = new Map<number,number>();
+    feeSnapshot?.units.forEach(u => counts.set(u.id,(counts.get(u.id)??0)+1));
+    const lines = feeSnapshot ? [...counts].map(([id,qty])=>({id,qty})) : legacyLines;
     const ids = lines.map((l) => l.id);
-    const rows = ids.length
+    const liveRows = !feeSnapshot && ids.length
       ? (await db.execute(sql`
           SELECT id, title, image, price, price_gbp, seller_email, category FROM listings WHERE id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})
         `)).rows as Array<Record<string, unknown>>
       : [];
+    const rows: Array<Record<string,unknown>> = feeSnapshot ? [...new Map(feeSnapshot.units.map(u=>[u.id,{id:u.id,title:u.title,image:u.image,price:u.priceMinor/100,price_gbp:u.priceMinor/100,seller_email:u.sellerEmail,category:u.category}])).values()] : liveRows;
     const byId = new Map(rows.map((r) => [Number(r.id), r]));
 
     let lineNo = 0;
@@ -81,17 +89,22 @@ export async function fulfillCartSession(sessionId: string, expectedEmail?: stri
       for (let u = 0; u < l.qty; u++) {
         lineNo++;
         const orderId = `ORD-${randomUUID().slice(0, 8).toUpperCase()}`;
-        const sellerTypeRow = seller ? (await db.execute(sql`SELECT seller_type FROM users WHERE LOWER(email)=LOWER(${seller}) LIMIT 1`)).rows[0] as any : null;
-        const sellerType = String(sellerTypeRow?.seller_type ?? "private");
+        const frozen = feeSnapshot?.units[lineNo-1];
+        const sellerTypeRow = !frozen && seller ? (await db.execute(sql`SELECT seller_type FROM users WHERE LOWER(email)=LOWER(${seller}) LIMIT 1`)).rows[0] as any : null;
+        const sellerType = frozen?.sellerType ?? String(sellerTypeRow?.seller_type ?? "private");
         const categorySlug = String(row.category ?? "").toLowerCase();
-        const businessRate = sellerType === "private" ? 0 : (feeSettings[`fee_rate_${categorySlug}`] ?? feeSettings.fee_rate_default ?? 5);
-        const sellerFee = price * (businessRate / 100);
-        const protectionShare = totalItemValue > 0 ? buyerProtectionTotal * (price / totalItemValue) : 0;
+        // Legacy paid sessions retain the previous fallback rate.
+        const businessRate = frozen ? (sellerType === "private" ? 0 : frozen.businessRate) : sellerType === "private" ? 0 : (feeSettings[`fee_rate_${categorySlug}`] ?? feeSettings.fee_rate_default ?? 5);
+        const sellerFee = frozen ? frozen.sellerFeeMinor/100 : price * (businessRate/100);
+        const protectionShare = frozen ? frozen.protectionMinor/100 : totalItemValue > 0 ? buyerProtectionTotal*(price/totalItemValue) : 0;
+        const deliveryShare = frozen ? frozen.deliveryMinor/100 : 0;
+        const net = frozen ? frozen.sellerNetMinor/100 : price-sellerFee;
+        const buyerTotal = frozen ? frozen.buyerTotalMinor/100 : price+protectionShare;
         await db.execute(sql`
           INSERT INTO orders (id, buyer_email, seller_email, item_title, item_image, price, status,
-                              stripe_session_id, line_no, buyer_protection_fee, seller_fee, created_at, updated_at)
+                              stripe_session_id, line_no, buyer_protection_fee, seller_fee, seller_type, seller_fee_rate, seller_net, delivery_fee, buyer_total, fee_policy, created_at, updated_at)
           VALUES (${orderId}, ${buyerEmail}, ${seller}, ${row.title as string}, ${(row.image as string | null) ?? null},
-                  ${price}, 'confirmed', ${sessionId}, ${lineNo}, ${protectionShare}, ${sellerFee}, NOW(), NOW())
+                  ${price}, 'confirmed', ${sessionId}, ${lineNo}, ${protectionShare}, ${sellerFee}, ${sellerType}, ${businessRate}, ${net}, ${deliveryShare}, ${buyerTotal}, ${feeSnapshot?.policy ?? "legacy"}, NOW(), NOW())
           ON CONFLICT (stripe_session_id, line_no) DO NOTHING
         `);
       }

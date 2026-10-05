@@ -26,15 +26,15 @@ import { Footer } from "@/components/Footer";
 
 const SELL_OPTIONS = [
   {
-    id: "quick-sell",
-    title: "Quick Sell",
+    id: "direct-sale",
+    title: "Direct Sale",
     description:
       "List your item for immediate sale with Buy It Now or Make an Offer options",
     icon: ShoppingCart,
     gradient: "from-[#5B4FD9] to-[#7C3AED]",
     cta: "Get started",
     ctaColor: "text-[#4A5CE8]",
-    href: "/sell/quick",
+    href: "/sell/direct",
     badge: null,
   },
   {
@@ -102,7 +102,7 @@ const STRIPE_RATE = 0.029;
 const STRIPE_FIXED = 0.30;
 
 function useMktRate(rawSettings: Record<string, string>) {
-  return (parseFloat(rawSettings["fee_rate_default"] ?? "5") || 5) / 100;
+  return (parseFloat(rawSettings["fee_rate_default"] ?? "8") || 8) / 100;
 }
 
 function buildFeeRows(mktRatePct: number) {
@@ -315,7 +315,7 @@ export function SellPage() {
             </span>
             <h2 className="text-3xl font-bold text-gray-900 mb-3">Seller Fees — No Hidden Costs</h2>
             <p className="text-gray-500 max-w-xl mx-auto">
-              Listing is always free. You only pay fees when an item sells, and they're
+              Private sellers list and sell free. Business sellers pay their configured selling fee when an item sells, and fees are
               deducted automatically — no invoices, no surprises.
             </p>
           </motion.div>
@@ -379,7 +379,7 @@ export function SellPage() {
                     { name: "Appliances",                slug: "appliances" },
                     { name: "Eco-Friendly",              slug: "eco-friendly" },
                   ].map((cat) => {
-                    const rate = parseFloat(rawSettings[`fee_rate_${cat.slug}`] ?? rawSettings["fee_rate_default"] ?? "5") || 5;
+                    const rate = parseFloat(rawSettings[`fee_rate_${cat.slug}`] ?? rawSettings["fee_rate_default"] ?? "8") || 8;
                     const isDefault = !rawSettings[`fee_rate_${cat.slug}`] || rawSettings[`fee_rate_${cat.slug}`] === rawSettings["fee_rate_default"];
                     return (
                       <div key={cat.slug} className="flex items-center justify-between px-6 py-2 text-sm">
@@ -501,7 +501,7 @@ export function SellPage() {
             </p>
             <div className="flex flex-wrap gap-3 justify-center">
               <Link
-                href="/sell/quick"
+                href="/sell/direct"
                 className="inline-flex items-center gap-2 px-7 py-3 rounded-full bg-[#F26B21] text-white font-semibold text-sm hover:bg-[#d95f1c] transition-colors shadow-sm"
                 data-testid="button-create-seller-account"
               >
