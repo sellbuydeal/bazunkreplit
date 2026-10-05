@@ -214,9 +214,19 @@ export function CartDrawer() {
                     </span>
                   </div>
                   <div className="flex justify-between text-base font-bold text-gray-900 pt-2 border-t border-gray-100">
-                    <span>Total</span>
+                    <span>Total before Buyer Protection</span>
                     <span>£{total.toFixed(2)}</span>
                   </div>
+                  <div className="flex justify-between gap-3 text-gray-600">
+                    <span>Buyer Protection</span>
+                    <span className="text-right">Calculated at checkout</span>
+                  </div>
+                  <p className="rounded-xl bg-blue-50 p-3 text-xs leading-relaxed text-blue-900">
+                    Buyer Protection is added at checkout for personal-seller items
+                    (5% + 70p by default, with one fixed fee per checkout).
+                    Business-seller purchases include protection with no extra buyer fee.
+                    Your final total is shown before payment.
+                  </p>
                 </div>
 
                 {/* Checkout button */}
