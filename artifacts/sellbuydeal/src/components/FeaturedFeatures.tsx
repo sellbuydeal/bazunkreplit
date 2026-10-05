@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Zap, Gavel, Handshake, ArrowRight, Shield, Tag, Radio } from "lucide-react";
+import { Zap, Handshake, ArrowRight, Shield, Tag, Radio, BadgePoundSterling } from "lucide-react";
 import { Link } from "wouter";
 import { useRawSettings } from "@/context/SiteSettingsContext";
 import { isFeatureEnabled } from "@/components/FeatureGate";
@@ -21,14 +21,14 @@ const FEATURE_BLOCKS = [
     glow: "shadow-[#F26B21]/10",
   },
   {
-    feature: "auctions",
-    icon: Gavel,
+    feature: "quick_sell",
+    icon: BadgePoundSterling,
     iconBg: "bg-[#4A5CE8]",
-    tag: "Live Right Now",
-    title: "Live Auctions",
-    description: "Real items. Real bidding. Every auction has a deadline — place your bid and see if you win.",
-    cta: "Browse Auctions",
-    href: "/auctions",
+    tag: "Private Sellers",
+    title: "Sell for FREE",
+    description: "List for free. No final value fees. Keep 100% of your sale price — no commission taken from private sellers.",
+    cta: "Start Selling",
+    href: "/sell",
     bg: "bg-[#4A5CE8]",
     border: "border-white/10",
     tagColor: "text-white/80 bg-white/15",
