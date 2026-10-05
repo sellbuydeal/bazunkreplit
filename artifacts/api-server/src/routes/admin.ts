@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { attachStripePaymentAmounts } from "../lib/adminPaymentRevenue.js";
 import { sql } from "drizzle-orm";
 import { createHmac } from "crypto";
 import { db, classifiedAdsTable } from "@workspace/db";
@@ -941,15 +942,22 @@ router.patch("/admin/users/:email/milestones/:milestoneId", async (req, res) => 
 
 router.get("/admin/payments", async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+    const limit = Math.max(1, Math.min(parseInt(req.query.limit as string) || 20, 100));
     const rows = await db.execute(
       sql`SELECT ct.id, ct.email, ct.credits_added, ct.created_at,
               u.name
           FROM credit_transactions ct
           LEFT JOIN users u ON u.email = ct.email
+          WHERE ct.id LIKE 'cs_%' AND ct.credits_added > 0
           ORDER BY ct.created_at DESC LIMIT ${limit}`
     ).then(r => r.rows);
-    res.json({ payments: rows });
+    let stripe: Awaited<ReturnType<typeof getUncachableStripeClient>> | null = null;
+    try { stripe = await getUncachableStripeClient(); } catch { /* Show unavailable, never estimate from credits. */ }
+    const report = await attachStripePaymentAmounts(rows as Array<{ id: string }>, (id) => {
+      if (!stripe) return Promise.reject(new Error("Stripe unavailable"));
+      return stripe.checkout.sessions.retrieve(id);
+    });
+    res.json(report);
   } catch (err) {
     logger.error({ err }, "Failed to get payments");
     res.status(500).json({ error: "Failed to get payments" });

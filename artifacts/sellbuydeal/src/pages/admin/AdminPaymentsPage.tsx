@@ -7,6 +7,7 @@ import { useAdmin } from "@/context/AdminContext";
 interface Payment {
   id: string; email: string; name: string | null;
   credits_added: string; created_at: string;
+  amount_minor: number | null; currency: string | null; payment_status: string; livemode: boolean | null;
 }
 
 const FEE_CATEGORIES = [
@@ -35,6 +36,9 @@ export function AdminPaymentsPage() {
   const { isAdmin, authFetch } = useAdmin();
   const [, setLocation] = useLocation();
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [totals, setTotals] = useState<Record<string, number>>({});
+  const [unavailable, setUnavailable] = useState(0);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [feeRates, setFeeRates] = useState<Record<string, string>>({});
   const [payTab, setPayTab] = useState<PayTab>("credits");
@@ -44,22 +48,30 @@ export function AdminPaymentsPage() {
 
   async function load() {
     setLoading(true);
+    setError("");
     try {
       const [paymentsRes, settingsRes] = await Promise.all([
         authFetch("/api/admin/payments?limit=50"),
         authFetch("/api/admin/settings"),
       ]);
-      if (paymentsRes.ok) { const d = await paymentsRes.json(); setPayments(d.payments); }
+      if (!paymentsRes.ok) throw new Error("Unable to load payment amounts. Please retry.");
+      const d = await paymentsRes.json();
+      setPayments(d.payments); setTotals(d.totals ?? {}); setUnavailable(d.unavailable ?? 0);
       if (settingsRes.ok) {
         const d = await settingsRes.json() as Record<string, string>;
         const rates: Record<string, string> = {};
         Object.entries(d).forEach(([k, v]) => { if (k.startsWith("fee_rate_")) rates[k] = v; });
         setFeeRates(rates);
       }
-    } finally { setLoading(false); }
+    } catch { setError("Unable to load payments. Please retry."); setPayments([]); setTotals({}); setUnavailable(0); } finally { setLoading(false); }
   }
 
-  const totalRevenue = payments.reduce((sum, p) => sum + parseFloat(p.credits_added), 0);
+  function money(amountMinor: number, currency: string) {
+    const formatter = new Intl.NumberFormat("en-GB", { style: "currency", currency });
+    const digits = formatter.resolvedOptions().maximumFractionDigits ?? 2;
+    return formatter.format(amountMinor / (10 ** digits));
+  }
+  const revenue = Object.entries(totals).map(([currency, amount]) => money(amount, currency)).join(" · ") || "No verified live payments";
 
   function getRate(slug: string, def: string) {
     return feeRates[`fee_rate_${slug}`] ?? feeRates["fee_rate_default"] ?? def;
@@ -71,7 +83,7 @@ export function AdminPaymentsPage() {
         <div>
           <h1 className="text-xl font-black text-gray-900">Payments & Buyer Protection</h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            {payments.length} credit transactions · £{totalRevenue.toFixed(2)} revenue
+            {payments.length} recent credit purchases · {loading ? "Checking Stripe…" : error ? "Revenue unavailable" : revenue}
           </p>
         </div>
         <button onClick={load} disabled={loading}
@@ -81,6 +93,9 @@ export function AdminPaymentsPage() {
         </button>
       </div>
 
+      <p className="text-xs text-gray-500 mb-4">Gross live Stripe payments for the purchases shown (up to 50), before refunds and processing fees. Bonus credits and test payments are excluded from totals.</p>
+      {error && <p role="alert" className="text-sm text-red-600 mb-4">{error}</p>}
+      {unavailable > 0 && <p role="status" className="text-sm text-amber-700 mb-4">Totals are incomplete: Stripe amounts could not be verified for {unavailable} purchase(s). Refresh to retry.</p>}
       {/* Sub-tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-5 max-w-xs">
         {([
@@ -103,18 +118,18 @@ export function AdminPaymentsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50">
-                  {["Email", "Name", "Credits Added", "Date", "Session ID"].map(h => (
+                  {["Email", "Name", "Credits Added", "Stripe Amount", "Date", "Session ID"].map(h => (
                     <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {loading && (
-                  <tr><td colSpan={5} className="text-center text-gray-400 py-10">Loading…</td></tr>
+                  <tr><td colSpan={6} className="text-center text-gray-400 py-10">Loading…</td></tr>
                 )}
-                {!loading && payments.length === 0 && (
+                {!loading && !error && payments.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center py-10">
+                    <td colSpan={6} className="text-center py-10">
                       <CreditCard className="w-8 h-8 text-gray-200 mx-auto mb-2" />
                       <p className="text-gray-400 text-sm">No transactions yet</p>
                     </td>
@@ -126,7 +141,11 @@ export function AdminPaymentsPage() {
                     <td className="px-5 py-3 text-gray-500">{p.name ?? "—"}</td>
                     <td className="px-5 py-3">
                       <span className="font-black text-emerald-600">+{Math.round(parseFloat(p.credits_added) * 100).toLocaleString()} cr</span>
-                      <span className="ml-1 text-[10px] text-gray-400">≈ £{parseFloat(p.credits_added).toFixed(2)}</span>
+
+                    </td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      {p.amount_minor !== null && p.currency ? money(p.amount_minor, p.currency) : "Unavailable"}
+                      <span className="block text-xs text-gray-400">{p.livemode === false ? "Test · " : ""}{p.payment_status}</span>
                     </td>
                     <td className="px-5 py-3 text-gray-400 whitespace-nowrap">
                       {new Date(p.created_at).toLocaleDateString()} {new Date(p.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
