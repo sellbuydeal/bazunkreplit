@@ -20,9 +20,9 @@ const PILLS = [
 const SELL_OPTIONS = [
   {
     icon: ShoppingCart,
-    label: "Quick Sell",
+    label: "Direct Sale",
     desc: "List an item for sale right now",
-    href: "/sell/quick",
+    href: "/sell/direct",
     color: "bg-[#4A5CE8]/10 text-[#4A5CE8]",
     hover: "hover:border-[#4A5CE8]/30 hover:bg-[#4A5CE8]/5",
   },
@@ -103,20 +103,15 @@ export function Hero() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.55 }}
           >
-            <div className="inline-flex items-center gap-2 text-[#F26B21] text-[11px] font-black px-3 py-1.5 rounded-full mb-6 uppercase tracking-widest border border-[#F26B21]/30 bg-[#F26B21]/10">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F26B21] animate-pulse" />
-              The UK Peer-to-Peer Marketplace
-            </div>
-
-            <h1 className="text-5xl md:text-6xl lg:text-[5.5rem] font-black text-white leading-none tracking-tight mb-5">
-              Buy.<br />
-              <span className="text-[#F26B21]">Bid.</span><br />
-              Deal.
-            </h1>
-
-            <p className="text-white/55 text-base md:text-lg max-w-md mb-8 leading-relaxed">
-              A marketplace where every price is agreed between real buyers and real sellers — buy now, make an offer, bid in an auction, or catch a flash sale.
-            </p>
+            <h1 className="sr-only">Buy, Sell, Deal, Get Rewarded on Bazunk</h1>
+            <img
+              src="/hero-buy-sell-deal-rewarded.png"
+              alt="Buy, Sell, Deal, Get Rewarded — colourful Bazunk marketplace artwork"
+              width={1672}
+              height={941}
+              fetchPriority="high"
+              className="block w-full h-auto rounded-2xl mb-6 shadow-2xl shadow-black/20"
+            />
 
             <div className="flex flex-col sm:flex-row gap-3 mb-10">
               <Link href="/browse">
@@ -131,12 +126,12 @@ export function Hero() {
                 </button>
               </Link>
 
-              {/* Sell for Free — flyout trigger */}
+              {/* Sell — flyout trigger */}
               <button
                 onClick={handleSellClick}
                 className="flex items-center justify-center gap-2 px-7 py-3.5 border border-white/20 text-white font-bold rounded-2xl hover:bg-white/5 transition-colors text-sm w-full sm:w-auto"
               >
-                <Store className="w-4 h-4" /> Sell for Free
+                <Store className="w-4 h-4" /> Start Selling
                 <svg
                   className={`w-3.5 h-3.5 ml-0.5 transition-transform duration-200 ${sellOpen ? "rotate-180" : ""}`}
                   fill="none" stroke="currentColor" viewBox="0 0 24 24"
