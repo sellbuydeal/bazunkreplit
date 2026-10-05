@@ -238,6 +238,10 @@ export function BrowsePage() {
   const [apiListings, setApiListings] = useState<(typeof ALL_PRODUCTS[0] & { subcategory?: string; promotions: string[] })[]>([]);
   const [hasMoreListings, setHasMoreListings] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingListings, setLoadingListings] = useState(true);
+  const [listingError, setListingError] = useState<string | null>(null);
+  const [moreError, setMoreError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
   const [subcategoryCounts, setSubcategoryCounts] = useState<Record<string, number>>({});
 
@@ -266,25 +270,41 @@ export function BrowsePage() {
   }, []);
 
   useEffect(() => {
-    fetch(`/api/listings?limit=${LISTING_BATCH}&offset=0`)
-      .then((r) => r.json())
-      .then((data: ApiListing[]) => {
-        const rows = Array.isArray(data) ? data : [];
-        setApiListings(rows.map(mapApiListing));
-        setHasMoreListings(rows.length === LISTING_BATCH);
+    const controller = new AbortController();
+    setLoadingListings(true);
+    setListingError(null);
+    setMoreError(null);
+    fetch(`/api/listings?limit=${LISTING_BATCH}&offset=0`, { signal: controller.signal })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Could not load listings");
+        const data: ApiListing[] = await r.json();
+        if (!Array.isArray(data)) throw new Error("Invalid listings response");
+        if (controller.signal.aborted) return;
+        setApiListings(data.map(mapApiListing));
+        setHasMoreListings(data.length === LISTING_BATCH);
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => {
+        if (!controller.signal.aborted) setListingError("We couldn’t load listings. Please try again.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingListings(false);
+      });
+    return () => controller.abort();
+  }, [loadAttempt]);
 
   async function loadMoreListings() {
-    if (loadingMore || !hasMoreListings) return;
+    if (loadingMore || loadingListings || !hasMoreListings) return;
     setLoadingMore(true);
+    setMoreError(null);
     try {
       const r = await fetch(`/api/listings?limit=${LISTING_BATCH}&offset=${apiListings.length}`);
+      if (!r.ok) throw new Error("Could not load more listings");
       const data: ApiListing[] = await r.json();
-      const rows = Array.isArray(data) ? data : [];
-      setApiListings((current) => [...current, ...rows.map(mapApiListing)]);
-      setHasMoreListings(rows.length === LISTING_BATCH);
+      if (!Array.isArray(data)) throw new Error("Invalid listings response");
+      setApiListings((current) => [...current, ...data.map(mapApiListing)]);
+      setHasMoreListings(data.length === LISTING_BATCH);
+    } catch {
+      setMoreError("We couldn’t load more listings. Your current results are still available. Please try again.");
     } finally {
       setLoadingMore(false);
     }
@@ -493,7 +513,7 @@ export function BrowsePage() {
                     />
                     <span className="text-sm text-gray-700 group-hover:text-[#4A5CE8] transition-colors">{cat.name}</span>
                   </div>
-                  <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{count}</span>
+                  <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{loadingListings || listingError ? "—" : count}</span>
                 </label>
                 {isChecked && cat.subcategories.length > 0 && (
                   <div className="ml-5 mt-0.5 space-y-0.5 border-l-2 border-[#4A5CE8]/15 pl-2.5">
@@ -525,8 +545,8 @@ export function BrowsePage() {
 
       <FilterSection title="Condition">
         <div className="space-y-1.5">
-          {CONDITIONS.map((c) => {
-            const count = ALL_PRODUCTS.filter((p) => p.condition === c).length;
+          {Array.from(new Set([...CONDITIONS, ...allListings.map((p) => p.condition)])).map((c) => {
+            const count = allListings.filter((p) => p.condition === c).length;
             return (
               <label key={c} className="flex items-center justify-between gap-2 cursor-pointer group py-0.5">
                 <div className="flex items-center gap-2">
@@ -539,7 +559,7 @@ export function BrowsePage() {
                   />
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full capitalize ${CONDITION_COLORS[c]}`}>{c}</span>
                 </div>
-                <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{count}</span>
+                <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{loadingListings || listingError ? "—" : count}</span>
               </label>
             );
           })}
@@ -860,7 +880,7 @@ export function BrowsePage() {
           <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
             <div>
               <h1 className="text-lg font-bold text-gray-900">{pageTitle}</h1>
-              <p className="text-sm text-gray-400">{filtered.length} listing{filtered.length !== 1 ? "s" : ""} found</p>
+              <p className="text-sm text-gray-400">{loadingListings ? "Loading listings…" : listingError ? "Listings unavailable" : `${filtered.length} listing${filtered.length !== 1 ? "s" : ""} found`}</p>
             </div>
             <div className="flex items-center gap-2">
               {/* Sort */}
@@ -897,7 +917,22 @@ export function BrowsePage() {
           </div>
 
           {/* Results */}
-          {filtered.length === 0 ? (
+          {loadingListings ? (
+            <div role="status" aria-live="polite" className="bg-white rounded-2xl border border-blue-100 py-20 px-6 flex flex-col items-center text-center overflow-hidden">
+              <div className="relative mb-6 rounded-full bg-gradient-to-br from-blue-50 to-orange-50 p-8">
+                <div aria-hidden="true" className="absolute inset-0 rounded-full border-4 border-blue-100 border-t-[#F26B21] animate-spin motion-reduce:animate-none" />
+                <img src="/bazunk-logo-header.png" alt="Bazunk" className="relative w-40 h-auto object-contain animate-pulse motion-reduce:animate-none" />
+              </div>
+              <p className="font-bold text-gray-900">Finding your next great deal…</p>
+              <p className="mt-2 text-sm text-gray-500">Loading Bazunk listings</p>
+            </div>
+          ) : listingError ? (
+            <div role="alert" className="bg-white rounded-2xl border border-orange-100 py-16 px-6 text-center">
+              <h3 className="text-lg font-bold text-gray-800 mb-2">Listings couldn’t load</h3>
+              <p className="text-sm text-gray-500 mb-6">{listingError}</p>
+              <button onClick={() => setLoadAttempt((attempt) => attempt + 1)} className="px-6 py-2.5 rounded-xl bg-[#4A5CE8] text-white text-sm font-semibold">Try again</button>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="bg-white rounded-2xl border border-gray-100 py-20 flex flex-col items-center text-center">
               <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                 <Search className="w-8 h-8 text-gray-300" />
@@ -923,14 +958,15 @@ export function BrowsePage() {
               ))}
             </div>
           )}
-          {hasMoreListings && (
+          {moreError && <p role="alert" className="mt-6 text-center text-sm text-red-600">{moreError}</p>}
+          {!loadingListings && !listingError && hasMoreListings && (
             <div className="flex justify-center mt-8">
               <button
                 onClick={loadMoreListings}
                 disabled={loadingMore}
                 className="px-6 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 hover:border-[#4A5CE8] hover:text-[#4A5CE8] disabled:opacity-50 transition-colors"
               >
-                {loadingMore ? "Loading…" : "Load more listings"}
+                {loadingMore ? "Loading…" : moreError ? "Try loading more again" : "Load more listings"}
               </button>
             </div>
           )}
