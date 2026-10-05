@@ -35,6 +35,24 @@ const CATEGORY_THEMES = [
   "from-green-700 via-emerald-600 to-lime-500",
 ];
 
+const CATEGORY_PHOTOS: Record<string, string[]> = {
+  appliances: ["/dyson.png", "/samsung-tv.png"],
+  "arts-crafts-sewing": ["/camera.png", "/tshirt.png"],
+  automotive: ["/camera.png"],
+  "baby-products": ["/tshirt.png", "/sneakers.png"],
+  "beauty-personal-care": ["/camera.png"],
+  books: ["/macbook.png"],
+  "cds-vinyl": ["/ps5.png"],
+  "cell-phones": ["/macbook.png", "/camera.png"],
+  "clothing-shoes-jewelry": ["/sneakers.png", "/jeans.png", "/tshirt.png"],
+  electronics: ["/macbook.png", "/camera.png", "/ps5.png"],
+  "eco-friendly": ["/dyson.png"],
+  "health-household": ["/dyson.png"],
+  "home-kitchen": ["/dyson.png", "/samsung-tv.png"],
+  "industrial-scientific": ["/camera.png"],
+  "movies-tv": ["/samsung-tv.png", "/ps5.png"],
+};
+
 function CategoryIcon({ name, className = "w-6 h-6 text-white" }: { name: string; className?: string }) {
   const Icon = (LucideIcons[name as LucideIconName] ?? LucideIcons.Tag) as React.ElementType;
   return <Icon className={className} />;
@@ -69,10 +87,10 @@ export function CategoriesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#091426] text-white flex flex-col">
+    <div className="min-h-screen bg-gray-50 text-gray-950 dark:bg-[#091426] dark:text-white flex flex-col transition-colors">
       <Navbar />
 
-      <div className="border-b border-white/5 bg-[radial-gradient(circle_at_top_left,_rgba(74,92,232,0.18),_transparent_38%)]">
+      <div className="border-b border-gray-200 bg-white dark:border-white/5 dark:bg-[radial-gradient(circle_at_top_left,_rgba(74,92,232,0.18),_transparent_38%)] transition-colors">
         <div className="container mx-auto px-4 py-8 lg:py-10">
           <div className="grid lg:grid-cols-[1fr_1.1fr] gap-6 items-center">
             <div>
@@ -82,7 +100,7 @@ export function CategoriesPage() {
                 </div>
                 <div>
                   <h1 className="text-3xl lg:text-4xl font-black tracking-tight">Categories</h1>
-                  <p className="text-slate-400 mt-1">Explore all categories and find exactly what you're looking for.</p>
+                  <p className="text-gray-600 dark:text-slate-200 font-medium mt-1">Explore all categories and find exactly what you're looking for.</p>
                 </div>
               </div>
             </div>
@@ -114,7 +132,7 @@ export function CategoriesPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search categories or subcategories..."
-              className="pl-11 h-11 rounded-xl border-white/10 bg-white/[0.06] text-white placeholder:text-slate-500 focus-visible:ring-[#4A5CE8]"
+              className="pl-11 h-11 rounded-xl border-gray-300 bg-white text-gray-950 placeholder:text-gray-500 dark:border-white/15 dark:bg-white/[0.08] dark:text-white dark:placeholder:text-slate-300 focus-visible:ring-[#4A5CE8]"
               data-testid="input-category-search"
             />
           </div>
@@ -125,7 +143,7 @@ export function CategoriesPage() {
 
       <main className="flex-1 container mx-auto px-4 py-8">
         {filtered.length === 0 ? (
-          <div className="text-center py-20 text-slate-400">
+          <div className="text-center py-20 text-gray-600 dark:text-slate-300">
             <p className="text-lg font-medium">No categories match "{search}"</p>
           </div>
         ) : (
@@ -143,8 +161,8 @@ export function CategoriesPage() {
                   transition={{ delay: Math.min(index * 0.025, 0.3) }}
                   className={`rounded-2xl overflow-hidden border transition-all duration-300 ${
                     isOpen
-                      ? "border-white/20 shadow-2xl shadow-black/30 bg-[#0e1c32]"
-                      : "border-white/[0.08] shadow-lg shadow-black/10 bg-[#0e1a2e] hover:-translate-y-0.5 hover:border-white/15"
+                      ? "border-gray-300 shadow-2xl shadow-black/10 bg-white dark:border-white/20 dark:shadow-black/30 dark:bg-[#0e1c32]"
+                      : "border-gray-200 shadow-lg shadow-black/5 bg-white hover:-translate-y-0.5 hover:border-gray-300 dark:border-white/[0.08] dark:shadow-black/10 dark:bg-[#0e1a2e] dark:hover:border-white/15"
                   }`}
                   data-testid={`card-category-${category.slug}`}
                 >
@@ -155,6 +173,23 @@ export function CategoriesPage() {
                   >
                     <div className="absolute -right-8 -bottom-12 w-36 h-36 rounded-full bg-white/10" />
                     <div className="absolute right-12 -top-12 w-24 h-24 rounded-full bg-white/[0.06]" />
+
+                    <div className="absolute inset-y-0 right-3 w-[48%] pointer-events-none overflow-hidden">
+                      {(CATEGORY_PHOTOS[category.slug] ?? ["/camera.png"]).slice(0, 3).map((src, photoIndex) => (
+                        <img
+                          key={`${category.slug}-${src}`}
+                          src={src}
+                          alt=""
+                          aria-hidden="true"
+                          className={`absolute bottom-[-6px] object-contain drop-shadow-2xl ${
+                            photoIndex === 0 ? "right-0 h-[82%] w-[72%]" :
+                            photoIndex === 1 ? "right-[38%] h-[58%] w-[52%]" :
+                            "right-[8%] h-[45%] w-[42%]"
+                          }`}
+                        />
+                      ))}
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-white/5" />
+                    </div>
 
                     <div className="relative flex items-start justify-between gap-3">
                       <div className="w-12 h-12 rounded-xl bg-black/10 border border-white/15 backdrop-blur-sm flex items-center justify-center shadow-sm">
@@ -168,9 +203,9 @@ export function CategoriesPage() {
                       </motion.div>
                     </div>
 
-                    <div className="relative mt-4">
-                      <p className="font-black text-lg leading-tight text-white">{category.name}</p>
-                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-white/80">
+                    <div className="relative mt-4 max-w-[70%] drop-shadow-md">
+                      <p className="font-black text-lg leading-tight text-white drop-shadow-sm">{category.name}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs font-bold text-white">
                         <span>{category.subcategories.length} subcategories</span>
                         {totalListings > 0 && (
                           <>
@@ -200,14 +235,14 @@ export function CategoriesPage() {
                                 <li key={sub.slug}>
                                   <Link
                                     href={`/browse?category=${category.slug}&sub=${sub.slug}`}
-                                    className="flex items-center justify-between gap-3 text-sm text-slate-300 hover:text-white py-2 px-2.5 rounded-lg hover:bg-white/[0.07] transition-colors group"
+                                    className="flex items-center justify-between gap-3 text-sm font-semibold text-gray-800 hover:text-[#4A5CE8] py-2 px-2.5 rounded-lg hover:bg-indigo-50 dark:text-white dark:hover:text-white dark:hover:bg-white/[0.09] transition-colors group"
                                     data-testid={`link-subcategory-${sub.slug}`}
                                   >
                                     <div className="flex items-center gap-2.5 min-w-0">
-                                      <CategoryIcon name={category.icon} className="w-3.5 h-3.5 text-slate-500 group-hover:text-indigo-300" />
+                                      <CategoryIcon name={category.icon} className="w-3.5 h-3.5 text-gray-500 group-hover:text-[#4A5CE8] dark:text-slate-300 dark:group-hover:text-indigo-200" />
                                       <span className="truncate">{sub.name}</span>
                                     </div>
-                                    {sc > 0 && <span className="text-[11px] text-slate-500 flex-shrink-0">{sc}</span>}
+                                    {sc > 0 && <span className="text-[11px] font-bold text-gray-500 dark:text-slate-300 flex-shrink-0">{sc}</span>}
                                   </Link>
                                 </li>
                               );
@@ -216,7 +251,7 @@ export function CategoriesPage() {
 
                           <Link
                             href={`/browse?category=${category.slug}`}
-                            className="mt-3 flex items-center justify-center gap-1.5 w-full rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-xs font-bold text-white py-2.5 transition-colors"
+                            className="mt-3 flex items-center justify-center gap-1.5 w-full rounded-xl border border-gray-200 bg-gray-50 hover:bg-indigo-50 text-xs font-extrabold text-gray-900 dark:border-white/15 dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-white py-2.5 transition-colors"
                           >
                             View all {category.name} <ChevronRight className="w-3.5 h-3.5" />
                           </Link>
