@@ -3,6 +3,10 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/adminAuth.js";
 import { randomUUID } from "crypto";
+import { getUncachableStripeClient } from "../stripeClient.js";
+import { recordAdminAudit } from "../lib/adminAudit.js";
+import { recordCreditEconomy } from "../lib/creditEconomy.js";
+import { sendSystemMessage } from "../lib/systemMessages.js";
 
 const router = Router();
 
@@ -104,8 +108,69 @@ router.patch("/disputes/:id/seller-response", async (req, res) => {
 });
 
 router.get("/admin/disputes", requireAdmin, async (_req, res) => {
-  const rows = await db.execute(sql`SELECT * FROM disputes ORDER BY created_at DESC`);
+  const rows = await db.execute(sql`
+    SELECT d.*, o.price AS order_price, o.buyer_protection_fee, o.status AS order_status,
+           CASE WHEN o.stripe_session_id IS NULL THEN false ELSE true END AS has_stripe_payment
+    FROM disputes d LEFT JOIN orders o ON o.id = d.order_id
+    ORDER BY d.created_at DESC
+  `);
   res.json(rows.rows);
+});
+
+// Execute a real dispute resolution action. Money-moving actions happen server-side only.
+router.post("/admin/disputes/:id/action", requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  const action = String(req.body?.action ?? "");
+  const notes = String(req.body?.notes ?? "").trim();
+  const amount = Number(req.body?.amount ?? 0);
+  const credits = Number(req.body?.credits ?? 0);
+
+  const dispute = (await db.execute(sql`SELECT * FROM disputes WHERE id=${id}`)).rows[0] as any;
+  if (!dispute) { res.status(404).json({ error: "Dispute not found" }); return; }
+  const order = dispute.order_id ? (await db.execute(sql`SELECT * FROM orders WHERE id=${dispute.order_id}`)).rows[0] as any : null;
+  if (["resolved_refund", "resolved_no_action", "closed"].includes(String(dispute.status)) && ["refund_full", "refund_partial", "credits"].includes(action)) {
+    res.status(409).json({ error: "This dispute is already resolved. Reopen it or move it to Under Review before issuing another financial remedy." }); return;
+  }
+
+  try {
+    if (action === "mark_review") {
+      await db.execute(sql`UPDATE disputes SET status='under_review', resolution_notes=${notes || null}, updated_at=NOW() WHERE id=${id}`);
+    } else if (action === "no_action") {
+      await db.execute(sql`UPDATE disputes SET status='resolved_no_action', resolution_notes=${notes || null}, resolved_at=NOW(), updated_at=NOW() WHERE id=${id}`);
+      await sendSystemMessage(dispute.buyer_email, { category:"Dispute update", subject:`Dispute resolved: ${dispute.item_title}`, body:`Bazunk reviewed your dispute and closed it without a refund.${notes ? `\n\n${notes}` : ""}` });
+    } else if (action === "close") {
+      await db.execute(sql`UPDATE disputes SET status='closed', resolution_notes=${notes || null}, resolved_at=NOW(), updated_at=NOW() WHERE id=${id}`);
+    } else if (action === "credits") {
+      if (!Number.isFinite(credits) || credits <= 0 || !Number.isInteger(credits)) { res.status(400).json({ error:"Enter a whole number of credits greater than 0." }); return; }
+      const updated = await db.execute(sql`UPDATE users SET credits=credits+${credits} WHERE LOWER(email)=LOWER(${dispute.buyer_email}) RETURNING credits`);
+      if (!updated.rows.length) { res.status(404).json({ error:"Buyer account was not found." }); return; }
+      await recordCreditEconomy({ email:dispute.buyer_email, kind:"refund", credits, reason:`Dispute goodwill credit: ${dispute.item_title}`, referenceType:"dispute_credit", referenceId:id, metadata:{orderId:dispute.order_id} });
+      await db.execute(sql`UPDATE disputes SET status='closed', resolution_notes=${notes || `Awarded ${credits} Bazunk credits`}, resolved_at=NOW(), updated_at=NOW() WHERE id=${id}`);
+      await sendSystemMessage(dispute.buyer_email, { category:"Dispute update", subject:`${credits} Bazunk credits added`, body:`Bazunk has added ${credits} credits to your account following your dispute for “${dispute.item_title}”.${notes ? `\n\n${notes}` : ""}` });
+    } else if (action === "refund_full" || action === "refund_partial") {
+      if (!order?.stripe_session_id) { res.status(400).json({ error:"This order has no Stripe payment, so an automatic card refund cannot be issued." }); return; }
+      const stripe = await getUncachableStripeClient();
+      const session:any = await stripe.checkout.sessions.retrieve(order.stripe_session_id,{expand:["payment_intent.latest_charge"]});
+      const pi:any = session.payment_intent; const charge:any = pi?.latest_charge;
+      if (!pi?.id || !charge) { res.status(400).json({ error:"No refundable Stripe payment was found." }); return; }
+      const currency=String(session.currency||"gbp").toLowerCase();
+      const remaining=Math.max(0,(Number(charge.amount||0)-Number(charge.amount_refunded||0))/100);
+      const requested=action === "refund_full" ? remaining : amount;
+      if (!Number.isFinite(requested) || requested <= 0) { res.status(400).json({ error:"Enter a refund amount greater than 0." }); return; }
+      if (requested > remaining + 0.0001) { res.status(400).json({ error:`Only ${currency.toUpperCase()} ${remaining.toFixed(2)} remains refundable.` }); return; }
+      const zero=["bif","clp","djf","gnf","jpy","kmf","krw","mga","pyg","rwf","ugx","vnd","vuv","xaf","xof","xpf"].includes(currency);
+      const refund=await stripe.refunds.create({payment_intent:pi.id,amount:Math.round(requested*(zero?1:100)),metadata:{bazunk_order_id:String(order.id),bazunk_dispute_id:id}});
+      const isFull=requested >= remaining - 0.005;
+      if (isFull) await db.execute(sql`UPDATE orders SET status='refunded',updated_at=NOW() WHERE id=${order.id}`);
+      await db.execute(sql`UPDATE disputes SET status='resolved_refund', refund_amount=${requested.toFixed(2)}, resolution_notes=${notes || null}, resolved_at=NOW(), updated_at=NOW() WHERE id=${id}`);
+      await sendSystemMessage(dispute.buyer_email, { category:"Dispute update", subject:`Refund issued: ${dispute.item_title}`, body:`Bazunk issued a ${isFull ? "full" : "partial"} refund of ${currency.toUpperCase()} ${requested.toFixed(2)} to your original payment method.${notes ? `\n\n${notes}` : ""}` });
+      await recordAdminAudit({req,category:"disputes",action:isFull?"dispute.refund_full":"dispute.refund_partial",targetType:"dispute",targetId:id,summary:`${isFull?"Full":"Partial"} refund ${currency.toUpperCase()} ${requested.toFixed(2)} for dispute ${id}`,before:{status:dispute.status},after:{status:"resolved_refund",refundAmount:requested,refundId:refund.id},metadata:{orderId:order.id}});
+      res.json({ok:true, amount:requested, currency:currency.toUpperCase(), refundId:refund.id}); return;
+    } else { res.status(400).json({ error:"Unknown dispute action." }); return; }
+
+    await recordAdminAudit({req,category:"disputes",action:`dispute.${action}`,targetType:"dispute",targetId:id,summary:`Dispute action: ${action}`,before:{status:dispute.status},after:{notes,credits:action==="credits"?credits:undefined},metadata:{orderId:dispute.order_id}});
+    res.json({ok:true});
+  } catch (err:any) { res.status(500).json({ error:err?.message || "Dispute action failed" }); }
 });
 
 router.patch("/admin/disputes/:id", requireAdmin, async (req, res) => {
