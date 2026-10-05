@@ -1,4 +1,6 @@
 import { Router, type Request, type Response } from "express";
+import { getAuth, clerkClient } from "@clerk/express";
+import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/adminAuth.js";
@@ -7,6 +9,7 @@ import {
   verifyWebhookSignature,
   DIDIT_STATUS_MAP,
   type VerificationStatus,
+  diditConfigured,
 } from "../lib/didit.js";
 import { logger } from "../lib/logger.js";
 
@@ -14,77 +17,41 @@ const router = Router();
 
 // ── Public / seller routes ─────────────────────────────────────────────────
 
-/** GET /api/verification/status?email=… */
-router.get("/verification/status", async (req, res) => {
-  const email = req.query.email as string | undefined;
-  if (!email) {
-    res.status(400).json({ error: "email query parameter is required" });
-    return;
-  }
+async function authenticatedIdentity(req: Request): Promise<{ userId: string; email: string } | null> {
+  const auth=getAuth(req); if(!auth.isAuthenticated||!auth.userId)return null;
+  const u=await clerkClient.users.getUser(auth.userId);
+  const email=u.primaryEmailAddress?.emailAddress?.toLowerCase() ?? u.emailAddresses[0]?.emailAddress?.toLowerCase();
+  return email ? { userId: auth.userId, email } : null;
+}
+function newVerificationCode(){ return `BZV-${randomBytes(5).toString("hex").toUpperCase()}`; }
 
-  const result = await db.execute(sql`
-    SELECT verification_status, verification_date, didit_verification_id
-    FROM users
-    WHERE email = ${email}
-  `);
-
-  if (!result.rows.length) {
-    res.json({ verificationStatus: "unverified" });
-    return;
-  }
-
-  const row = result.rows[0];
-  res.json({
-    verificationStatus: (row.verification_status as string) ?? "unverified",
-    verificationDate: row.verification_date,
-    diditVerificationId: row.didit_verification_id,
-  });
+router.get("/verification/status", async (req,res)=>{
+  const identity=await authenticatedIdentity(req); if(!identity){res.status(401).json({error:"Authentication required"});return;}
+  const email=identity.email;
+  const result=await db.execute(sql`SELECT verification_status, verification_date, didit_verification_id, verification_code FROM users WHERE LOWER(email)=LOWER(${email})`);
+  const row=result.rows[0];
+  res.json({verificationStatus:(row?.verification_status as string)??"unverified",verificationDate:row?.verification_date??null,verificationCode:row?.verification_code??null,configured:diditConfigured()});
 });
 
-/** POST /api/verification/session — create a Didit KYC session for the calling seller */
-router.post("/verification/session", async (req, res) => {
-  const { email } = req.body as { email?: string };
-  if (!email) {
-    res.status(400).json({ error: "email is required" });
-    return;
-  }
+router.post("/verification/session", async (req,res)=>{
+  const identity=await authenticatedIdentity(req); if(!identity){res.status(401).json({error:"Authentication required"});return;}
+  const email=identity.email;
+  if(!diditConfigured()){res.status(503).json({error:"Identity verification is not configured yet. Check DIDIT_API_KEY and DIDIT_WEBHOOK_SECRET on the API service."});return;}
+  const siteUrl=(process.env.PUBLIC_BASE_URL??"https://bazunk.com").replace(/\/$/,"");
+  const apiUrl=(process.env.PUBLIC_API_URL??"https://bazunkreplit.onrender.com").replace(/\/$/,"");
+  try{
+    const session=await createVerificationSession({vendorData:identity.userId,callbackUrl:`${siteUrl}/dashboard?section=verification&verification_return=1`});
+    await db.execute(sql`UPDATE users SET verification_status='pending', didit_verification_id=${session.session_id} WHERE LOWER(email)=LOWER(${email})`);
+    await db.execute(sql`INSERT INTO verification_webhook_logs(session_id,vendor_data,event_type,status,raw_payload,created_at) VALUES(${session.session_id},${identity.userId},'session_created','pending',${JSON.stringify({session_id:session.session_id})}::jsonb,NOW())`);
+    res.json({url:session.url,sessionId:session.session_id});
+  }catch(err){logger.error({err},"Failed to create Didit session");res.status(502).json({error:err instanceof Error?err.message:"Failed to create verification session"});}
+});
 
-  // PUBLIC_BASE_URL = the frontend (where the user returns to)
-  // PUBLIC_API_URL  = this API service (where Didit sends the webhook)
-  const siteUrl = (process.env.PUBLIC_BASE_URL ?? "https://bazunk-web.onrender.com").replace(/\/$/, "");
-  const apiUrl = (process.env.PUBLIC_API_URL ?? siteUrl).replace(/\/$/, "");
-  const redirectUrl = `${siteUrl}/dashboard?section=verification&verified=1`;
-  const callbackUrl = `${apiUrl}/api/verification/webhook`;
-
-  try {
-    const session = await createVerificationSession({
-      vendorData: email,
-      redirectUrl,
-      callbackUrl,
-    });
-
-    await db.execute(sql`
-      UPDATE users
-      SET verification_status = 'pending',
-          didit_verification_id = ${session.session_id}
-      WHERE email = ${email}
-    `);
-
-    await db.execute(sql`
-      INSERT INTO verification_webhook_logs
-        (session_id, vendor_data, event_type, status, raw_payload, created_at)
-      VALUES
-        (${session.session_id}, ${email}, 'session_created', 'pending',
-         ${JSON.stringify({ session_id: session.session_id, vendor_data: email })}::jsonb,
-         NOW())
-    `);
-
-    req.log.info({ sessionId: session.session_id, email }, "Didit verification session created");
-    res.json({ url: session.url, sessionId: session.session_id });
-  } catch (err) {
-    logger.error({ err }, "Failed to create Didit session");
-    res.status(500).json({ error: "Failed to create verification session" });
-  }
+router.get("/verification/code/:code", async (req,res)=>{
+  const code=String(req.params.code||"").toUpperCase();
+  const r=await db.execute(sql`SELECT username, verification_code, verification_date FROM users WHERE verification_status='verified' AND verification_code=${code} LIMIT 1`);
+  if(!r.rows.length){res.status(404).json({verified:false});return;}
+  res.json({verified:true,username:r.rows[0].username??null,verificationCode:r.rows[0].verification_code,verificationDate:r.rows[0].verification_date});
 });
 
 // ── Admin routes ───────────────────────────────────────────────────────────
@@ -97,7 +64,7 @@ router.get("/admin/verification/users", requireAdmin, async (req, res) => {
   let result;
   if (status && allowed.includes(status as VerificationStatus)) {
     result = await db.execute(sql`
-      SELECT id, email, name, verification_status, verification_date,
+      SELECT id, email, name, verification_status, verification_date, verification_code,
              didit_verification_id, created_at
       FROM users
       WHERE verification_status = ${status}
@@ -105,7 +72,7 @@ router.get("/admin/verification/users", requireAdmin, async (req, res) => {
     `);
   } else {
     result = await db.execute(sql`
-      SELECT id, email, name, verification_status, verification_date,
+      SELECT id, email, name, verification_status, verification_date, verification_code,
              didit_verification_id, created_at
       FROM users
       WHERE verification_status != 'unverified'
@@ -148,7 +115,8 @@ router.patch("/admin/verification/users/:email", requireAdmin, async (req, res) 
   await db.execute(sql`
     UPDATE users
     SET verification_status = ${status},
-        verification_date = ${status === "verified" ? sql`NOW()` : sql`NULL`}
+        verification_date = ${status === "verified" ? sql`NOW()` : sql`NULL`},
+        verification_code = CASE WHEN ${status} = 'verified' THEN COALESCE(verification_code, ${newVerificationCode()}) ELSE verification_code END
     WHERE email = ${email}
   `);
 
@@ -161,21 +129,7 @@ export default router;
 // ── Webhook handler (registered separately with raw body in app.ts) ────────
 
 export async function handleDiditWebhook(req: Request, res: Response): Promise<void> {
-  const signatureHeader = req.headers["x-signature"] as string | undefined;
   const rawBody = req.body as Buffer;
-
-  if (signatureHeader) {
-    if (!verifyWebhookSignature(rawBody, signatureHeader)) {
-      logger.warn("Didit webhook: invalid signature — rejecting");
-      res.status(400).json({ error: "Invalid webhook signature" });
-      return;
-    }
-  } else if (process.env.NODE_ENV === "production" && process.env.DIDIT_WEBHOOK_SECRET) {
-    logger.warn("Didit webhook: missing x-signature header in production — rejecting");
-    res.status(400).json({ error: "Missing webhook signature" });
-    return;
-  }
-
   let payload: Record<string, unknown>;
   try {
     payload = JSON.parse(rawBody.toString("utf-8")) as Record<string, unknown>;
@@ -184,37 +138,53 @@ export async function handleDiditWebhook(req: Request, res: Response): Promise<v
     return;
   }
 
-  const { session_id, status, vendor_data } = payload as {
-    session_id?: string;
-    status?: string;
-    vendor_data?: string;
-  };
-
-  logger.info({ session_id, status, vendor_data }, "Didit webhook received");
-
-  const ourStatus: VerificationStatus =
-    (status && DIDIT_STATUS_MAP[status]) || "pending";
-
-  // Log every event for audit trail
-  await db.execute(sql`
-    INSERT INTO verification_webhook_logs
-      (session_id, vendor_data, event_type, status, raw_payload, created_at)
-    VALUES
-      (${session_id ?? null}, ${vendor_data ?? null}, 'webhook', ${ourStatus},
-       ${JSON.stringify(payload)}::jsonb, NOW())
-  `);
-
-  // Update the user record when a terminal status is received
-  if (vendor_data && (ourStatus === "verified" || ourStatus === "rejected")) {
-    await db.execute(sql`
-      UPDATE users
-      SET verification_status   = ${ourStatus},
-          verification_date     = NOW(),
-          didit_verification_id = ${session_id ?? null}
-      WHERE email = ${vendor_data}
-    `);
-    logger.info({ email: vendor_data, status: ourStatus }, "User verification status updated");
+  const signature = String(req.headers["x-signature-v2"] ?? "");
+  const timestamp = Array.isArray(req.headers["x-timestamp"])
+    ? req.headers["x-timestamp"][0]
+    : req.headers["x-timestamp"];
+  if (!verifyWebhookSignature(payload, signature, timestamp)) {
+    logger.warn("Didit webhook: invalid signature or stale timestamp — rejecting");
+    res.status(401).json({ error: "Invalid webhook signature" });
+    return;
   }
 
+  const { event_id, session_id, status, vendor_data, webhook_type } = payload as {
+    event_id?: string; session_id?: string; status?: string; vendor_data?: string; webhook_type?: string;
+  };
+  if (!event_id || !session_id || !status) {
+    res.status(400).json({ error: "Missing Didit webhook fields" });
+    return;
+  }
+
+  const duplicate = await db.execute(sql`SELECT 1 FROM verification_webhook_logs WHERE event_id=${event_id} LIMIT 1`);
+  if (duplicate.rows.length) { res.json({ received: true, duplicate: true }); return; }
+
+  const ourStatus: VerificationStatus = DIDIT_STATUS_MAP[status] ?? "pending";
+  await db.execute(sql`
+    INSERT INTO verification_webhook_logs
+      (event_id, session_id, vendor_data, event_type, status, raw_payload, created_at)
+    VALUES (${event_id}, ${session_id}, ${vendor_data ?? null}, ${webhook_type ?? "webhook"},
+            ${ourStatus}, ${JSON.stringify(payload)}::jsonb, NOW())
+    ON CONFLICT (event_id) DO NOTHING
+  `);
+
+  if (status === "Approved") {
+    await db.execute(sql`
+      UPDATE users SET verification_status='verified', verification_date=NOW(),
+        didit_verification_id=${session_id},
+        verification_code=COALESCE(verification_code, ${newVerificationCode()})
+      WHERE didit_verification_id=${session_id}
+    `);
+  } else if (status === "Declined") {
+    await db.execute(sql`UPDATE users SET verification_status='rejected', verification_date=NOW() WHERE didit_verification_id=${session_id}`);
+  } else if (status === "Kyc Expired") {
+    await db.execute(sql`UPDATE users SET verification_status='unverified', verification_date=NULL WHERE didit_verification_id=${session_id}`);
+  } else if (["In Progress","Awaiting User","In Review","Resubmitted","Abandoned"].includes(status)) {
+    await db.execute(sql`UPDATE users SET verification_status='pending' WHERE didit_verification_id=${session_id}`);
+  } else if (status === "Expired" || status === "Not Started") {
+    await db.execute(sql`UPDATE users SET verification_status='unverified' WHERE didit_verification_id=${session_id}`);
+  }
+
+  logger.info({ event_id, session_id, status, vendor_data }, "Didit V3 webhook processed");
   res.json({ received: true });
 }

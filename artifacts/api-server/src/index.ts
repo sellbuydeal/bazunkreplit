@@ -48,19 +48,8 @@ async function runAppMigrations() {
     )
   `, "users");
 
-  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT`, "users.username");
-  await run(sql`CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique_ci ON users (LOWER(username)) WHERE username IS NOT NULL`, "users.username.unique");
   await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned BOOLEAN NOT NULL DEFAULT FALSE`, "users.banned");
   await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_type TEXT NOT NULL DEFAULT 'private'`, "users.seller_type");
-  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`, "users.phone");
-  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS address_line1 TEXT`, "users.address_line1");
-  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS address_line2 TEXT`, "users.address_line2");
-  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS city TEXT`, "users.city");
-  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS postcode TEXT`, "users.postcode");
-  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS country TEXT`, "users.country");
-  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_preferences JSONB NOT NULL DEFAULT '{"orders":true,"offers":true,"messages":true,"promotions":false}'::jsonb`, "users.notification_preferences");
-  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_step INTEGER NOT NULL DEFAULT 1`, "users.onboarding_step");
-  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN NOT NULL DEFAULT FALSE`, "users.onboarding_completed");
   await run(sql`CREATE TABLE IF NOT EXISTS user_rapidapi_keys (email TEXT PRIMARY KEY, encrypted_key TEXT NOT NULL, key_last4 TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`, "user_rapidapi_keys");
 
   await run(sql`
@@ -465,6 +454,9 @@ async function runAppMigrations() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS didit_verification_id TEXT
   `, "users.didit_verification_id");
 
+  await run(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code TEXT`, "users.verification_code");
+  await run(sql`CREATE UNIQUE INDEX IF NOT EXISTS users_verification_code_unique ON users (verification_code) WHERE verification_code IS NOT NULL`, "users.verification_code_unique");
+
   await run(sql`
     ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_account_id TEXT
   `, "users.stripe_account_id");
@@ -480,6 +472,9 @@ async function runAppMigrations() {
       created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )
   `, "verification_webhook_logs");
+
+  await run(sql`ALTER TABLE verification_webhook_logs ADD COLUMN IF NOT EXISTS event_id TEXT`, "verification_webhook_logs.event_id");
+  await run(sql`CREATE UNIQUE INDEX IF NOT EXISTS verification_webhook_event_id_unique ON verification_webhook_logs (event_id) WHERE event_id IS NOT NULL`, "verification_webhook_event_id_unique");
 
   await run(sql`
     CREATE INDEX IF NOT EXISTS idx_vwl_session_id   ON verification_webhook_logs (session_id)

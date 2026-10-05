@@ -1,133 +1,104 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-const DIDIT_BASE_URL = process.env.DIDIT_BASE_URL ?? "https://apx.didit.me";
-const DIDIT_CLIENT_ID = process.env.DIDIT_CLIENT_ID ?? "";
-const DIDIT_CLIENT_SECRET = process.env.DIDIT_CLIENT_SECRET ?? "";
+const DIDIT_API_URL = "https://verification.didit.me";
+const DIDIT_API_KEY = process.env.DIDIT_API_KEY ?? "";
 const DIDIT_WEBHOOK_SECRET = process.env.DIDIT_WEBHOOK_SECRET ?? "";
-
-interface DiditTokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-}
+export const DIDIT_WORKFLOW_ID = "58ada7b4-08f6-4dff-b98f-97cfd225988e"; // Free KYC
 
 export interface DiditSession {
   session_id: string;
+  session_token?: string;
   url: string;
-  status: string;
-  vendor_data: string;
+  status?: string;
+  workflow_id?: string;
+  vendor_data?: string;
 }
 
 export type VerificationStatus = "unverified" | "pending" | "verified" | "rejected";
-
 export const DIDIT_STATUS_MAP: Record<string, VerificationStatus> = {
+  "Not Started": "unverified",
+  "In Progress": "pending",
+  "Awaiting User": "pending",
+  "In Review": "pending",
   Approved: "verified",
   Declined: "rejected",
-  "In Progress": "pending",
-  "Not started": "unverified",
+  Resubmitted: "pending",
+  Abandoned: "pending",
+  Expired: "unverified",
+  "Kyc Expired": "unverified",
 };
 
-let tokenCache: { token: string; expiresAt: number } | null = null;
-
-async function getAccessToken(): Promise<string> {
-  if (tokenCache && Date.now() < tokenCache.expiresAt - 60_000) {
-    return tokenCache.token;
-  }
-
-  if (!DIDIT_CLIENT_ID || !DIDIT_CLIENT_SECRET) {
-    throw new Error("DIDIT_CLIENT_ID and DIDIT_CLIENT_SECRET must be configured");
-  }
-
-  const credentials = Buffer.from(`${DIDIT_CLIENT_ID}:${DIDIT_CLIENT_SECRET}`).toString("base64");
-  const res = await fetch(`${DIDIT_BASE_URL}/auth/v2/token`, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${credentials}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: "grant_type=client_credentials",
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Didit token request failed ${res.status}: ${text}`);
-  }
-
-  const data = (await res.json()) as DiditTokenResponse;
-  tokenCache = {
-    token: data.access_token,
-    expiresAt: Date.now() + data.expires_in * 1000,
-  };
-  return data.access_token;
+export function diditConfigured() {
+  return Boolean(DIDIT_API_KEY && DIDIT_WEBHOOK_SECRET);
 }
 
 export async function createVerificationSession(opts: {
   vendorData: string;
-  redirectUrl: string;
   callbackUrl: string;
-  features?: string;
 }): Promise<DiditSession> {
-  const token = await getAccessToken();
-  const res = await fetch(`${DIDIT_BASE_URL}/verification/v1/session/`, {
+  if (!DIDIT_API_KEY) throw new Error("DIDIT_API_KEY is not configured");
+
+  const res = await fetch(`${DIDIT_API_URL}/v3/session/`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      "x-api-key": DIDIT_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
+      workflow_id: DIDIT_WORKFLOW_ID,
       vendor_data: opts.vendorData,
-      features: opts.features ?? "OCR + FACE",
       callback: opts.callbackUrl,
-      redirect_url: opts.redirectUrl,
     }),
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Didit session creation failed ${res.status}: ${text}`);
+    const detail = await res.text();
+    throw new Error(`Didit session creation failed ${res.status}: ${detail}`);
   }
-
   return res.json() as Promise<DiditSession>;
 }
 
-/**
- * Verifies the Didit webhook signature.
- * Didit sends: x-signature: sha256=<hmac_hex>
- * The HMAC is computed over the raw request body using the webhook secret.
- */
-export function verifyWebhookSignature(rawBody: Buffer, signatureHeader: string): boolean {
+function shortenFloats(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(shortenFloats);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, shortenFloats(v)]),
+    );
+  }
+  return value;
+}
+
+function sortKeys(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortKeys);
+  if (value && typeof value === "object") {
+    return Object.keys(value as Record<string, unknown>)
+      .sort()
+      .reduce<Record<string, unknown>>((acc, key) => {
+        acc[key] = sortKeys((value as Record<string, unknown>)[key]);
+        return acc;
+      }, {});
+  }
+  return value;
+}
+
+export function verifyWebhookSignature(
+  parsedBody: unknown,
+  signature: string,
+  timestampHeader: string | undefined,
+): boolean {
   try {
-    if (!DIDIT_WEBHOOK_SECRET) return false;
+    if (!DIDIT_WEBHOOK_SECRET || !signature || !timestampHeader) return false;
+    const timestamp = Number(timestampHeader);
+    if (!Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) return false;
 
-    const expected = (() => {
-      if (signatureHeader.startsWith("sha256=")) {
-        return createHmac("sha256", DIDIT_WEBHOOK_SECRET).update(rawBody).digest("hex");
-      }
-      // Timestamped format: t=<ts>,v1=<hex>
-      const parts = Object.fromEntries(
-        signatureHeader.split(",").map((p) => {
-          const idx = p.indexOf("=");
-          return [p.slice(0, idx), p.slice(idx + 1)] as [string, string];
-        }),
-      );
-      const { t: ts, v1: _sig } = parts;
-      if (ts) {
-        const payload = `${ts}.${rawBody.toString("utf-8")}`;
-        return createHmac("sha256", DIDIT_WEBHOOK_SECRET).update(payload).digest("hex");
-      }
-      return null;
-    })();
+    const canonical = JSON.stringify(sortKeys(shortenFloats(parsedBody)));
+    const expected = createHmac("sha256", DIDIT_WEBHOOK_SECRET)
+      .update(canonical, "utf8")
+      .digest("hex");
 
-    if (!expected) return false;
-
-    const received = signatureHeader.startsWith("sha256=")
-      ? signatureHeader.slice(7)
-      : (signatureHeader.split(",").find((p) => p.startsWith("v1="))?.slice(3) ?? "");
-
-    const receivedBuf = Buffer.from(received, "hex");
-    const expectedBuf = Buffer.from(expected, "hex");
-    if (receivedBuf.length !== expectedBuf.length) return false;
-    return timingSafeEqual(receivedBuf, expectedBuf);
+    const receivedBuffer = Buffer.from(signature, "utf8");
+    const expectedBuffer = Buffer.from(expected, "utf8");
+    return receivedBuffer.length === expectedBuffer.length && timingSafeEqual(receivedBuffer, expectedBuffer);
   } catch {
     return false;
   }
