@@ -6,6 +6,13 @@ import {
 } from "lucide-react";
 import { AdminLayout } from "./AdminLayout";
 import { useAdmin } from "@/context/AdminContext";
+import { CATEGORIES } from "@/data/categories";
+
+const digital = CATEGORIES.find(c => c.slug === "digital")!;
+const SITE_CATEGORIES = CATEGORIES.filter(c => c.slug !== "digital-products").map(c => c.slug === "digital" ? {
+  ...c, name: "Digital Products", subcategories: [...digital.subcategories, ...CATEGORIES.find(c => c.slug === "digital-products")!.subcategories.filter(sub => !digital.subcategories.some(existing => existing.name === sub.name))],
+} : c);
+
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -69,9 +76,8 @@ export function AdminProductsPage() {
   useEffect(() => { if (!isAdmin) setLocation("/admin"); }, [isAdmin]);
   useEffect(() => { loadCategories(); }, []);
 
-  async function loadCategories() {
-    const res = await authFetch("/api/admin/categories");
-    if (res.ok) { const d = await res.json(); setCategories(d.categories ?? []); }
+  function loadCategories() {
+    setCategories(SITE_CATEGORIES.map(c => ({ id: c.slug, name: c.name, slug: c.slug, description: null, product_count: 0 })));
   }
 
   const TABS = [
@@ -193,7 +199,7 @@ function ProductsTab({ authFetch, categories }: { authFetch: (url: string, opts?
           className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 text-gray-600"
         >
           <option value="">All Categories</option>
-          {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
+          {SITE_CATEGORIES.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
         </select>
         <button onClick={load} disabled={loading} className="p-2.5 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-gray-700 disabled:opacity-40">
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
@@ -257,7 +263,7 @@ function ProductsTab({ authFetch, categories }: { authFetch: (url: string, opts?
                       <p className="font-semibold text-gray-800 truncate">{p.title}</p>
                       {p.seller_email && <p className="text-[10px] text-gray-400 truncate">{p.seller_email}</p>}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{p.category_name ?? <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{SITE_CATEGORIES.find(c => c.slug === p.category_id)?.name ?? p.category_name ?? <span className="text-gray-300">—</span>}</td>
                     <td className="px-4 py-3 font-bold text-gray-800 whitespace-nowrap">£{parseFloat(p.price).toFixed(2)}</td>
                     <td className="px-4 py-3">
                       <span className={`text-[10px] font-bold px-2 py-1 rounded-full capitalize ${CONDITION_STYLE[p.condition] ?? "bg-gray-100 text-gray-500"}`}>{p.condition}</span>
@@ -485,10 +491,11 @@ function ProductDrawer({
               </label>
               <label className="block">
                 <span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Category</span>
-                <select value={form.category_id} onChange={e => set("category_id", e.target.value)}
+                <select value={form.category_id} onChange={e => { set("category_id", e.target.value); set("subcategory", ""); }}
                   className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 bg-white">
                   <option value="">None</option>
-                  {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
+                  {form.category_id && !SITE_CATEGORIES.some(c => c.slug === form.category_id) && <option value={form.category_id}>Current category: {form.category_id} (legacy)</option>}
+                  {SITE_CATEGORIES.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
                 </select>
               </label>
             </div>
@@ -510,7 +517,11 @@ function ProductDrawer({
 
             <div className="grid grid-cols-3 gap-3">
               <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Subcategory</span>
-                <input value={form.subcategory} onChange={e => set("subcategory", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" placeholder="e.g. microwaves" /></label>
+                <select value={form.subcategory} onChange={e => set("subcategory", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm">
+                  <option value="">No subcategory</option>
+                  {form.subcategory && !SITE_CATEGORIES.find(c => c.slug === form.category_id)?.subcategories.some(sub => sub.slug === form.subcategory) && <option value={form.subcategory}>Current subcategory: {form.subcategory} (legacy)</option>}
+                  {(SITE_CATEGORIES.find(c => c.slug === form.category_id)?.subcategories ?? []).map(sub => <option key={sub.slug} value={sub.slug}>{sub.name}</option>)}
+                </select></label>
               <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">Brand</span>
                 <input value={form.brand} onChange={e => set("brand", e.target.value)} className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm" /></label>
               <label className="block"><span className="text-xs font-bold text-gray-600 uppercase tracking-wide">SKU</span>
@@ -636,133 +647,14 @@ function ProductDrawer({
 
 // ── Categories Tab ────────────────────────────────────────────────────────────
 
-function CategoriesTab({ authFetch, categories, onRefresh }: {
-  authFetch: (url: string, opts?: RequestInit) => Promise<Response>;
-  categories: Category[];
-  onRefresh: () => void;
-}) {
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editDesc, setEditDesc] = useState("");
-  const [newName, setNewName] = useState("");
-  const [newDesc, setNewDesc] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-
-  async function createCategory() {
-    if (!newName.trim()) return;
-    setSaving(true);
-    await authFetch("/api/admin/categories", { method: "POST", body: JSON.stringify({ name: newName.trim(), description: newDesc.trim() || null }) });
-    setNewName(""); setNewDesc("");
-    onRefresh(); setSaving(false);
-  }
-
-  async function saveEdit(id: string) {
-    if (!editName.trim()) return;
-    setSaving(true);
-    await authFetch(`/api/admin/categories/${id}`, { method: "PUT", body: JSON.stringify({ name: editName.trim(), description: editDesc.trim() || null }) });
-    setEditId(null); onRefresh(); setSaving(false);
-  }
-
-  async function deleteCategory(id: string) {
-    if (deleteConfirm !== id) { setDeleteConfirm(id); return; }
-    setDeleteConfirm(null);
-    await authFetch(`/api/admin/categories/${id}`, { method: "DELETE" });
-    onRefresh();
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* Add form */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <h3 className="text-sm font-bold text-gray-900 mb-4">Add Category</h3>
-        <div className="flex gap-3">
-          <input value={newName} onChange={e => setNewName(e.target.value)} onKeyDown={e => e.key === "Enter" && createCategory()}
-            placeholder="Category name"
-            className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]" />
-          <input value={newDesc} onChange={e => setNewDesc(e.target.value)}
-            placeholder="Description (optional)"
-            className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]" />
-          <button onClick={createCategory} disabled={saving || !newName.trim()}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#F26B21] text-white rounded-xl text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40">
-            <Plus className="w-4 h-4" /> Add
-          </button>
-        </div>
-      </div>
-
-      {/* Category list */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50">
-              {["Name", "Slug", "Description", "Products", "Actions"].map(h => (
-                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {categories.length === 0 && (
-              <tr><td colSpan={5} className="py-12 text-center text-gray-400 text-sm">No categories yet</td></tr>
-            )}
-            {categories.map(c => (
-              <tr key={c.id} className="border-t border-gray-50">
-                <td className="px-4 py-3">
-                  {editId === c.id ? (
-                    <input value={editName} onChange={e => setEditName(e.target.value)}
-                      className="w-full border border-[#4A5CE8] rounded-lg px-2 py-1 text-sm focus:outline-none" autoFocus />
-                  ) : (
-                    <span className="font-semibold text-gray-800">{c.name}</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-gray-400 font-mono text-xs">{c.slug}</td>
-                <td className="px-4 py-3 text-gray-500 max-w-48">
-                  {editId === c.id ? (
-                    <input value={editDesc} onChange={e => setEditDesc(e.target.value)}
-                      className="w-full border border-[#4A5CE8] rounded-lg px-2 py-1 text-sm focus:outline-none" />
-                  ) : (
-                    <span className="truncate block">{c.description ?? <span className="text-gray-300">—</span>}</span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <span className="bg-[#4A5CE8]/10 text-[#4A5CE8] text-xs font-bold px-2 py-1 rounded-full">{c.product_count}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1.5">
-                    {editId === c.id ? (
-                      <>
-                        <button onClick={() => saveEdit(c.id)} disabled={saving}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-[#4A5CE8] text-white rounded-lg text-xs font-bold disabled:opacity-40">
-                          <Save className="w-3 h-3" /> Save
-                        </button>
-                        <button onClick={() => setEditId(null)} className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs font-semibold">Cancel</button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => { setEditId(c.id); setEditName(c.name); setEditDesc(c.description ?? ""); }}
-                          className="w-7 h-7 rounded-lg bg-[#4A5CE8]/10 hover:bg-[#4A5CE8]/20 text-[#4A5CE8] flex items-center justify-center transition-colors">
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => deleteCategory(c.id)}
-                          className={`h-7 rounded-lg flex items-center gap-1 px-2 transition-colors ${
-                            deleteConfirm === c.id ? "bg-red-500 text-white text-[10px] font-bold" : "w-7 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500"
-                          }`}
-                          onBlur={() => setDeleteConfirm(null)}>
-                          {deleteConfirm === c.id ? <><AlertTriangle className="w-3 h-3" /> Confirm</> : <Trash2 className="w-3.5 h-3.5" />}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+function CategoriesTab(_props: { authFetch: (url: string, opts?: RequestInit) => Promise<Response>; categories: Category[]; onRefresh: () => void }) {
+  return <div className="space-y-4">
+    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-sm text-blue-800">These are the shared marketplace categories used by browsing and product editing. Digital and Digital Products are combined. Category names and subcategories come from the site's shared category list.</div>
+    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden"><table className="w-full text-sm"><thead className="bg-gray-50"><tr>{["Category", "Slug", "Subcategories"].map(label => <th key={label} className="text-left px-4 py-3">{label}</th>)}</tr></thead><tbody>
+      {SITE_CATEGORIES.map(c => <tr key={c.slug} className="border-t border-gray-100"><td className="px-4 py-3 font-semibold">{c.name}</td><td className="px-4 py-3 font-mono text-xs">{c.slug}</td><td className="px-4 py-3 text-gray-500">{c.subcategories.map(sub => sub.name).join(" · ")}</td></tr>)}
+    </tbody></table></div>
+  </div>;
 }
-
-// ── Import / Export Tab ───────────────────────────────────────────────────────
 
 function ImportExportTab({ authFetch, categories }: {
   authFetch: (url: string, opts?: RequestInit) => Promise<Response>;
