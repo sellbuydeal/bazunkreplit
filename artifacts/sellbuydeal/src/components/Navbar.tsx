@@ -6,7 +6,7 @@ import {
   Heart, ShoppingCart, Tag, ChevronDown, LogOut,
   LayoutDashboard, Menu, Home, Grid3X3, List, Newspaper, MessageSquare,
   Gavel, Zap, Gift, Package, Radio, Handshake, Info,
-  Trophy, MoreHorizontal, Flame, ArrowDownToLine, ShieldCheck,
+  Trophy, MoreHorizontal, Film, Flame, ArrowDownToLine, ShieldCheck,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -28,10 +28,10 @@ const SELL_OPTIONS: Array<{
 }> = [
   {
     id: "quick",
-    label: "Quick List",
+    label: "Direct Sale",
     desc: "List a single item in seconds",
     icon: Zap,
-    href: "/sell/quick",
+    href: "/sell/direct",
     color: "text-[#F26B21]",
     bg: "bg-orange-50",
   },
@@ -65,6 +65,7 @@ const SELL_OPTIONS: Array<{
 ];
 
 const MORE_NAV = [
+  { href: "/videos", label: "Videos", icon: Film, color: "text-blue-600", bg: "bg-blue-50" },
   { href: "/auctions",          label: "Auctions",         icon: Gavel,           color: "text-amber-600",   bg: "bg-amber-50" },
   { href: "/flash-sales",       label: "Flash Sales",      icon: Flame,           color: "text-red-500",     bg: "bg-red-50" },
   { href: "/classifieds",       label: "Classifieds",      icon: Newspaper,       color: "text-purple-600",  bg: "bg-purple-50" },
@@ -74,6 +75,7 @@ const MORE_NAV = [
 ];
 
 const MOBILE_NAV_LINKS = [
+  { href: "/videos", label: "Videos", icon: Film },
   { href: "/",            label: "Home",        icon: Home },
   { href: "/browse",      label: "Browse",      icon: Grid3X3 },
   { href: "/auctions",    label: "Auctions",    icon: Gavel },
@@ -81,7 +83,7 @@ const MOBILE_NAV_LINKS = [
   { href: "/live",        label: "Live",        icon: Radio,  live: true },
   { href: "/categories",  label: "Categories",  icon: List },
   { href: "/classifieds", label: "Classifieds", icon: Newspaper },
-  { href: "/sell/quick",  label: "Quick List",  icon: Tag },
+  { href: "/sell/direct",  label: "Direct Sale",  icon: Tag },
   { href: "/bundle",      label: "Bundle Deal", icon: Package },
   { href: "/offers",      label: "My Offers",   icon: Handshake },
   { href: "/messages",    label: "Messages",    icon: MessageSquare },
@@ -592,7 +594,7 @@ export function Navbar() {
                         <button onClick={() => { setUserMenuOpen(false); setMessageCenterOpen(true); }} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                           <MessageSquare className="w-4 h-4 text-gray-400" /> Messages
                         </button>
-                        <Link href="/sell/quick" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                        <Link href="/sell/direct" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                           <Tag className="w-4 h-4 text-gray-400" /> Create Listing
                         </Link>
                         <div className="border-t border-gray-100">

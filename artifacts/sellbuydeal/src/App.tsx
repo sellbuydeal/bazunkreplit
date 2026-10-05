@@ -31,7 +31,7 @@ import { RewardsTeaser } from "@/components/RewardsTeaser";
 import { AdSlot } from "@/components/AdSlot";
 import { CategoriesPage } from "@/pages/CategoriesPage";
 import { SellPage } from "@/pages/SellPage";
-import { QuickSellPage } from "@/pages/QuickSellPage";
+import { DirectSalePage } from "@/pages/DirectSalePage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { ImportersPage } from "@/pages/ImportersPage";
 import { BrowsePage } from "@/pages/BrowsePage";
@@ -254,7 +254,8 @@ function Router() {
       <Route path="/register">{() => <Redirect to="/sign-up" />}</Route>
       <Route path="/categories" component={CategoriesPage} />
       <Route path="/sell" component={SellPage} />
-      <Route path="/sell/quick">{() => <FeatureGate feature="quick_sell" name="Quick Sell"><QuickSellPage /></FeatureGate>}</Route>
+      <Route path="/sell/direct">{() => <FeatureGate feature="quick_sell" name="Direct Sale"><DirectSalePage /></FeatureGate>}</Route>
+      <Route path="/sell/quick">{() => <FeatureGate feature="quick_sell" name="Direct Sale"><DirectSalePage /></FeatureGate>}</Route>
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/importers">{() => <FeatureGate feature="importers" name="Importers"><ImportersPage /></FeatureGate>}</Route>
       <Route path="/browse" component={BrowsePage} />
@@ -306,7 +307,8 @@ function Router() {
       <Route path="/admin/reviews" component={AdminReviewsPage} />
       <Route path="/admin/verification" component={AdminVerificationPage} />
       <Route path="/setup" component={SetupWizardPage} />
-      <Route path="/video">{() => <FeatureGate feature="product_video" name="Product Video"><VideoPage /></FeatureGate>}</Route>
+      <Route path="/videos" component={VideoPage} />
+      <Route path="/video" component={VideoPage} />
       <Route path="/rewards/referrals">{() => <FeatureGate feature="referrals" name="Referrals"><ReferralsPage /></FeatureGate>}</Route>
       <Route path="/rewards">{() => <FeatureGate feature="games" name="Rewards Arcade"><RewardsPage /></FeatureGate>}</Route>
       <Route path="/treasure-hunt">{() => { window.location.replace("/rewards"); return null; }}</Route>

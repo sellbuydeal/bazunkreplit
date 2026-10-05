@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ShoppingCart, Store, Zap, Gavel, Handshake, Newspaper, Tag, Layers,
-  ArrowRight, X, Play,
+  ArrowRight, X,
   Smartphone, Shirt, Armchair, Dumbbell, BookOpen, CarFront, Gamepad2, Gem, Package2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -120,11 +120,7 @@ export function Hero() {
                 </button>
               </Link>
 
-              <Link href="/video">
-                <button className="flex items-center justify-center gap-2 px-7 py-3.5 border border-[#F26B21]/40 text-[#F26B21] font-bold rounded-2xl hover:bg-[#F26B21]/10 transition-colors text-sm w-full sm:w-auto">
-                  <Play className="w-4 h-4 fill-[#F26B21]" /> Watch Video
-                </button>
-              </Link>
+
 
               {/* Sell — flyout trigger */}
               <button

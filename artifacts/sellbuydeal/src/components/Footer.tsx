@@ -74,7 +74,6 @@ export function Footer() {
               <li><Link href="/buyer-protection" className={linkClass}>Buyer Protection</Link></li>
               <li><Link href="/dashboard" className={linkClass}>Returns & Refunds</Link></li>
               <li><Link href="/support" className={linkClass}>Contact Us</Link></li>
-              <li><Link href="/video" className={linkClass}>Watch Our Video</Link></li>
             </ul>
           </div>
         </div>
