@@ -1,9 +1,12 @@
 import { motion } from "framer-motion";
 import { Zap, Gavel, Handshake, ArrowRight, Shield, Tag, Radio } from "lucide-react";
 import { Link } from "wouter";
+import { useRawSettings } from "@/context/SiteSettingsContext";
+import { isFeatureEnabled } from "@/components/FeatureGate";
 
 const FEATURE_BLOCKS = [
   {
+    feature: "flash_sales",
     icon: Zap,
     iconBg: "bg-[#F26B21]",
     tag: "New Feature",
@@ -18,6 +21,7 @@ const FEATURE_BLOCKS = [
     glow: "shadow-[#F26B21]/10",
   },
   {
+    feature: "auctions",
     icon: Gavel,
     iconBg: "bg-[#4A5CE8]",
     tag: "Live Right Now",
@@ -32,6 +36,7 @@ const FEATURE_BLOCKS = [
     glow: "shadow-[#4A5CE8]/20",
   },
   {
+    feature: "offers",
     icon: Handshake,
     iconBg: "bg-white/15",
     tag: "Unique to Bazunk",
@@ -48,12 +53,15 @@ const FEATURE_BLOCKS = [
 ];
 
 const TRUST_ITEMS = [
-  { icon: Shield,  label: "Buyer Protection",      sub: "30-day dispute window"       },
-  { icon: Tag,     label: "Free to List & Sell",    sub: "0% seller fees for private sellers" },
-  { icon: Radio,   label: "Live Selling",           sub: "Stream and sell in real time"},
+  { feature: "buyer_protection", icon: Shield,  label: "Buyer Protection",      sub: "30-day dispute window"       },
+  { feature: "quick_sell", icon: Tag,     label: "Free to List & Sell",    sub: "0% seller fees for private sellers" },
+  { feature: "live", icon: Radio,   label: "Live Selling",           sub: "Stream and sell in real time"},
 ];
 
 export function FeaturedFeatures() {
+  const flags = useRawSettings();
+  const blocks = FEATURE_BLOCKS.filter(x => isFeatureEnabled(flags, x.feature));
+  const trustItems = TRUST_ITEMS.filter(x => isFeatureEnabled(flags, x.feature));
   return (
     <section className="bg-gray-50 py-16 border-t border-gray-100">
       <div className="max-w-6xl mx-auto px-4">
@@ -80,7 +88,7 @@ export function FeaturedFeatures() {
 
         {/* 3 feature blocks */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-12">
-          {FEATURE_BLOCKS.map(({ icon: Icon, iconBg, tag, title, description, cta, href, bg, border, tagColor, ctaColor, glow }, i) => (
+          {blocks.map(({ icon: Icon, iconBg, tag, title, description, cta, href, bg, border, tagColor, ctaColor, glow }, i) => (
             <motion.div
               key={title}
               initial={{ opacity: 0, y: 20 }}
@@ -116,7 +124,7 @@ export function FeaturedFeatures() {
 
         {/* Trust row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {TRUST_ITEMS.map(({ icon: Icon, label, sub }, i) => (
+          {trustItems.map(({ icon: Icon, label, sub }, i) => (
             <motion.div
               key={label}
               initial={{ opacity: 0, y: 12 }}

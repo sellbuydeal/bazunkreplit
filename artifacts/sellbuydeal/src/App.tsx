@@ -64,7 +64,7 @@ import { AdminUsersPage } from "@/pages/admin/AdminUsersPage";
 import { AdminAuditLogPage } from "@/pages/admin/AdminAuditLogPage";
 import { AdminSystemStatusPage } from "@/pages/admin/AdminSystemStatusPage";
 import { AdminFeatureFlagsPage } from "@/pages/admin/AdminFeatureFlagsPage";
-import { FeatureGate } from "@/components/FeatureGate";
+import { FeatureGate, FeatureVisible } from "@/components/FeatureGate";
 import { AdminPaymentsPage } from "@/pages/admin/AdminPaymentsPage";
 import { AdminOrdersPage } from "@/pages/admin/AdminOrdersPage";
 import { AdminSettingsPage } from "@/pages/admin/AdminSettingsPage";
@@ -227,7 +227,7 @@ function Home() {
       <main className="flex-1">
         <Hero />
         <CategorySection />
-        <LiveNowStrip />
+        <FeatureVisible feature="live"><LiveNowStrip /></FeatureVisible>
         <RewardsTeaser />
         <FeaturedListings />
         <FeaturedFeatures />

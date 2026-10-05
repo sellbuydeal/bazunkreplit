@@ -9,6 +9,8 @@ import {
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { AdSlot } from "@/components/AdSlot";
+import { useRawSettings } from "@/context/SiteSettingsContext";
+import { isFeatureEnabled } from "@/components/FeatureGate";
 
 const CATEGORIES = [
   {
@@ -39,6 +41,7 @@ const CATEGORIES = [
   },
   {
     icon: Gavel,
+    feature: "auctions",
     label: "Auctions",
     color: "bg-violet-100 text-violet-600",
     faqs: [
@@ -52,6 +55,7 @@ const CATEGORIES = [
   },
   {
     icon: Zap,
+    feature: "flash_sales",
     label: "Flash Sales",
     color: "bg-amber-100 text-amber-600",
     faqs: [
@@ -65,6 +69,7 @@ const CATEGORIES = [
   },
   {
     icon: Radio,
+    feature: "live",
     label: "Live Shopping",
     color: "bg-red-100 text-red-600",
     faqs: [
@@ -172,7 +177,22 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 }
 
 export function SupportPage() {
+  const featureSettings = useRawSettings();
+  const visibleCategories = CATEGORIES.filter((c:any) => !c.feature || isFeatureEnabled(featureSettings, c.feature));
   const [activeCategory, setActiveCategory] = useState(0);
+  const faqVisible = (faq:{q:string;a:string}) => {
+    const t=(faq.q+" "+faq.a).toLowerCase();
+    const refs:[string,string[]][] = [
+      ["live",["live shopping","live stream","going live","go live"]],
+      ["auctions",["auction","bid"]],
+      ["flash_sales",["flash sale"]],
+      ["classifieds",["classified"]],
+      ["offers",["make an offer","offers","auto-accept"]],
+      ["buyer_protection",["buyer protection"]],
+      ["credits",["bazunk credits","credits"]]
+    ];
+    return refs.every(([feature,words]) => isFeatureEnabled(featureSettings,feature) || !words.some(w=>t.includes(w)));
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -186,7 +206,7 @@ export function SupportPage() {
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">Support Centre</h1>
           <p className="text-white/60 text-base max-w-md mx-auto">
-            Find answers to common questions about buying, selling, auctions, live shopping, and your account.
+            Find answers to common questions about buying, selling, marketplace features, and your account.
           </p>
         </motion.div>
       </section>
@@ -197,7 +217,7 @@ export function SupportPage() {
 
         {/* Category tabs */}
         <div className="flex flex-wrap gap-2 mb-8 justify-center">
-          {CATEGORIES.map((cat, i) => {
+          {visibleCategories.map((cat, i) => {
             const Icon = cat.icon;
             return (
               <button
@@ -226,7 +246,7 @@ export function SupportPage() {
             transition={{ duration: 0.15 }}
             className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-2"
           >
-            {CATEGORIES[activeCategory].faqs.map((faq) => (
+            {visibleCategories[activeCategory].faqs.filter(faqVisible).map((faq) => (
               <FaqItem key={faq.q} q={faq.q} a={faq.a} />
             ))}
           </motion.div>

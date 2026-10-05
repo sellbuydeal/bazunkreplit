@@ -16,6 +16,8 @@ import { useCart } from "@/context/CartContext";
 import { useCurrency, CURRENCIES, type CurrencyCode } from "@/context/CurrencyContext";
 import { MessageCenterOverlay } from "./MessageCenterOverlay";
 import { ThemeToggle } from "./ThemeToggle";
+import { useRawSettings } from "@/context/SiteSettingsContext";
+import { featureForHref, isFeatureEnabled } from "@/components/FeatureGate";
 
 const ALL_PRODUCTS: { id: number; title: string; price: number; condition: string; views: number; image: string; category: string }[] = [];
 
@@ -93,6 +95,8 @@ export function Navbar() {
   const { user, logout } = useAuth();
   const { itemCount, openCart } = useCart();
   const { currency, setCurrency, formatPrice } = useCurrency();
+  const featureSettings = useRawSettings();
+  const visibleHref = (href:string) => { const f=featureForHref(href); return !f || isFeatureEnabled(featureSettings,f); };
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [liveSearchResults, setLiveSearchResults] = useState<any[]>([]);
@@ -190,10 +194,10 @@ export function Navbar() {
   const initial = user?.name?.charAt(0).toUpperCase() ?? "U";
 
   const primaryLinks = [
-    { href: "/browse",     label: "Browse" },
+    { href: "/browse", label: "Browse" },
     { href: "/categories", label: "Categories" },
-    { href: "/live",       label: "Live", live: true },
-  ];
+    { href: "/live", label: "Live", live: true },
+  ].filter(x => visibleHref(x.href));
 
   return (
     <>
@@ -307,7 +311,7 @@ export function Navbar() {
                     transition={{ duration: 0.15 }}
                     className="absolute left-0 top-[calc(100%+8px)] w-60 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 py-1.5"
                   >
-                    {MORE_NAV.map(({ href, label, icon: Icon, color, bg }) => {
+                    {MORE_NAV.filter(x => visibleHref(x.href)).map(({ href, label, icon: Icon, color, bg }) => {
                       const active = location === href;
                       return (
                         <Link
@@ -472,7 +476,7 @@ export function Navbar() {
                         <div className="px-4 pt-3 pb-2">
                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">How do you want to sell?</p>
                         </div>
-                        {SELL_OPTIONS.map((opt) => {
+                        {SELL_OPTIONS.filter(x => visibleHref(x.href)).map((opt) => {
                           const Icon = opt.icon;
                           return (
                             <Link
@@ -727,7 +731,7 @@ export function Navbar() {
                     <ChevronRight className="w-3.5 h-3.5 text-amber-300 ml-auto" />
                   </button>
                 )}
-                {MOBILE_NAV_LINKS.map(({ href, label, icon: Icon, live }) => (
+                {MOBILE_NAV_LINKS.filter(x => visibleHref(x.href)).map(({ href, label, icon: Icon, live }) => (
                   <button
                     key={href}
                     onClick={() => navTo(href)}
