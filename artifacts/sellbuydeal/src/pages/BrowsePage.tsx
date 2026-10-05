@@ -336,17 +336,15 @@ export function BrowsePage() {
         return raw ? JSON.parse(raw) : [];
       } catch { return []; }
     }
+    const matchesCategory = (category: string) => selectedCategories.includes(category)
+      || (["digital", "digital-products"].includes(category) && selectedCategories.some((selected) => ["digital", "digital-products"].includes(selected)));
+    const matchesSubcategory = (subcategory: string) => selectedSubcategories.includes(subcategory)
+      || (["software", "software-apps"].includes(subcategory) && selectedSubcategories.some((selected) => ["software", "software-apps"].includes(selected)));
     if (selectedCategories.length > 0) {
-      result = result.filter((p) => {
-        if (selectedCategories.includes(p.category)) return true;
-        return parseExtras(p).some(e => selectedCategories.includes(e.category));
-      });
+      result = result.filter((p) => matchesCategory(p.category) || parseExtras(p).some((e) => matchesCategory(e.category)));
     }
     if (selectedSubcategories.length > 0) {
-      result = result.filter((p) => {
-        if (p.subcategory && selectedSubcategories.includes(p.subcategory)) return true;
-        return parseExtras(p).some(e => selectedSubcategories.includes(e.subcategory));
-      });
+      result = result.filter((p) => (p.subcategory && matchesSubcategory(p.subcategory)) || parseExtras(p).some((e) => matchesSubcategory(e.subcategory)));
     }
     if (selectedConditions.length > 0) {
       result = result.filter((p) => selectedConditions.includes(p.condition));

@@ -36,6 +36,15 @@ const CATEGORY_THEMES = [
 ];
 
 const CATEGORY_ART: Record<string, string> = {
+  "adult": "/category-art/adult.png",
+  "digital": "/category-art/digital.png",
+  "musical-instruments": "/category-art/musical-instruments.png",
+  "office-products": "/category-art/office-products.png",
+  "patio-lawn-garden": "/category-art/patio-lawn-garden.png",
+  "pet-supplies": "/category-art/pet-supplies.png",
+  "tools-home-improvement": "/category-art/tools-home-improvement.png",
+  "video-games": "/category-art/video-games.png",
+
   electronics: "/category-art/electronics.webp",
   "home-kitchen": "/category-art/home-kitchen.webp",
   "clothing-shoes-jewelry": "/category-art/clothing-shoes-jewelry.webp",
@@ -79,7 +88,14 @@ export function CategoriesPage() {
       .catch(() => {});
   }, []);
 
-  const ordered = [...CATEGORIES].sort((a, b) => {
+  const digital = CATEGORIES.find((c) => c.slug === "digital")!;
+  const legacyDigital = CATEGORIES.find((c) => c.slug === "digital-products")!;
+  const digitalSubs = [...digital.subcategories];
+  for (const sub of legacyDigital.subcategories) {
+    if (!digitalSubs.some((existing) => existing.name === sub.name)) digitalSubs.push(sub);
+  }
+  const displayCategories = CATEGORIES.filter((c) => c.slug !== "digital-products").map((c) => c.slug === "digital" ? { ...c, name: "Digital Products", subcategories: digitalSubs } : c);
+  const ordered = [...displayCategories].sort((a, b) => {
     const ai = CATEGORY_ORDER.indexOf(a.slug);
     const bi = CATEGORY_ORDER.indexOf(b.slug);
     if (ai === -1 && bi === -1) return a.name.localeCompare(b.name);
@@ -95,14 +111,14 @@ export function CategoriesPage() {
       )
     : ordered;
 
-  const selected = CATEGORIES.find((c) => c.slug === openSlug) ?? null;
+  const selected = displayCategories.find((c) => c.slug === openSlug) ?? null;
 
   function catCount(slug: string) {
-    return counts.filter((l) => l.category === slug).reduce((sum, l) => sum + Number(l.count || 0), 0);
+    return counts.filter((l) => (l.category === slug || (slug === "digital" && l.category === "digital-products"))).reduce((sum, l) => sum + Number(l.count || 0), 0);
   }
 
   function subCount(catSlug: string, subSlug: string) {
-    return counts.find((l) => l.category === catSlug && l.subcategory === subSlug)?.count ?? 0;
+    return counts.filter((l) => (l.category === catSlug || (catSlug === "digital" && l.category === "digital-products")) && (l.subcategory === subSlug || (catSlug === "digital" && subSlug === "software-apps" && l.subcategory === "software"))).reduce((sum, l) => sum + Number(l.count || 0), 0);
   }
 
   function themeFor(slug: string) {
