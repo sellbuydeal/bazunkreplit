@@ -11,23 +11,23 @@ interface Payment {
 }
 
 const FEE_CATEGORIES = [
-  { name: "Electronics", slug: "electronics", defaultRate: "10" },
-  { name: "Phones & Tablets", slug: "cell-phones", defaultRate: "10" },
-  { name: "Fashion, Clothing & Jewellery", slug: "clothing-shoes-jewelry", defaultRate: "12" },
-  { name: "Automotive", slug: "automotive", defaultRate: "5" },
-  { name: "Home & Garden", slug: "home-garden", defaultRate: "10" },
-  { name: "Sports & Outdoors", slug: "sports-outdoors", defaultRate: "10" },
-  { name: "Toys & Games", slug: "toys-games", defaultRate: "10" },
-  { name: "Books", slug: "books", defaultRate: "12" },
-  { name: "CDs, Vinyl & Music", slug: "cds-vinyl", defaultRate: "12" },
-  { name: "Beauty & Personal Care", slug: "beauty-personal-care", defaultRate: "12" },
-  { name: "Baby Products", slug: "baby-products", defaultRate: "10" },
-  { name: "Health & Household", slug: "health-household", defaultRate: "10" },
-  { name: "Arts, Crafts & Sewing", slug: "arts-crafts-sewing", defaultRate: "10" },
+  { name: "Electronics", slug: "electronics", defaultRate: "8" },
+  { name: "Phones & Tablets", slug: "cell-phones", defaultRate: "8" },
+  { name: "Fashion, Clothing & Jewellery", slug: "clothing-shoes-jewelry", defaultRate: "8" },
+  { name: "Automotive", slug: "automotive", defaultRate: "8" },
+  { name: "Home & Garden", slug: "home-garden", defaultRate: "8" },
+  { name: "Sports & Outdoors", slug: "sports-outdoors", defaultRate: "8" },
+  { name: "Toys & Games", slug: "toys-games", defaultRate: "8" },
+  { name: "Books", slug: "books", defaultRate: "8" },
+  { name: "CDs, Vinyl & Music", slug: "cds-vinyl", defaultRate: "8" },
+  { name: "Beauty & Personal Care", slug: "beauty-personal-care", defaultRate: "8" },
+  { name: "Baby Products", slug: "baby-products", defaultRate: "8" },
+  { name: "Health & Household", slug: "health-household", defaultRate: "8" },
+  { name: "Arts, Crafts & Sewing", slug: "arts-crafts-sewing", defaultRate: "8" },
   { name: "Appliances", slug: "appliances", defaultRate: "8" },
   { name: "Eco-Friendly", slug: "eco-friendly", defaultRate: "8" },
-  { name: "Digital", slug: "digital", defaultRate: "10" },
-  { name: "Adult", slug: "adult", defaultRate: "10" },
+  { name: "Digital", slug: "digital", defaultRate: "8" },
+  { name: "Adult", slug: "adult", defaultRate: "8" },
 ];
 
 type PayTab = "credits" | "fees";
@@ -140,7 +140,7 @@ export function AdminPaymentsPage() {
                     <td className="px-5 py-3 font-medium text-gray-800">{p.email}</td>
                     <td className="px-5 py-3 text-gray-500">{p.name ?? "—"}</td>
                     <td className="px-5 py-3">
-                      <span className="font-black text-emerald-600">+{Math.round(parseFloat(p.credits_added) * 100).toLocaleString()} cr</span>
+                      <span className="font-black text-emerald-600">+{Number(p.credits_added).toLocaleString("en-GB", { maximumFractionDigits: 2 })} cr</span>
 
                     </td>
                     <td className="px-5 py-3 whitespace-nowrap">
@@ -168,7 +168,7 @@ export function AdminPaymentsPage() {
             <div>
               <p className="font-bold">Buyer Protection & Business Seller Fees</p>
               <p className="text-xs text-blue-500 mt-0.5">
-                Private sellers list and sell free. Buyer Protection is charged to buyers; configured seller fees apply only to business/sole-trader accounts.
+                Private sellers pay no seller commission. Buyers pay Buyer Protection only on personal-seller items (5% + £0.70 by default in GBP, with one fixed fee per checkout). Business and sole-trader sellers pay an 8% selling fee by default, subject to configured category rates, including protection and support. Buyers pay no additional Buyer Protection fee on business-seller items.
                 Change rates in <button onClick={() => setLocation("/admin/settings")} className="underline font-semibold">Site Settings → Fees</button>.
               </p>
             </div>
@@ -177,7 +177,7 @@ export function AdminPaymentsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-1">Business Default</p>
-              <p className="text-3xl font-black text-gray-900">{feeRates["fee_rate_default"] ?? "10"}%</p>
+              <p className="text-3xl font-black text-gray-900">{feeRates["fee_rate_default"] ?? "8"}%</p>
               <p className="text-xs text-gray-400 mt-1">Private sellers are always 0%</p>
             </div>
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
