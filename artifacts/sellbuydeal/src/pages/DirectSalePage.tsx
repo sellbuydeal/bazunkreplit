@@ -240,6 +240,14 @@ export function DirectSalePage() {
           tags: tags.trim() || undefined,
           specifications: specifications.length > 0 ? specifications : undefined,
           premiumVideo,
+          shipOrigin,
+          shipOriginOther: shipOrigin === "Other" ? countryOther.trim() : undefined,
+          shipZone,
+          carrier,
+          shippingPrice: shippingPrice || "0",
+          handlingCharge: handlingCharge || "0",
+          quantity: Number(quantity) || 1,
+          sku: sku.trim() || undefined,
         }),
       });
       if (!res.ok) {
