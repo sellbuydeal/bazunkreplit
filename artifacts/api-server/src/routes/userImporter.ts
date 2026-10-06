@@ -9,7 +9,56 @@ import { requestEmail, rapidKeyForRequest } from "../lib/userRapidApi.js";
 import { validateOwnEbayItems } from "../lib/freeEbayImport.js";
 import { randomUUID } from "node:crypto";
 import { toGbp } from "../fxRates.js";
+import { discoverPublicEbayUrls, fetchPublicEbayItems } from "../lib/ebayPublic.js";
 const router = Router();
+
+// Bazunk-owned eBay URL importer: no RapidAPI key required.
+router.post("/user/ebay-public/preview", async (req, res) => {
+  const email = await requestEmail(req); if (!email) { res.status(401).json({ error: "Sign in to import listings." }); return; }
+  const urls = Array.isArray(req.body.urls) ? req.body.urls.map(String) : [];
+  if (!urls.length || urls.length > 200) { res.status(400).json({ error: "Paste between 1 and 200 eBay item URLs." }); return; }
+  const result = await fetchPublicEbayItems(urls);
+  res.json(result);
+});
+router.post("/user/ebay-public/discover", async (req, res) => {
+  const email = await requestEmail(req); if (!email) { res.status(401).json({ error: "Sign in to import listings." }); return; }
+  try { const urls = await discoverPublicEbayUrls(String(req.body.url ?? ""), Number(req.body.limit ?? 100)); res.json({ urls, count: urls.length }); }
+  catch (e) { res.status(422).json({ error: e instanceof Error ? e.message : "Could not read that eBay page." }); }
+});
+router.post("/user/ebay-public/import", async (req, res) => {
+  try {
+    const email = await requestEmail(req); if (!email) { res.status(401).json({ error: "Sign in to import listings." }); return; }
+    const items = Array.isArray(req.body.items) ? req.body.items : [];
+    if (!items.length || items.length > 200) { res.status(400).json({ error: "Choose between 1 and 200 listings." }); return; }
+    const category = String(req.body.category ?? ""), subcategory = String(req.body.subcategory ?? "");
+    if (!/^[a-z0-9-]{1,80}$/.test(category) || (subcategory && !/^[a-z0-9-]{1,80}$/.test(subcategory))) { res.status(400).json({ error: "Choose a Bazunk category." }); return; }
+    const markupType = req.body.markupType === "fixed" ? "fixed" : "percentage";
+    const markupValue = Math.max(0, Number(req.body.markupValue ?? 0));
+    const shippingMode = ["source","source_plus","fixed","free"].includes(req.body.shippingMode) ? req.body.shippingMode : "source";
+    const shippingExtra = Math.max(0, Number(req.body.shippingExtra ?? 0)), fixedShipping = Math.max(0, Number(req.body.fixedShipping ?? 0));
+    const syncEnabled = req.body.syncEnabled !== false;
+    const user = await db.execute(sql`SELECT name FROM users WHERE lower(email)=lower(${email}) LIMIT 1`).then(r => r.rows[0] as any);
+    let imported=0, skipped=0;
+    for (const raw of items) {
+      const itemId=String(raw.itemId??""), url=String(raw.url??""); const sourcePrice=Number(raw.price);
+      if(!/^\d{9,15}$/.test(itemId)||!/^https:\/\//i.test(url)||!Number.isFinite(sourcePrice)||sourcePrice<=0){skipped++;continue}
+      const exists=await db.execute(sql`SELECT si.id FROM supplier_imports si JOIN listings l ON l.id=si.listing_id WHERE si.supplier_source='ebay-public' AND si.supplier_id=${itemId} AND lower(l.seller_email)=lower(${email}) LIMIT 1`);
+      if(exists.rows.length){skipped++;continue}
+      const sourceShipping=raw.shipping==null?null:Math.max(0,Number(raw.shipping));
+      const shippingCharge=shippingMode==="free"?0:shippingMode==="fixed"?fixedShipping:shippingMode==="source_plus"?(sourceShipping??0)+shippingExtra:(sourceShipping??0);
+      const productPrice=markupType==="fixed"?sourcePrice+markupValue:sourcePrice*(1+markupValue/100);
+      const bazunkPrice=Math.round(productPrice*100)/100, currency=String(raw.currency??"GBP").toUpperCase();
+      const priceGbp=(await toGbp(bazunkPrice,currency)).toFixed(2);
+      const specs=JSON.stringify({source:"eBay Public",item_id:itemId,ebay_url:url,ebay_price:sourcePrice,ebay_currency:currency,source_shipping:sourceShipping,shipping_charge:shippingCharge,shipping_mode:shippingMode,shipping_extra:shippingExtra,fixed_shipping:fixedShipping,markup_type:markupType,markup_value:markupValue,sync_enabled:syncEnabled,category_path:raw.categoryPath??[]});
+      const listing=await db.execute(sql`INSERT INTO listings(public_id,title,price,price_gbp,currency,category,subcategory,description,condition,image,seller_email,seller_name,specifications,status,created_at,updated_at)
+        VALUES(${'BZK-EBY-'+randomUUID()},${String(raw.title??"eBay item").slice(0,500)},${bazunkPrice},${priceGbp},${currency},${category},${subcategory||null},${String(raw.description??raw.title??"").slice(0,5000)},${String(raw.condition??"used").slice(0,80)},${raw.image||null},${email},${user?.name||email.split("@")[0]},${specs},${raw.available===false?"inactive":"active"},NOW(),NOW()) RETURNING id`).then(r=>r.rows[0] as any);
+      await db.execute(sql`INSERT INTO supplier_imports(listing_id,supplier_source,supplier_id,supplier_url,supplier_price,supplier_currency,markup_type,markup_value,last_synced_at,sync_status,supplier_data,created_at,updated_at)
+        VALUES(${listing.id},'ebay-public',${itemId},${url},${sourcePrice},${currency},${markupType},${markupValue},NOW(),${syncEnabled?"ok":"disabled"},${JSON.stringify({shippingMode,shippingExtra,fixedShipping,sourceShipping,shippingCharge,syncEnabled})}::jsonb,NOW(),NOW())`);
+      imported++;
+    }
+    res.json({ imported, skipped, message: `Imported ${imported} eBay listing${imported===1?"":"s"} with ${syncEnabled?"automatic sync enabled":"sync disabled"}.` });
+  } catch (err) { logger.error({err},"Bazunk eBay URL import failed"); res.status(500).json({error:"Import failed. Existing imports were not duplicated."}); }
+});
 
 // Free seller-owned inventory: no external fetch, RapidAPI key or refresh metadata.
 router.post("/user/import-ebay-own", async (req, res) => {
