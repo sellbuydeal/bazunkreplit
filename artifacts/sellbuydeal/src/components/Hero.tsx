@@ -8,7 +8,6 @@ import {
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { useState } from "react";
-import { NewBuyerPromo } from "./NewBuyerPromo";
 
 const PILLS = [
   { icon: Tag,       label: "Buy It Now"    },
@@ -105,14 +104,21 @@ export function Hero() {
             transition={{ duration: 0.55 }}
           >
             <h1 className="sr-only">Buy, Sell, Deal, Get Rewarded on Bazunk</h1>
-            <img
-              src="/hero-buy-sell-deal-rewarded.png"
-              alt="Buy, Sell, Deal, Get Rewarded — colourful Bazunk marketplace artwork"
-              width={1672}
-              height={941}
-              fetchPriority="high"
-              className="block w-full aspect-[16/9] object-cover rounded-2xl mb-4 shadow-2xl shadow-black/20"
-            />
+            <Link href="/welcome-new-buyers">
+              <a
+                className="block group rounded-2xl overflow-hidden mb-4 shadow-2xl shadow-black/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FACC15]"
+                aria-label="New buyer offer — learn more"
+              >
+                <img
+                  src="/new-buyer-home-banner.png"
+                  alt="New buyers: £5, $5 or €5 credit, first buyer protection fee covered by Bazunk, plus Buyer Protection"
+                  width={976}
+                  height={528}
+                  fetchPriority="high"
+                  className="block w-full aspect-[16/9] object-cover transition-transform duration-300 group-hover:scale-[1.01]"
+                />
+              </a>
+            </Link>
 
             <div className="flex flex-col sm:flex-row gap-3 mb-4">
               <Link href="/browse">
@@ -182,8 +188,23 @@ export function Hero() {
           </motion.div>
         </div>
 
-        {/* New-buyer incentive — visible before sign-up */}
-        <NewBuyerPromo />
+        {/* Original marketplace artwork moved below the main hero. */}
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.45 }}
+          className="mt-6 lg:mt-7"
+        >
+          <img
+            src="/hero-buy-sell-deal-rewarded.png"
+            alt="Buy, Sell, Deal, Get Rewarded — colourful Bazunk marketplace artwork"
+            width={1672}
+            height={941}
+            loading="lazy"
+            className="block w-full h-auto rounded-2xl shadow-2xl shadow-black/20"
+          />
+        </motion.div>
       </div>
 
       {/* ── Sell flyout portal (escapes overflow-hidden) ── */}

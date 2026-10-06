@@ -1,0 +1,9 @@
+ROUTE FIX — add these two lines to the app's existing Wouter router file (normally src/App.tsx).
+
+1) With the other page imports:
+import WelcomeNewBuyers from "@/pages/WelcomeNewBuyers";
+
+2) INSIDE the existing <Switch>, ABOVE the catch-all / NotFound route:
+<Route path="/welcome-new-buyers" component={WelcomeNewBuyers} />
+
+IMPORTANT: putting the route after the catch-all can still show Page Not Found.
