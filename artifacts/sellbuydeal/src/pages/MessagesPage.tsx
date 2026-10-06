@@ -16,6 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useOffers, type Offer, type OfferStatus } from "@/context/OfferContext";
 import { useCart } from "@/context/CartContext";
 import { ALL_PRODUCTS } from "@/data/products";
+import { useCurrency } from "@/context/CurrencyContext";
 
 function safeTimestamp(message?: Partial<Message> | null): string | null {
   if (!message) return null;
@@ -134,7 +135,7 @@ function SellerPanel({ convo, onClose }: { convo: Conversation; onClose: () => v
           <img src={convo.listingImage} alt={convo.listingTitle} className="h-full object-contain p-2" />
         </div>
         <p className="text-sm font-bold text-gray-900 line-clamp-2">{convo.listingTitle}</p>
-        <p className="text-lg font-black text-[#F26B21] mt-1">£{convo.listingPrice.toLocaleString()}</p>
+        <p className="text-lg font-black text-[#F26B21] mt-1">{formatPrice(convo.listingPrice)}</p>
         <Link
           href={`/listing/${convo.listingId}`}
           className="mt-3 w-full py-2 rounded-lg bg-[#4A5CE8] text-white text-xs font-bold flex items-center justify-center gap-1 hover:opacity-90 transition-opacity"
@@ -204,8 +205,8 @@ function OfferRow({ offer, active, onClick }: { offer: Offer; active: boolean; o
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-gray-800 line-clamp-1 mb-0.5">{offer.productTitle}</p>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-sm font-bold text-gray-900">£{offer.offerPrice.toFixed(2)}</span>
-          <span className="text-[10px] text-gray-400 line-through">£{offer.listingPrice.toFixed(2)}</span>
+          <span className="text-sm font-bold text-gray-900">{formatPrice(offer.offerPrice)}</span>
+          <span className="text-[10px] text-gray-400 line-through">{formatPrice(offer.listingPrice)}</span>
           {parseFloat(savings) > 0 && (
             <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 rounded">−{savings}%</span>
           )}
@@ -257,7 +258,7 @@ function OfferDetail({
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-gray-900 text-sm line-clamp-1">{offer.productTitle}</p>
-            <p className="text-xs text-gray-400">Asking: £{offer.listingPrice.toFixed(2)}</p>
+            <p className="text-xs text-gray-400">Asking: {formatPrice(offer.listingPrice)}</p>
           </div>
           {product && (
             <Link href={`/listing/${product.id}`}
@@ -274,7 +275,7 @@ function OfferDetail({
         <div className="bg-gray-50 rounded-2xl p-4 flex items-center gap-6 justify-center">
           <div className="text-center">
             <p className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide">Your Offer</p>
-            <p className="text-2xl font-black text-[#4A5CE8]">£{offer.offerPrice.toFixed(2)}</p>
+            <p className="text-2xl font-black text-[#4A5CE8]">{formatPrice(offer.offerPrice)}</p>
             {parseFloat(savings) > 0 && (
               <p className="text-xs text-emerald-600 font-semibold mt-0.5">−{savings}% off asking</p>
             )}
@@ -282,7 +283,7 @@ function OfferDetail({
           <ArrowRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
           <div className="text-center">
             <p className="text-[10px] text-gray-400 mb-1 uppercase tracking-wide">Asking Price</p>
-            <p className="text-2xl font-black text-gray-900">£{offer.listingPrice.toFixed(2)}</p>
+            <p className="text-2xl font-black text-gray-900">{formatPrice(offer.listingPrice)}</p>
             <p className="text-xs text-gray-400 mt-0.5">Listed price</p>
           </div>
         </div>
@@ -301,7 +302,7 @@ function OfferDetail({
                 {(offer.status !== "pending") && <div className="w-0.5 h-4 bg-gray-200 mt-1" />}
               </div>
               <div className="flex-1 pt-0.5">
-                <p className="text-sm font-semibold text-gray-900">You offered <span className="text-[#4A5CE8]">£{offer.offerPrice.toFixed(2)}</span></p>
+                <p className="text-sm font-semibold text-gray-900">You offered <span className="text-[#4A5CE8]">{formatPrice(offer.offerPrice)}</span></p>
                 {offer.message && <p className="text-xs text-gray-500 italic mt-0.5">"{offer.message}"</p>}
                 <p className="text-[10px] text-gray-400 mt-1 flex items-center gap-1">
                   <Clock className="w-3 h-3" /> {timeAgo(offer.createdAt)}
@@ -356,7 +357,7 @@ function OfferDetail({
                   </div>
                   <div className="flex-1 pt-0.5">
                     <p className="text-sm font-semibold text-gray-900">
-                      {offer.sellerName} countered at <span className="text-blue-600">£{offer.counterPrice?.toFixed(2)}</span>
+                      {offer.sellerName} countered at <span className="text-blue-600">{offer.counterPrice != null ? formatPrice(offer.counterPrice) : "—"}</span>
                     </p>
                     {offer.counterMessage && (
                       <p className="text-xs text-gray-500 italic mt-0.5">"{offer.counterMessage}"</p>
@@ -405,7 +406,7 @@ function OfferDetail({
           {offer.status === "countered" && (
             <>
               <p className="text-xs font-semibold text-gray-600 text-center">
-                Seller countered at <span className="text-blue-600 font-bold">£{offer.counterPrice?.toFixed(2)}</span> — respond below:
+                Seller countered at <span className="text-blue-600 font-bold">{offer.counterPrice != null ? formatPrice(offer.counterPrice) : "—"}</span> — respond below:
               </p>
               {!showCounter ? (
                 <div className="flex gap-2">
@@ -432,7 +433,7 @@ function OfferDetail({
                 <AnimatePresence>
                   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">£</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">{currency.symbol}</span>
                       <input
                         type="number" min="1"
                         value={counterAmt}
@@ -498,7 +499,7 @@ function OfferDetail({
               onClick={() => product && addToCart(product, 1)}
               className="flex-[2] py-2.5 rounded-xl bg-[#F26B21] text-white font-bold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
             >
-              <ShoppingCart className="w-4 h-4" /> Buy at £{product.price.toFixed(2)}
+              <ShoppingCart className="w-4 h-4" /> Buy at {formatPrice(product.price)}
             </button>
           </div>
         </div>
@@ -510,6 +511,7 @@ function OfferDetail({
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export function MessagesPage() {
+  const { formatPrice, currency } = useCurrency();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(true);
   const { session } = useSession();
@@ -737,7 +739,7 @@ export function MessagesPage() {
                     <Avatar initials={activeConvo.with.avatar} />
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-gray-900 text-sm">{activeConvo.with.name}</p>
-                      <p className="text-xs text-[#F26B21] font-medium truncate">{activeConvo.listingTitle} — £{activeConvo.listingPrice.toLocaleString()}</p>
+                      <p className="text-xs text-[#F26B21] font-medium truncate">{activeConvo.listingTitle} — {formatPrice(activeConvo.listingPrice)}</p>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button onClick={() => setShowPanel(!showPanel)}

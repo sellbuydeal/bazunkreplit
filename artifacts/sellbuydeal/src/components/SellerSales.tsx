@@ -4,6 +4,7 @@ import { Loader2, Package, Truck, Star, TrendingUp, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { ReviewModal } from "./ReviewModal";
 import { useSession } from "@clerk/react";
+import { useCurrency } from "@/context/CurrencyContext";
 
 interface SaleRow {
   id: string; item_title: string; item_image: string | null; price: string; status: string;
@@ -26,6 +27,7 @@ const CARRIERS = ["Royal Mail", "Evri", "DPD", "DHL", "UPS", "Yodel", "Parcelfor
 
 /** Seller dashboard → Sales: see orders, dispatch them, and review buyers. */
 export function SellerSales() {
+  const { formatPrice, currency } = useCurrency();
   const { user } = useAuth();
   const { session } = useSession();
   const [rows, setRows] = useState<SaleRow[] | null>(null);
@@ -73,7 +75,7 @@ export function SellerSales() {
       <div className="p-5 border-b border-gray-100">
         <h2 className="font-bold text-gray-900">Sales</h2>
         <p className="text-xs text-gray-400 mt-0.5">
-          {rows ? `${sent.length} sent · £${gross.toFixed(2)} sold${toDispatch ? ` · ${toDispatch} waiting to be dispatched` : ""}` : "Loading…"}
+          {rows ? `${sent.length} sent · ${formatPrice(gross)} sold${toDispatch ? ` · ${toDispatch} waiting to be dispatched` : ""}` : "Loading…"}
         </p>
       </div>
 
@@ -111,9 +113,9 @@ export function SellerSales() {
                   )}
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="font-bold text-gray-900 text-sm">£{parseFloat(s.price).toFixed(2)}</p>
-                  <p className="text-xs text-gray-500">Selling fee: £{Number(s.seller_fee ?? 0).toFixed(2)}{Number(s.seller_fee)>0 ? " · protection & support included" : " · no seller commission"}</p>
-                  <p className="text-xs font-bold text-emerald-600">Net sale amount: £{Number(s.seller_net ?? (Number(s.price)-Number(s.seller_fee??0))).toFixed(2)}</p>
+                  <p className="font-bold text-gray-900 text-sm">{formatPrice(parseFloat(s.price))}</p>
+                  <p className="text-xs text-gray-500">Selling fee: {formatPrice(Number(s.seller_fee ?? 0))}{Number(s.seller_fee)>0 ? " · protection & support included" : " · no seller commission"}</p>
+                  <p className="text-xs font-bold text-emerald-600">Net sale amount: {formatPrice(Number(s.seller_net ?? (Number(s.price)-Number(s.seller_fee??0))))}</p>
                   <p className="text-xs text-gray-500">{s.payout_status === "paid" ? "Transferred to your Stripe account" : "Awaiting payout release"}</p>
                   <span className={`inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
                 </div>

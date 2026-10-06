@@ -1,10 +1,12 @@
 import { Link } from "wouter";
 import { Facebook, Twitter, Instagram, Youtube } from "lucide-react";
 import { useSiteSettings } from "@/context/SiteSettingsContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 const linkClass = "text-sm font-medium text-white/70 hover:text-white transition-colors";
 
 export function Footer() {
+  const { formatPrice, currency } = useCurrency();
   const s = useSiteSettings();
 
   return (
@@ -21,7 +23,7 @@ export function Footer() {
             </Link>
             <p className="max-w-xs text-sm leading-6 text-white/65">
               Buy. Sell. Deal. Get Rewarded.<br />
-              Private sellers list and sell for £0.
+              Private sellers list and sell for {formatPrice(0)}.
             </p>
 
             <div className="flex items-center gap-2.5 mt-4">
