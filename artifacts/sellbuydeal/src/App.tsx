@@ -94,6 +94,7 @@ import { AdminVerificationPage } from "@/pages/admin/AdminVerificationPage";
 import BuyerProtectionPage from "@/pages/BuyerProtectionPage";
 import CashbackPage from "@/pages/CashbackPage";
 import { ReferralsPage } from "@/pages/ReferralsPage";
+import WelcomeNewBuyers from "@/pages/WelcomeNewBuyers";
 import { AdminReferralsPage } from "@/pages/admin/AdminReferralsPage";
 
 
@@ -314,6 +315,7 @@ function Router() {
       <Route path="/treasure-hunt">{() => { window.location.replace("/rewards"); return null; }}</Route>
       <Route path="/buyer-protection">{() => <FeatureGate feature="buyer_protection" name="Buyer Protection"><BuyerProtectionPage /></FeatureGate>}</Route>
       <Route path="/cashback">{() => <FeatureGate feature="cashback" name="Cashback"><CashbackPage /></FeatureGate>}</Route>
+      <Route path="/welcome-new-buyers" component={WelcomeNewBuyers} />
       <Route component={NotFound} />
     </Switch>
   );
