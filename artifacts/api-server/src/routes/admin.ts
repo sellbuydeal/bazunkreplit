@@ -1002,6 +1002,23 @@ router.get("/admin/listings", async (req, res) => {
   }
 });
 
+// PATCH /api/admin/listings/:id/image — set or replace a listing image from Admin
+router.patch("/admin/listings/:id/image", async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const image = typeof req.body?.image === "string" ? req.body.image.trim() : "";
+    if (!Number.isInteger(id) || id < 1) { res.status(400).json({ error: "Invalid listing ID" }); return; }
+    if (image && !/^https:\\/\\//i.test(image)) { res.status(400).json({ error: "Image must be an HTTPS URL." }); return; }
+    if (image.length > 4000) { res.status(400).json({ error: "Image URL is too long." }); return; }
+    const rows = await db.execute(sql`UPDATE listings SET image=${image || null}, updated_at=NOW() WHERE id=${id} RETURNING id,image`).then(r => r.rows);
+    if (!rows.length) { res.status(404).json({ error: "Listing not found" }); return; }
+    res.json(rows[0]);
+  } catch (err) {
+    logger.error({ err }, "Failed to update listing image");
+    res.status(500).json({ error: "Failed to update listing image" });
+  }
+});
+
 // GET /api/admin/search-amazon — search Amazon UK and return raw results for admin to browse
 router.get("/admin/search-amazon", async (req, res) => {
   const apiKey = process.env.RAPIDAPI_KEY;

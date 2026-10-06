@@ -18,6 +18,7 @@ interface Listing {
   seller_email: string;
   seller_username: string | null;
   specifications: string | null;
+  image: string | null;
   created_at: string;
 }
 
@@ -51,6 +52,10 @@ export function AdminListingsPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "imported" | "user">("all");
   const [offset, setOffset] = useState(0);
+  const [imageEditing, setImageEditing] = useState<number | null>(null);
+  const [imageDraft, setImageDraft] = useState("");
+  const [imageSaving, setImageSaving] = useState<number | null>(null);
+  const [imageError, setImageError] = useState("");
   const LIMIT = 50;
 
   useEffect(() => { if (!isAdmin) setLocation("/admin"); }, [isAdmin]);
@@ -77,6 +82,18 @@ export function AdminListingsPage() {
 
   const pages = Math.ceil(total / LIMIT);
   const page = Math.floor(offset / LIMIT);
+
+  async function saveImage(listing: Listing, value = imageDraft) {
+    setImageError(""); setImageSaving(listing.id);
+    try {
+      const res = await authFetch(`/api/admin/listings/${listing.id}/image`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ image: value.trim() }) });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Could not update image.");
+      setListings(prev => prev.map(l => l.id === listing.id ? { ...l, image: data.image ?? null } : l));
+      setImageEditing(null); setImageDraft("");
+    } catch (e) { setImageError(e instanceof Error ? e.message : "Could not update image."); }
+    finally { setImageSaving(null); }
+  }
 
   return (
     <AdminLayout>
@@ -157,9 +174,10 @@ export function AdminListingsPage() {
 
                     {/* Title */}
                     <td className="px-4 py-3 max-w-56">
-                      <p className="font-medium text-gray-800 truncate text-xs leading-snug">{l.title}</p>
+                      <div className="flex gap-2 items-start"><div className="w-12 h-12 rounded-lg border bg-gray-50 shrink-0 overflow-hidden flex items-center justify-center">{l.image ? <img src={l.image} alt="" className="w-full h-full object-contain" /> : <Package className="w-5 h-5 text-gray-300" />}</div><p className="font-medium text-gray-800 text-xs leading-snug">{l.title}</p></div>
                       <p className="text-[10px] text-gray-400 mt-0.5 capitalize">{l.condition}</p>
-                      <div className="mt-2"><AdminListingPromotion listingId={l.id} title={l.title} status={l.status} /></div>
+                      <div className="mt-2 flex flex-wrap gap-2 items-center"><AdminListingPromotion listingId={l.id} title={l.title} status={l.status} /><button onClick={() => { setImageEditing(l.id); setImageDraft(l.image ?? ""); setImageError(""); }} className="text-[10px] font-bold px-2 py-1 rounded-md border border-gray-200 hover:bg-gray-50">{l.image ? "Change image" : "Add image"}</button></div>
+                      {imageEditing === l.id && <div className="mt-2 rounded-lg border border-gray-200 p-2 bg-gray-50"><input autoFocus value={imageDraft} onChange={e=>setImageDraft(e.target.value)} placeholder="https://… image URL" className="w-full rounded-md border bg-white px-2 py-1.5 text-xs text-gray-800" /><div className="mt-2 flex gap-2"><button disabled={imageSaving===l.id} onClick={()=>void saveImage(l)} className="rounded-md bg-[#4A5CE8] text-white px-2 py-1 text-[10px] font-bold disabled:opacity-50">{imageSaving===l.id?"Saving…":"Save image"}</button><button onClick={()=>{setImageEditing(null);setImageDraft("");setImageError("");}} className="rounded-md border px-2 py-1 text-[10px] font-bold">Cancel</button>{l.image&&<button disabled={imageSaving===l.id} onClick={()=>void saveImage(l,"")} className="text-[10px] text-red-600 ml-auto">Remove</button>}</div>{imageError&&<p className="text-[10px] text-red-600 mt-1">{imageError}</p>}</div>}
                     </td>
 
                     {/* Category */}
