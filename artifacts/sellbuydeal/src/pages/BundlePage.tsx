@@ -9,6 +9,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 const CONDITION_COLORS: Record<string, string> = {
   "new": "bg-emerald-100 text-emerald-700",
@@ -43,6 +44,7 @@ interface SellerListing {
 }
 
 export function BundlePage() {
+  const { formatPrice, currency } = useCurrency();
   const { addToCart } = useCart();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -279,7 +281,7 @@ export function BundlePage() {
                       <div className="p-3">
                         <p className="text-xs font-semibold text-gray-800 line-clamp-2 mb-2 min-h-[2rem]">{product.title}</p>
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-gray-900">£{product.price.toFixed(2)}</span>
+                          <span className="text-sm font-bold text-gray-900">{formatPrice(product.price)}</span>
                         </div>
                         {product.location && (
                           <div className="flex items-center gap-0.5 mt-1 text-[10px] text-gray-400">
@@ -320,7 +322,7 @@ export function BundlePage() {
                             : <Package className="w-4 h-4 text-gray-300" />}
                         </div>
                         <p className="flex-1 text-xs font-medium text-gray-700 line-clamp-1">{p.title}</p>
-                        <span className="text-xs font-bold text-gray-900 flex-shrink-0">£{p.price.toFixed(2)}</span>
+                        <span className="text-xs font-bold text-gray-900 flex-shrink-0">{formatPrice(p.price)}</span>
                         <button onClick={(e) => { e.stopPropagation(); toggle(p.id); }} className="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -331,23 +333,23 @@ export function BundlePage() {
                   <div className="border-t border-gray-100 pt-3 space-y-1.5 text-sm">
                     <div className="flex justify-between text-gray-600">
                       <span>Subtotal ({selected.length} items)</span>
-                      <span className="font-semibold text-gray-900">£{subtotal.toFixed(2)}</span>
+                      <span className="font-semibold text-gray-900">{formatPrice(subtotal)}</span>
                     </div>
                     {tier && (
                       <div className="flex justify-between text-emerald-600 font-semibold">
                         <span className="flex items-center gap-1"><Tag className="w-3 h-3" /> Bundle discount ({tier.label})</span>
-                        <span>−£{discount.toFixed(2)}</span>
+                        <span>−{formatPrice(discount)}</span>
                       </div>
                     )}
                     <div className="flex justify-between font-bold text-gray-900 text-base pt-2 border-t border-gray-100">
                       <span>Bundle Total</span>
-                      <span className={tier ? "text-emerald-600" : ""}>£{total.toFixed(2)}</span>
+                      <span className={tier ? "text-emerald-600" : ""}>{formatPrice(total)}</span>
                     </div>
                   </div>
 
                   {tier && (
                     <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-xs text-emerald-700 font-semibold flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" /> Buyers save £{discount.toFixed(2)} with this bundle!
+                      <Sparkles className="w-3.5 h-3.5" /> Buyers save {formatPrice(discount)} with this bundle!
                     </div>
                   )}
 
