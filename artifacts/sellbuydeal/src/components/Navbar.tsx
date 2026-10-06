@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { CATEGORIES } from "@/data/categories";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
-import { useCurrency, CURRENCIES, type CurrencyCode } from "@/context/CurrencyContext";
+import { useCurrency, CURRENCIES, MARKET_COUNTRIES, type CurrencyCode } from "@/context/CurrencyContext";
 import { MessageCenterOverlay } from "./MessageCenterOverlay";
 import { ThemeToggle } from "./ThemeToggle";
 import { useRawSettings } from "@/context/SiteSettingsContext";
@@ -99,7 +99,7 @@ const MOBILE_NAV_LINKS = [
 export function Navbar() {
   const { user, logout } = useAuth();
   const { itemCount, openCart } = useCart();
-  const { currency, setCurrency, formatPrice } = useCurrency();
+  const { currency, setCurrency, formatPrice, country, setCountry } = useCurrency();
   const featureSettings = useRawSettings();
   const visibleHref = (href:string) => { const f=featureForHref(href); return !f || isFeatureEnabled(featureSettings,f); };
   const [query, setQuery] = useState("");
@@ -631,21 +631,26 @@ export function Navbar() {
         <div className="h-[3px] w-full bg-gradient-to-r from-[#1E6FE8] via-[#4A5CE8] to-[#F5B301]" />
       </nav>
 
-      {/* Floating currency selector */}
+      {/* Floating country + currency selector */}
       <div ref={currencyRef} className="fixed right-4 bottom-4 z-40 hidden md:block">
         <button onClick={() => setCurrencyOpen(!currencyOpen)}
           className="flex items-center gap-2 px-3.5 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-700 bg-white shadow-lg hover:border-[#4A5CE8] hover:text-[#4A5CE8] transition-colors">
-          <span>{currency.flag}</span><span>{currency.code} {currency.symbol}</span>
+          <span>{country.flag}</span><span>{country.name}</span><span className="text-gray-400">·</span><span>{currency.code} {currency.symbol}</span>
           <ChevronDown className={`w-3 h-3 transition-transform ${currencyOpen ? "rotate-180" : ""}`} />
         </button>
         {currencyOpen && (
-          <div className="absolute right-0 bottom-[calc(100%+8px)] w-52 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 py-1">
-            {(Object.values(CURRENCIES) as typeof CURRENCIES[CurrencyCode][]).map((c) => (
-              <button key={c.code} onClick={() => { setCurrency(c.code); setCurrencyOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left ${currency.code === c.code ? "bg-[#4A5CE8]/5 text-[#4A5CE8] font-semibold" : "text-gray-700 hover:bg-gray-50"}`}>
-                <span>{c.flag}</span><span className="flex-1">{c.name}</span><span className="text-gray-400">{c.symbol}</span>
-              </button>
-            ))}
+          <div className="absolute right-0 bottom-[calc(100%+8px)] w-72 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 p-3">
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Country</label>
+            <select value={country.code} onChange={e => setCountry(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 mb-3">
+              {MARKET_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
+            </select>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Currency</label>
+            <select value={currency.code} onChange={e => setCurrency(e.target.value as CurrencyCode)}
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800">
+              {(Object.values(CURRENCIES) as typeof CURRENCIES[CurrencyCode][]).map(c => <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.symbol})</option>)}
+            </select>
+            <p className="mt-2 text-[11px] leading-relaxed text-gray-400">Changing country selects its normal currency automatically. You can override the currency afterwards.</p>
           </div>
         )}
       </div>
@@ -771,7 +776,7 @@ export function Navbar() {
 
               <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between gap-3 shrink-0">
                 <ThemeToggle className="flex w-10 h-10 rounded-xl bg-gray-100 items-center justify-center" />
-                <label className="text-xs text-gray-600">Currency<select value={currency.code} onChange={e => setCurrency(e.target.value as CurrencyCode)} className="ml-2 bg-gray-100 rounded-lg p-2 text-base">{Object.values(CURRENCIES).map(c => <option key={c.code} value={c.code}>{c.code}</option>)}</select></label>
+                <div className="flex flex-col gap-1 text-xs text-gray-600"><label>Country<select value={country.code} onChange={e => setCountry(e.target.value)} className="ml-2 bg-gray-100 rounded-lg p-2 text-base">{MARKET_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select></label><label>Currency<select value={currency.code} onChange={e => setCurrency(e.target.value as CurrencyCode)} className="ml-2 bg-gray-100 rounded-lg p-2 text-base">{Object.values(CURRENCIES).map(c => <option key={c.code} value={c.code}>{c.code} {c.symbol}</option>)}</select></label></div>
               </div>
               {/* Bottom auth actions */}
               {!user && (

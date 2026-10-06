@@ -10,6 +10,18 @@ export const COUNTRY_CURRENCY_MAP: Record<string, CurrencyCode> = {
   EE: "EUR", CY: "EUR", LU: "EUR", MT: "EUR",
 };
 
+export const MARKET_COUNTRIES = [
+  { code: "GB", name: "United Kingdom", flag: "🇬🇧" }, { code: "US", name: "United States", flag: "🇺🇸" },
+  { code: "IE", name: "Ireland", flag: "🇮🇪" }, { code: "AU", name: "Australia", flag: "🇦🇺" },
+  { code: "CA", name: "Canada", flag: "🇨🇦" }, { code: "NZ", name: "New Zealand", flag: "🇳🇿" },
+  { code: "CH", name: "Switzerland", flag: "🇨🇭" }, { code: "DE", name: "Germany", flag: "🇩🇪" },
+  { code: "FR", name: "France", flag: "🇫🇷" }, { code: "IT", name: "Italy", flag: "🇮🇹" },
+  { code: "ES", name: "Spain", flag: "🇪🇸" }, { code: "NL", name: "Netherlands", flag: "🇳🇱" },
+  { code: "BE", name: "Belgium", flag: "🇧🇪" }, { code: "PT", name: "Portugal", flag: "🇵🇹" },
+  { code: "AT", name: "Austria", flag: "🇦🇹" }, { code: "FI", name: "Finland", flag: "🇫🇮" },
+  { code: "GR", name: "Greece", flag: "🇬🇷" }, { code: "LU", name: "Luxembourg", flag: "🇱🇺" },
+] as const;
+
 export function countryToCurrency(countryCode: string): CurrencyCode {
   return COUNTRY_CURRENCY_MAP[countryCode.toUpperCase()] ?? "USD";
 }
@@ -37,13 +49,26 @@ interface CurrencyContextType {
   currency: CurrencyInfo;
   setCurrency: (code: CurrencyCode) => void;
   formatPrice: (gbpAmount: number) => string;
+  countryCode: string;
+  country: { code: string; name: string; flag: string };
+  setCountry: (code: string) => void;
 }
 
 const CurrencyContext = createContext<CurrencyContextType | null>(null);
 
 const STORAGE_KEY = "sbd_currency";
+const COUNTRY_KEY = "sbd_country";
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
+  const [countryCode, setCountryCode] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(COUNTRY_KEY);
+      if (saved && MARKET_COUNTRIES.some(c => c.code === saved)) return saved;
+      const locale = (navigator.language || "").toUpperCase();
+      const hit = MARKET_COUNTRIES.find(c => locale.endsWith(`-${c.code}`));
+      return hit?.code ?? "GB";
+    } catch { return "GB"; }
+  });
   const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY) as CurrencyCode | null;
@@ -58,6 +83,14 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   });
 
   const currency = CURRENCIES[currencyCode];
+  const country = MARKET_COUNTRIES.find(c => c.code === countryCode) ?? MARKET_COUNTRIES[0];
+
+  function setCountry(code: string) {
+    if (!MARKET_COUNTRIES.some(c => c.code === code)) return;
+    setCountryCode(code);
+    try { localStorage.setItem(COUNTRY_KEY, code); } catch {}
+    setCurrency(countryToCurrency(code));
+  }
 
   function setCurrency(code: CurrencyCode) {
     setCurrencyCode(code);
@@ -74,7 +107,7 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <CurrencyContext.Provider value={{ currency, setCurrency, formatPrice }}>
+    <CurrencyContext.Provider value={{ currency, setCurrency, formatPrice, countryCode, country, setCountry }}>
       {children}
     </CurrencyContext.Provider>
   );
