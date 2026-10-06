@@ -180,10 +180,36 @@ router.get("/listings/mine", async (req, res) => {
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
 
+    // Keep the dashboard query limited to columns that exist in the production
+    // listings table. Selecting the entire Drizzle model can fail when newly
+    // modelled columns have not yet been migrated in production.
     const rows = await db
-      .select()
+      .select({
+        id: listingsTable.id,
+        publicId: listingsTable.publicId,
+        title: listingsTable.title,
+        price: listingsTable.price,
+        category: listingsTable.category,
+        subcategory: listingsTable.subcategory,
+        description: listingsTable.description,
+        condition: listingsTable.condition,
+        image: listingsTable.image,
+        views: listingsTable.views,
+        watchers: listingsTable.watchers,
+        status: listingsTable.status,
+        sellerEmail: listingsTable.sellerEmail,
+        sellerName: listingsTable.sellerName,
+        sellerUsername: listingsTable.sellerUsername,
+        tags: listingsTable.tags,
+        extraCategories: listingsTable.extraCategories,
+        specifications: listingsTable.specifications,
+        currency: listingsTable.currency,
+        priceGbp: listingsTable.priceGbp,
+        createdAt: listingsTable.createdAt,
+        updatedAt: listingsTable.updatedAt,
+      })
       .from(listingsTable)
-      .where(eq(listingsTable.sellerEmail, email))
+      .where(sql`LOWER(${listingsTable.sellerEmail}) = LOWER(${email})`)
       .orderBy(desc(listingsTable.createdAt))
       .limit(100);
     const withPromos = await attachPromotions(rows);
