@@ -3,6 +3,8 @@ import { sql } from "drizzle-orm";
 import { logger } from "./logger.js";
 import { fetchAliExpressProduct, calculateBazunkPrice } from "./aliexpress.js";
 import { rapidKeyForEmail } from "./userRapidApi.js";
+import { fetchPublicEbayItem } from "./ebayPublic.js";
+import { toGbp } from "../fxRates.js";
 
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
@@ -14,11 +16,13 @@ interface ImportRow {
   markupType: string;
   markupValue: string;
   sellerEmail: string;
+  supplierUrl: string;
+  supplierData: any;
 }
 
 export async function syncImport(importId: number): Promise<{ ok: boolean; error?: string }> {
   const rows = await db.execute(sql`
-    SELECT si.id, si.listing_id, si.supplier_id, si.supplier_source, si.markup_type, si.markup_value, l.seller_email AS "sellerEmail"
+    SELECT si.id, si.listing_id, si.supplier_id, si.supplier_source, si.markup_type, si.markup_value, si.supplier_url AS "supplierUrl", si.supplier_data AS "supplierData", l.seller_email AS "sellerEmail"
     FROM supplier_imports si JOIN listings l ON l.id=si.listing_id WHERE si.id = ${importId}
   `);
 
@@ -30,7 +34,7 @@ export async function syncImport(importId: number): Promise<{ ok: boolean; error
 
 export async function syncAllImports(): Promise<{ synced: number; errors: number }> {
   const rows = await db.execute(sql`
-    SELECT si.id, si.listing_id, si.supplier_id, si.supplier_source, si.markup_type, si.markup_value, l.seller_email AS "sellerEmail"
+    SELECT si.id, si.listing_id, si.supplier_id, si.supplier_source, si.markup_type, si.markup_value, si.supplier_url AS "supplierUrl", si.supplier_data AS "supplierData", l.seller_email AS "sellerEmail"
     FROM supplier_imports si JOIN listings l ON l.id=si.listing_id
     ORDER BY si.last_synced_at ASC NULLS FIRST
   `);
@@ -52,9 +56,23 @@ export async function syncAllImports(): Promise<{ synced: number; errors: number
 
 async function syncRow(row: ImportRow): Promise<{ ok: boolean; error?: string }> {
   try {
-    if (row.supplierSource !== "aliexpress") {
-      return { ok: false, error: `Unsupported source: ${row.supplierSource}` };
+    if (row.supplierSource === "ebay-public") {
+      const settings = row.supplierData ?? {};
+      if (settings.syncEnabled === false) return { ok: false, error: "Sync disabled" };
+      const product = await fetchPublicEbayItem(row.supplierUrl);
+      const markup = parseFloat(row.markupValue);
+      const productPrice = row.markupType === "fixed" ? product.price + markup : product.price * (1 + markup / 100);
+      const bazunkPrice = Math.round(productPrice * 100) / 100;
+      const shippingMode = settings.shippingMode ?? "source";
+      const shippingCharge = shippingMode === "free" ? 0 : shippingMode === "fixed" ? Number(settings.fixedShipping ?? 0) : shippingMode === "source_plus" ? (product.shipping ?? 0) + Number(settings.shippingExtra ?? 0) : (product.shipping ?? 0);
+      const priceGbp = (await toGbp(bazunkPrice, product.currency)).toFixed(2);
+      const nextData = { ...settings, sourceShipping: product.shipping, shippingCharge, available: product.available, categoryPath: product.categoryPath };
+      await db.execute(sql`UPDATE supplier_imports SET supplier_price=${product.price},supplier_currency=${product.currency},last_synced_at=NOW(),sync_status='ok',sync_error=NULL,supplier_data=${JSON.stringify(nextData)}::jsonb,updated_at=NOW() WHERE id=${row.id}`);
+      await db.execute(sql`UPDATE listings SET price=${bazunkPrice},price_gbp=${priceGbp},currency=${product.currency},shipping_price=${shippingCharge},image=COALESCE(${product.image},image),status=${product.available ? "active" : "inactive"},updated_at=NOW() WHERE id=${row.listingId}`);
+      logger.info({ importId: row.id, supplierId: row.supplierId, bazunkPrice, shippingCharge }, "eBay import synced");
+      return { ok: true };
     }
+    if (row.supplierSource !== "aliexpress") return { ok: false, error: `Unsupported source: ${row.supplierSource}` };
 
     const apiKey = await rapidKeyForEmail(row.sellerEmail);
     if (!apiKey) return { ok: false, error: "Seller RapidAPI key is not connected" };
@@ -103,12 +121,7 @@ async function syncRow(row: ImportRow): Promise<{ ok: boolean; error?: string }>
 }
 
 export function startSyncJob(): void {
-  if (!process.env.RAPIDAPI_KEY) {
-    logger.info("RAPIDAPI_KEY not set — supplier auto-sync disabled");
-    return;
-  }
-
-  logger.info({ intervalMs: SYNC_INTERVAL_MS }, "Supplier sync job started");
+  logger.info({ intervalMs: SYNC_INTERVAL_MS }, "Supplier sync job started (Bazunk eBay + connected suppliers)");
 
   setInterval(async () => {
     logger.info("Running scheduled supplier sync");
