@@ -20,6 +20,7 @@ import { useCurrency } from "@/context/CurrencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useSession } from "@clerk/react";
 import { SellerProfileCard } from "@/components/SellerProfileCard";
+import { useLanguage } from "@/context/LanguageContext";
 
 const CONDITION_COLORS: Record<string, string> = {
   "new":        "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -302,6 +303,7 @@ export function ListingPage() {
   const { addToWatchlist, removeFromWatchlist, isWatched } = useWatchlist();
   const { makeOffer } = useOffers();
   const { formatPrice, country, currency } = useCurrency();
+  const { t } = useLanguage();
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [activeImg, setActiveImg] = useState(0);
   const [offerOpen, setOfferOpen] = useState(false);
@@ -594,7 +596,7 @@ export function ListingPage() {
               </div>
             </div>
 
-            {/* Description & Details */}
+            {/* {t("descriptionDetails")} */}
             {(() => {
               const extra = product as typeof product & ApiListingExtra;
               const specs = extra._specifications ?? [];
@@ -606,7 +608,7 @@ export function ListingPage() {
                     <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                       <FileText className="w-4 h-4 text-white" />
                     </div>
-                    <h2 className="font-bold text-white text-base">Description & Details</h2>
+                    <h2 className="font-bold text-white text-base">{t("descriptionDetails")}</h2>
                   </div>
 
                   <div className="p-6 space-y-6">
@@ -710,12 +712,12 @@ export function ListingPage() {
               return (
                 <div className="rounded-2xl overflow-hidden border border-cyan-200 shadow-sm bg-white">
                   <div className="bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-4 text-white">
-                    <h3 className="font-black flex items-center gap-2"><Globe2 className="w-5 h-5" /> Delivery & location</h3>
+                    <h3 className="font-black flex items-center gap-2"><Globe2 className="w-5 h-5" /> {t("deliveryLocation")}</h3>
                     <p className="text-xs text-white/85 mt-1">Check where this item is coming from before you buy</p>
                   </div>
                   <div className="p-5 grid sm:grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-cyan-50 border border-cyan-100 p-4"><p className="text-[11px] uppercase tracking-wider font-bold text-cyan-700">Ships from</p><p className="font-black text-gray-900 mt-1">{origin}</p></div>
-                    <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-4"><p className="text-[11px] uppercase tracking-wider font-bold text-indigo-700">Ships to</p><p className="font-black text-gray-900 mt-1">{destination}</p></div>
+                    <div className="rounded-xl bg-cyan-50 border border-cyan-100 p-4"><p className="text-[11px] uppercase tracking-wider font-bold text-cyan-700">{t("shipsFrom")}</p><p className="font-black text-gray-900 mt-1">{origin}</p></div>
+                    <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-4"><p className="text-[11px] uppercase tracking-wider font-bold text-indigo-700">{t("shipsTo")}</p><p className="font-black text-gray-900 mt-1">{destination}</p></div>
                     {x.carrier && <div className="rounded-xl bg-violet-50 border border-violet-100 p-4"><p className="text-[11px] uppercase tracking-wider font-bold text-violet-700">Carrier</p><p className="font-bold text-gray-900 mt-1 capitalize">{x.carrier.replaceAll("-", " ")}</p></div>}
                     <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4"><p className="text-[11px] uppercase tracking-wider font-bold text-emerald-700">Postage</p><p className="font-black text-gray-900 mt-1">{x.shippingPrice == null || x.shippingPrice === 0 ? "Free / included" : formatPrice(x.shippingPrice)}</p></div>
                   </div>
@@ -729,10 +731,10 @@ export function ListingPage() {
               const x = product as typeof product & ApiListingExtra;
               return (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <div className="rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 p-4"><BadgeCheck className="w-5 h-5 text-orange-500 mb-2" /><p className="text-xs text-gray-500">Condition</p><p className="font-black text-gray-900 capitalize">{product.condition}</p></div>
-                  <div className="rounded-2xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-100 p-4"><Package className="w-5 h-5 text-violet-500 mb-2" /><p className="text-xs text-gray-500">Available</p><p className="font-black text-gray-900">{x.quantity ?? 1}</p></div>
+                  <div className="rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 p-4"><BadgeCheck className="w-5 h-5 text-orange-500 mb-2" /><p className="text-xs text-gray-500">{t("condition")}</p><p className="font-black text-gray-900 capitalize">{product.condition}</p></div>
+                  <div className="rounded-2xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-100 p-4"><Package className="w-5 h-5 text-violet-500 mb-2" /><p className="text-xs text-gray-500">{t("available")}</p><p className="font-black text-gray-900">{x.quantity ?? 1}</p></div>
                   <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-100 p-4"><Box className="w-5 h-5 text-blue-500 mb-2" /><p className="text-xs text-gray-500">SKU</p><p className="font-bold text-gray-900 truncate">{x.sku || "Not specified"}</p></div>
-                  <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-4"><Plane className="w-5 h-5 text-emerald-500 mb-2" /><p className="text-xs text-gray-500">Listing currency</p><p className="font-black text-gray-900">{x.listingCurrency || "GBP"}</p></div>
+                  <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-4"><Plane className="w-5 h-5 text-emerald-500 mb-2" /><p className="text-xs text-gray-500">{t("listingCurrency")}</p><p className="font-black text-gray-900">{x.listingCurrency || "GBP"}</p></div>
                 </div>
               );
             })()}
@@ -808,7 +810,7 @@ export function ListingPage() {
                 data-testid="button-buy-now"
               >
                 <ShoppingCart className="w-4 h-4" />
-                Buy It Now
+                {t("buyNow")}
               </button>
 
               {/* Make an Offer */}
@@ -817,7 +819,7 @@ export function ListingPage() {
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm border-2 border-[#4A5CE8] bg-[#4A5CE8]/10 text-[#4A5CE8] hover:bg-[#4A5CE8]/20 transition-colors mb-2.5"
                 data-testid="button-make-offer"
               >
-                <Tag className="w-4 h-4" /> Make an Offer
+                <Tag className="w-4 h-4" /> {t("makeOffer")}
               </button>
 
               {/* Message Seller */}
@@ -827,7 +829,7 @@ export function ListingPage() {
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors mb-4 disabled:opacity-60"
                 data-testid="button-message-seller"
               >
-                <MessageSquare className="w-4 h-4" /> {startingMessage ? "Opening chat…" : "Message Seller"}
+                <MessageSquare className="w-4 h-4" /> {startingMessage ? "Opening chat…" : t("messageSeller")}
               </button>
 
               {/* Watchlist */}

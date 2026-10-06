@@ -19,6 +19,7 @@ import NotFound from "@/pages/not-found";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
 import { CurrencyProvider } from "@/context/CurrencyContext";
+import { LanguageProvider } from "@/context/LanguageContext";
 import { WatchlistProvider } from "@/context/WatchlistContext";
 import { CartDrawer } from "@/components/CartDrawer";
 import { Navbar } from "@/components/Navbar";
@@ -369,6 +370,7 @@ function App() {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem storageKey="bazunk-theme" disableTransitionOnChange={false}>
     <TooltipProvider>
       <CurrencyProvider>
+        <LanguageProvider>
         <SiteSettingsProvider>
           <AdminProvider>
             <WouterRouter base={basePath}>
@@ -376,6 +378,7 @@ function App() {
             </WouterRouter>
           </AdminProvider>
         </SiteSettingsProvider>
+        </LanguageProvider>
       </CurrencyProvider>
     </TooltipProvider>
     </ThemeProvider>
