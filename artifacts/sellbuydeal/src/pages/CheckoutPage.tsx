@@ -11,13 +11,14 @@ import { Footer } from "@/components/Footer";
 import { BuyerProtectionBadge } from "@/components/BuyerProtectionBadge";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 const PROMO_CODES: Record<string, { type: "percent" | "fixed"; value: number; label: string; source: "site" | "seller" }> = {
   SAVE10:    { type: "percent", value: 10,  label: "10% off your order",           source: "site" },
   WELCOME20: { type: "percent", value: 20,  label: "20% off for new members",      source: "site" },
-  SELLER5:   { type: "fixed",   value: 5,   label: "£5 off — Seller discount",     source: "seller" },
+  SELLER5:   { type: "fixed",   value: 5,   label: "5-unit seller discount",     source: "seller" },
   DEAL15:    { type: "percent", value: 15,  label: "15% off — Bazunk promo",  source: "site" },
-  NEWUSER:   { type: "fixed",   value: 10,  label: "£10 new user credit",          source: "site" },
+  NEWUSER:   { type: "fixed",   value: 10,  label: "10-unit new user credit",          source: "site" },
 };
 
 type Step = "summary" | "redirecting";
@@ -56,6 +57,7 @@ export function CheckoutPage() {
   const { items, clearCart } = useCart();
   const { user, refreshBalance } = useAuth();
   const [, setLocation] = useLocation();
+  const { formatPrice, currency } = useCurrency();
 
   const [step, setStep] = useState<Step>("summary");
   const [promoCode, setPromoCode] = useState("");
@@ -291,7 +293,7 @@ export function CheckoutPage() {
                             <span className="text-xs text-gray-400">Qty: {item.quantity}</span>
                           </div>
                         </div>
-                        <span className="font-bold text-gray-900 text-sm">£{((quote?.items.find(row=>row.id===item.product.id)?.price ?? item.product.priceGbp ?? item.product.price) * item.quantity).toFixed(2)}</span>
+                        <span className="font-bold text-gray-900 text-sm">{formatPrice((quote?.items.find(row=>row.id===item.product.id)?.price ?? item.product.priceGbp ?? item.product.price) * item.quantity)}</span>
                       </div>
                     ))}
                   </div>
@@ -324,7 +326,7 @@ export function CheckoutPage() {
                 >
                   {checkoutLoading
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Preparing checkout…</>
-                    : <><Lock className="w-4 h-4" /> Pay £{total.toFixed(2)} with Stripe <ChevronRight className="w-4 h-4" /></>
+                    : <><Lock className="w-4 h-4" /> Pay {formatPrice(total)} with Stripe <ChevronRight className="w-4 h-4" /></>
                   }
                 </button>
 
@@ -364,41 +366,41 @@ export function CheckoutPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span className="font-semibold text-gray-900">£{subtotal.toFixed(2)}</span>
+                  <span className="font-semibold text-gray-900">{formatPrice(subtotal)}</span>
                 </div>
                 {appliedPromo && (
                   <div className="flex justify-between text-emerald-600">
                     <span className="flex items-center gap-1"><Tag className="w-3 h-3" /> {promoCode}</span>
-                    <span className="font-semibold">−£{promoDiscount.toFixed(2)}</span>
+                    <span className="font-semibold">−{formatPrice(promoDiscount)}</span>
                   </div>
                 )}
                 {useCredits && creditsApplied > 0 && (
                   <div className="flex justify-between text-amber-600">
                     <span className="flex items-center gap-1"><Coins className="w-3 h-3" /> {Math.round(creditsApplied * 100).toLocaleString()} credits</span>
-                    <span className="font-semibold">−£{creditsApplied.toFixed(2)}</span>
+                    <span className="font-semibold">−{formatPrice(creditsApplied)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-gray-600">
                   <span className="flex items-center gap-1">Buyer Protection <Link href="/buyer-protection" className="text-[#4A5CE8] underline text-xs">Learn more</Link></span>
-                  <span className="font-semibold text-gray-900">{quoteLoading ? "Calculating…" : !quote ? "Unavailable" : buyerProtectionFee>0 ? `£${buyerProtectionFee.toFixed(2)}` : "Included"}</span>
+                  <span className="font-semibold text-gray-900">{quoteLoading ? "Calculating…" : !quote ? "Unavailable" : buyerProtectionFee>0 ? formatPrice(buyerProtectionFee) : "Included"}</span>
                 </div>
-                <p className="text-xs text-gray-500">{quote?.privateSubtotal ? `${quote.protectionPercent}% of personal-seller items + £${quote.fixedProtection.toFixed(2)} once per checkout.` : "Protection is included on business-seller purchases."}</p>
+                <p className="text-xs text-gray-500">{quote?.privateSubtotal ? `${quote.protectionPercent}% of personal-seller items + ${formatPrice(quote.fixedProtection)} once per checkout.` : "Protection is included on business-seller purchases."}</p>
                 <div className="flex justify-between text-gray-600">
                   <span>Delivery</span>
                   <span className={`font-semibold ${delivery === 0 ? "text-emerald-600" : "text-gray-900"}`}>
-                    {delivery === 0 ? "FREE" : `£${delivery.toFixed(2)}`}
+                    {delivery === 0 ? "FREE" : formatPrice(delivery)}
                   </span>
                 </div>
                 <div className="flex justify-between font-bold text-gray-900 text-base pt-3 border-t border-gray-100">
                   <span>Total</span>
-                  <span>£{total.toFixed(2)}</span>
+                  <span>{formatPrice(total)}</span>
                 </div>
               </div>
 
               {(promoDiscount > 0 || creditsApplied > 0) && (
                 <div className="mt-3 bg-emerald-50 rounded-xl px-3 py-2 text-xs text-emerald-700 font-semibold flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5" />
-                  You're saving £{(promoDiscount + creditsApplied).toFixed(2)} on this order!
+                  You're saving {formatPrice(promoDiscount + creditsApplied)} on this order!
                 </div>
               )}
 
