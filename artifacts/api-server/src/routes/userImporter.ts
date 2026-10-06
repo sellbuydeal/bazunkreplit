@@ -32,7 +32,7 @@ router.post("/user/import-ebay-own", async (req, res) => {
         const marker = '%"own_ebay_item_id":"' + item.itemId + '"%';
         const exists = await tx.execute(sql`SELECT id FROM listings WHERE lower(seller_email)=${email} AND specifications LIKE ${marker} LIMIT 1`);
         if (exists.rows.length) { skipped++; continue; }
-        const specs = JSON.stringify({ source: "eBay own listings", import_mode: "one_time", sync_enabled: false, own_ebay_item_id: item.itemId, inventory: item.quantity });
+        const specs = JSON.stringify({ source: "eBay own listings", import_mode: "one_time", sync_enabled: false, own_ebay_item_id: item.itemId, item_id: item.itemId, ebay_url: `https://www.ebay.co.uk/itm/${item.itemId}`, inventory: item.quantity });
         await tx.execute(sql`INSERT INTO listings(public_id,title,price,price_gbp,currency,category,subcategory,description,condition,image,seller_email,seller_name,specifications,status,created_at,updated_at)
           VALUES(${'BZK-OWN-EBY-'+randomUUID()},${item.title},${item.price},${item.priceGbp},${item.currency},${category},${subcategory || null},${item.description || item.title},${item.condition},${item.image},${email},${user?.name || email.split("@")[0]},${specs},'active',NOW(),NOW())`);
         imported++;
