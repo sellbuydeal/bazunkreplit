@@ -26,7 +26,7 @@ interface Specs {
   asin?: string;
   source?: string;
   ebay_url?: string;
-  item_id?: string;
+  item_id?: string;\n  own_ebay_item_id?: string;
 }
 
 function parseSpecs(raw: string | null): Specs {
@@ -139,7 +139,7 @@ export function AdminListingsPage() {
               )}
               {!loading && listings.map(l => {
                 const isImported = l.public_id?.startsWith("BZK-DEMO-") ?? false;
-                const specs = parseSpecs(l.specifications);
+                const specs = parseSpecs(l.specifications);\n                const ebayItemId = specs.item_id ?? specs.own_ebay_item_id;\n                const ebayUrl = specs.ebay_url ?? (ebayItemId ? `https://www.ebay.co.uk/itm/${ebayItemId}` : undefined);
                 return (
                   <tr key={l.id} className="border-t border-gray-50 hover:bg-gray-50/50">
                     {/* ID */}
@@ -192,7 +192,7 @@ export function AdminListingsPage() {
                         <a href={specs.ebay_url} target="_blank" rel="noopener noreferrer"
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap">
                           <ExternalLink className="w-3 h-3" />
-                          {specs.item_id ? `eBay ${specs.item_id}` : "View on eBay"}
+                          {ebayItemId ? `eBay ${ebayItemId}` : "View on eBay"}
                         </a>
                       ) : specs.amazon_url ? (
                         <a href={specs.amazon_url} target="_blank" rel="noopener noreferrer"
