@@ -8,6 +8,7 @@ import { Footer } from "@/components/Footer";
 import { AdSlot } from "@/components/AdSlot";
 import { CATEGORIES } from "@/data/categories";
 import * as LucideIcons from "lucide-react";
+import { useCurrency } from "@/context/CurrencyContext";
 
 type LucideIconName = keyof typeof LucideIcons;
 
@@ -77,6 +78,7 @@ function CategoryIcon({ name, className = "w-6 h-6 text-white" }: { name: string
 }
 
 export function CategoriesPage() {
+  const { formatPrice, currency } = useCurrency();
   const [openSlug, setOpenSlug] = useState<string | null>("electronics");
   const [search, setSearch] = useState("");
   const [counts, setCounts] = useState<CategoryCount[]>([]);
@@ -155,7 +157,7 @@ export function CategoriesPage() {
                   <Tag className="w-7 h-7 text-white" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xl lg:text-2xl font-black text-white">Private Sellers Sell for <span className="text-3xl">£0</span></p>
+                  <p className="text-xl lg:text-2xl font-black text-white">Private Sellers Sell for <span className="text-3xl">{formatPrice(0)}</span></p>
                   <p className="text-white text-sm font-semibold mt-0.5">No listing fees. No final value fees. Keep 100% of your sale price.</p>
                 </div>
                 <span className="hidden sm:inline-flex bg-white text-indigo-700 font-black rounded-xl px-5 py-3 items-center gap-1 shadow-lg group-hover:translate-x-1 transition-transform">
