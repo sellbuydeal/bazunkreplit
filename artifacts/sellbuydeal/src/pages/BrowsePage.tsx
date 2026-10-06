@@ -125,7 +125,7 @@ function ProductCard({ product, view, promotions = [] }: { product: typeof ALL_P
         className={`bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 flex gap-4 p-4 group border ${isSpotlight ? "border-[#F26B21] ring-2 ring-[#F26B21]/20" : isFeatured ? "border-amber-300 ring-2 ring-amber-100" : "border-gray-100"}`}
         data-testid={`card-product-${product.id}`}
       >
-        <div className="w-28 h-28 rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden relative">
+        <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-xl bg-gray-100 flex-shrink-0 overflow-hidden relative">
           {product.image
             ? <img src={product.image} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
             : <div className="w-full h-full flex items-center justify-center"><ImageOff className="w-8 h-8 text-gray-300" /></div>
@@ -987,7 +987,7 @@ export function BrowsePage() {
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed left-0 top-0 bottom-0 w-72 bg-white z-50 overflow-y-auto shadow-2xl md:hidden"
+              className="fixed left-0 top-0 bottom-0 w-80 max-w-[100vw] bg-white z-50 overflow-y-auto overscroll-contain shadow-2xl md:hidden"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <h2 className="font-bold text-gray-900">Filters</h2>

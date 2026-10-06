@@ -477,7 +477,7 @@ export function ListingPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* Left: Image gallery + details */}
-          <div className="lg:col-span-2 space-y-5">
+          <div className="lg:col-span-2 space-y-5 min-w-0">
 
             {/* Image gallery */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -900,7 +900,7 @@ export function ListingPage() {
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="fixed z-50 inset-0 flex items-center justify-center p-4 pointer-events-none"
             >
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm pointer-events-auto overflow-hidden">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[90dvh] pointer-events-auto overflow-y-auto">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-[#3B4FD8] to-[#4A5CE8] px-5 py-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">

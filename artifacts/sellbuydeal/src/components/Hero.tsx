@@ -94,8 +94,8 @@ export function Hero() {
         <div className="absolute right-32 -top-20 w-72 h-72 rounded-full bg-[#F26B21]/10 blur-3xl" />
       </div>
 
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <div className="relative z-10 w-full max-w-6xl mx-auto px-4 py-8 sm:py-12 lg:py-16">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 items-center">
 
           {/* ── Left panel ─────────────────────────────── */}
           <motion.div
@@ -152,7 +152,7 @@ export function Hero() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="hidden lg:grid grid-cols-3 gap-3"
+            className="grid grid-flow-col auto-cols-[130px] overflow-x-auto pb-2 lg:pb-0 lg:overflow-visible lg:grid-flow-row lg:auto-cols-auto lg:grid-cols-3 gap-3"
           >
             {HERO_CATS.map(({ name, icon: Icon, color, href }, i) => (
               <motion.div
@@ -200,7 +200,7 @@ export function Hero() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
                 transition={{ duration: 0.2 }}
-                className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden"
+                className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Header */}

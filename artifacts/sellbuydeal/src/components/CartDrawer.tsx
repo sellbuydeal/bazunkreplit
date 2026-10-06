@@ -93,7 +93,7 @@ export function CartDrawer() {
             )}
 
             {/* Items */}
-            <div className="flex-1 overflow-y-auto py-3 px-4 space-y-3">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-3 px-4 space-y-3">
               {items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center py-16">
                   <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">

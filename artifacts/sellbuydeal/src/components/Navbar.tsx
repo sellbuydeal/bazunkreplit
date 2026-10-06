@@ -75,6 +75,9 @@ const MORE_NAV = [
 ];
 
 const MOBILE_NAV_LINKS = [
+  { href: "/rewards", label: "Daily Rewards", icon: Gift },
+  { href: "/dashboard?section=credits", label: "Credits & Milestones", icon: Trophy },
+  { href: "/promotions", label: "Promotions", icon: Zap },
   { href: "/videos", label: "Videos", icon: Film },
   { href: "/",            label: "Home",        icon: Home },
   { href: "/browse",      label: "Browse",      icon: Grid3X3 },
@@ -89,7 +92,7 @@ const MOBILE_NAV_LINKS = [
   { href: "/messages",    label: "Messages",    icon: MessageSquare },
   { href: "/dashboard",   label: "Dashboard",   icon: LayoutDashboard },
   { href: "/buyer-protection", label: "Buyer Protection", icon: ShieldCheck },
-  { href: "/dashboard",        label: "Importers",        icon: ArrowDownToLine },
+  { href: "/importers",        label: "Importers",        icon: ArrowDownToLine },
   { href: "/support",          label: "Support",          icon: HelpCircle },
 ];
 
@@ -204,13 +207,13 @@ export function Navbar() {
   return (
     <>
       <nav className="sticky top-0 z-50 w-full bg-white shadow-sm">
-        <div className="container mx-auto px-4 h-20 md:h-24 flex items-center justify-between gap-3">
+        <div className="container mx-auto px-4 h-16 md:h-24 flex items-center justify-between gap-3">
 
           {/* Theme + Logo */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <ThemeToggle className="hidden md:flex w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 items-center justify-center transition-colors flex-shrink-0" />
             <Link href="/" className="flex items-center flex-shrink-0" data-testid="link-logo">
-              <img src="/bazunk-logo-header.png" alt="Bazunk" className="h-11 md:h-12 xl:h-14 w-auto object-contain" />
+              <img src="/bazunk-logo-header.png" alt="Bazunk" className="h-7 sm:h-9 md:h-12 xl:h-14 w-auto object-contain" />
             </Link>
             <Link
               href="/"
@@ -620,6 +623,10 @@ export function Navbar() {
             </button>
           </div>
         </div>
+        <form onSubmit={handleSubmit} className="lg:hidden px-4 pb-3 flex gap-2" role="search" aria-label="Search marketplace">
+          <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search listings…" aria-label="Search listings" className="min-w-0 flex-1 rounded-xl bg-gray-100 px-3 py-2 text-base text-gray-800" />
+          <button type="submit" aria-label="Search" className="w-11 shrink-0 rounded-xl bg-[#4A5CE8] text-white flex items-center justify-center"><Search className="w-5 h-5" /></button>
+        </form>
         {/* Brand colour accent */}
         <div className="h-[3px] w-full bg-gradient-to-r from-[#1E6FE8] via-[#4A5CE8] to-[#F5B301]" />
       </nav>
@@ -662,12 +669,12 @@ export function Navbar() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 220 }}
-              className="fixed top-0 right-0 bottom-0 w-72 bg-white z-50 flex flex-col xl:hidden shadow-2xl"
+              className="fixed top-0 right-0 bottom-0 w-80 max-w-[100vw] bg-white z-50 flex flex-col xl:hidden shadow-2xl"
             >
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <Link href="/" onClick={() => setMobileOpen(false)} className="flex items-center">
-                   <img src="/bazunk-logo-header.png" alt="Bazunk" className="h-9 w-auto object-contain" />
+                   <img src="/bazunk-logo-header.png" alt="Bazunk" className="h-7 w-auto max-w-[200px] object-contain" />
                 </Link>
                 <button
                   onClick={() => setMobileOpen(false)}
@@ -725,7 +732,7 @@ export function Navbar() {
               )}
 
               {/* Nav links */}
-              <nav className="flex-1 overflow-y-auto py-2">
+              <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-2">
                 <ThemeToggle
                   withLabel
                   className="w-full flex items-center gap-3 px-5 py-3.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors text-left"
@@ -762,6 +769,10 @@ export function Navbar() {
                 ))}
               </nav>
 
+              <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between gap-3 shrink-0">
+                <ThemeToggle className="flex w-10 h-10 rounded-xl bg-gray-100 items-center justify-center" />
+                <label className="text-xs text-gray-600">Currency<select value={currency.code} onChange={e => setCurrency(e.target.value as CurrencyCode)} className="ml-2 bg-gray-100 rounded-lg p-2 text-base">{Object.values(CURRENCIES).map(c => <option key={c.code} value={c.code}>{c.code}</option>)}</select></label>
+              </div>
               {/* Bottom auth actions */}
               {!user && (
                 <div className="px-5 py-4 border-t border-gray-100 flex flex-col gap-2">
