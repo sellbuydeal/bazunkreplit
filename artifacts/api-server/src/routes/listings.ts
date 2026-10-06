@@ -269,6 +269,14 @@ router.post("/listings", async (req, res) => {
     const currency = typeof body.currency === "string" && body.currency ? body.currency.toUpperCase() : "GBP";
     const status = typeof body.status === "string" ? body.status : "active";
     const premiumVideo = body.premiumVideo === true;
+    const shipOrigin = typeof body.shipOrigin === "string" ? body.shipOrigin.slice(0, 80) : null;
+    const shipOriginOther = typeof body.shipOriginOther === "string" ? body.shipOriginOther.slice(0, 120) : null;
+    const shipZone = typeof body.shipZone === "string" ? body.shipZone.slice(0, 80) : null;
+    const carrier = typeof body.carrier === "string" ? body.carrier.slice(0, 80) : null;
+    const shippingPrice = body.shippingPrice != null && Number.isFinite(Number(body.shippingPrice)) ? String(body.shippingPrice) : null;
+    const handlingCharge = body.handlingCharge != null && Number.isFinite(Number(body.handlingCharge)) ? String(body.handlingCharge) : null;
+    const quantity = body.quantity != null && Number.isFinite(Number(body.quantity)) ? Math.max(0, Math.floor(Number(body.quantity))) : null;
+    const sku = typeof body.sku === "string" ? body.sku.slice(0, 120) : null;
 
     // Product Video is priced in credits and controlled by Admin → Promotions.
     // Validate the balance before creating the listing so a failed add-on cannot create duplicates.
@@ -311,6 +319,14 @@ router.post("/listings", async (req, res) => {
         specifications, 
         currency, 
         priceGbp,
+        shipOrigin,
+        shipOriginOther,
+        shipZone,
+        carrier,
+        shippingPrice,
+        handlingCharge,
+        quantity,
+        sku,
         status 
       })
       .returning();
