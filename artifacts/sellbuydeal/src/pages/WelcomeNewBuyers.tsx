@@ -15,7 +15,7 @@ export default function WelcomeNewBuyers() {
           />
 
           {/* Accessible CTA overlay matching the yellow CTA shown in the artwork. */}
-          <Link href="/join">
+          <Link href="/sign-up">
             <a
               aria-label="Create your free Bazunk account"
               className="absolute left-[27%] right-[27%] bottom-[5.3%] h-[8.5%] rounded-full focus:outline-none focus-visible:ring-4 focus-visible:ring-white/90"
@@ -45,7 +45,7 @@ export default function WelcomeNewBuyers() {
         </div>
 
         <div className="text-center mt-7">
-          <Link href="/join">
+          <Link href="/sign-up">
             <a className="inline-flex items-center gap-2 rounded-full bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black px-8 py-4 transition-colors shadow-xl">
               Create your free account <ArrowRight className="w-5 h-5" />
             </a>
