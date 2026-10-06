@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X, Download, Share2, Copy, Check, Loader2 } from "lucide-react";
+import { useCurrency } from "@/context/CurrencyContext";
 
 export interface ShareListing {
   id: number;
@@ -73,7 +74,7 @@ async function drawCard(canvas: HTMLCanvasElement, listing: ShareListing, format
 
   const pad = Math.round(w * 0.05);
   const price = typeof listing.price === "number" ? listing.price : parseFloat(String(listing.price));
-  const priceText = `£${isFinite(price) ? price.toFixed(2) : "0.00"}`;
+  const priceText = isFinite(price) ? formatPrice(price) : formatPrice(0);
 
   const drawPhoto = (x: number, y: number, pw: number, ph: number, r: number) => {
     ctx.save();
@@ -134,6 +135,7 @@ async function drawCard(canvas: HTMLCanvasElement, listing: ShareListing, format
 }
 
 export function ShareCardModal({ listing, onClose }: { listing: ShareListing; onClose: () => void }) {
+  const { formatPrice } = useCurrency();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [format, setFormat] = useState<Format>("square");
   const [busy, setBusy] = useState(true);
