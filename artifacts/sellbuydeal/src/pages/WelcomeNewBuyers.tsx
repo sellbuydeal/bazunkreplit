@@ -3,27 +3,23 @@ import { ArrowRight, ShieldCheck, Gift, BadgePercent } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 
 export default function WelcomeNewBuyers() {
-  const { currency } = useCurrency();
+  const { currency, formatPrice, country } = useCurrency();
   const credit = `${currency.symbol}5`;
   return (
     <main className="min-h-screen bg-[#071a42] text-white">
       <section className="max-w-6xl mx-auto px-4 py-8 md:py-12">
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 shadow-2xl bg-[#06205a]">
-          <img
-            src="/new-buyer-welcome.png"
-            alt="Welcome new Bazunk buyers — buyer protection fee covered on the first purchase, £5/$5/€5 credit, and Buyer Protection information"
-            width={1052}
-            height={765}
-            className="block w-full h-auto"
-          />
-
-          {/* Accessible CTA overlay matching the yellow CTA shown in the artwork. */}
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 shadow-2xl bg-gradient-to-br from-[#06205a] via-[#102d7b] to-[#4a176f] p-7 md:p-12 text-center">
+          <p className="text-xs md:text-sm font-black tracking-[0.22em] text-yellow-300 uppercase">Welcome new buyers · {country.flag} {country.name}</p>
+          <h1 className="mt-3 text-4xl md:text-6xl font-black leading-tight">Shop with confidence on Bazunk</h1>
+          <p className="mt-4 text-lg text-white/75">Extra protection and rewards for new buyers in {country.name}.</p>
+          <div className="mt-7 inline-flex items-center rounded-2xl bg-white/10 border border-white/15 px-6 py-4">
+            <Gift className="w-7 h-7 text-yellow-300 mr-3" />
+            <span className="font-black text-xl">Get {credit} credit on your 1st or 2nd qualifying purchase</span>
+          </div>
+          <p className="mt-5 text-white/80">Plus, we'll cover your Buyer Protection fee on your first qualifying purchase.</p>
           <Link href="/sign-up">
-            <a
-              aria-label="Create your free Bazunk account"
-              className="absolute left-[27%] right-[27%] bottom-[5.3%] h-[8.5%] rounded-full focus:outline-none focus-visible:ring-4 focus-visible:ring-white/90"
-            >
-              <span className="sr-only">Create your free account</span>
+            <a className="inline-flex items-center gap-2 mt-8 rounded-full bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black px-8 py-4 transition-colors shadow-xl">
+              Create your free account <ArrowRight className="w-5 h-5" />
             </a>
           </Link>
         </div>
@@ -32,7 +28,7 @@ export default function WelcomeNewBuyers() {
         <div className="grid md:grid-cols-3 gap-4 mt-6">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <BadgePercent className="w-7 h-7 text-sky-300 mb-3" />
-            <h2 className="font-black text-lg">First buyer protection fee: £0</h2>
+            <h2 className="font-black text-lg">First buyer protection fee: {formatPrice(0)}</h2>
             <p className="text-sm text-white/70 mt-1">Bazunk covers the buyer protection charge on your first qualifying purchase.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
