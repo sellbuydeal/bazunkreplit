@@ -196,14 +196,13 @@ router.get("/listings/mine", async (req, res) => {
 
 router.get("/listings/:id", async (req, res) => {
   try {
-    const rawId = req.params.id;
-    const numId = parseInt(rawId);
+    const rawId = decodeURIComponent(req.params.id).trim();
     let row;
-    if (!isNaN(numId)) {
-      [row] = await db.select().from(listingsTable).where(eq(listingsTable.id, numId)).limit(1);
-    }
-    if (!row) {
-      [row] = await db.select().from(listingsTable).where(eq(listingsTable.publicId, rawId)).limit(1);
+    // Public IDs can begin with digits, so always try the exact public ID first.
+    // Only fall back to the numeric primary key when the whole route segment is numeric.
+    [row] = await db.select().from(listingsTable).where(eq(listingsTable.publicId, rawId)).limit(1);
+    if (!row && /^\\d+$/.test(rawId)) {
+      [row] = await db.select().from(listingsTable).where(eq(listingsTable.id, Number(rawId))).limit(1);
     }
     if (!row) { res.status(404).json({ error: "not found" }); return; }
     if (row.status === "scheduled") {
