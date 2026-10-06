@@ -1200,7 +1200,7 @@ export function DirectSalePage() {
                 data-testid="button-save-draft"
               >
                 <Save className="w-4 h-4" />
-                {draftSaved ? "Draft Saved!" : "{t("saveDraft")}"}
+                {draftSaved ? "Draft Saved!" : t("saveDraft")}
               </button>
               <button
                 type="submit"
@@ -1209,7 +1209,7 @@ export function DirectSalePage() {
                 data-testid="button-publish-listing"
               >
                 <Bell className="w-4 h-4" />
-                {published ? "Published! Redirecting…" : publishing ? "Publishing…" : "{t("publishListing")}"}
+                {published ? "Published! Redirecting…" : publishing ? "Publishing…" : t("publishListing")}
               </button>
             </div>
 
