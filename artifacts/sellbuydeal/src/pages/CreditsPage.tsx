@@ -9,8 +9,9 @@ import {
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
-// 100 credits = £1
+// 100 credits = {formatPrice(1)}
 const CREDITS_PER_GBP = 100;
 
 interface Package {
@@ -44,6 +45,7 @@ const FEATURES = [
 ];
 
 export function CreditsPage() {
+  const { formatPrice, currency } = useCurrency();
   const { user, refreshBalance } = useAuth();
   const [, setLocation] = useLocation();
   const search = useSearch();
@@ -208,7 +210,7 @@ export function CreditsPage() {
           <div className="lg:col-span-2 space-y-4">
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <h2 className="font-bold text-gray-900 text-lg mb-1">Choose a Credit Package</h2>
-              <p className="text-sm text-gray-400 mb-5">Larger packages include bonus credits. All prices in GBP.</p>
+              <p className="text-sm text-gray-400 mb-5">Larger packages include bonus credits. Prices are shown in your selected currency.</p>
 
               <div className="space-y-3">
                 {PACKAGES.map((pkg) => {
@@ -247,7 +249,7 @@ export function CreditsPage() {
                         <p className="font-black text-gray-900 text-base">
                           {fmtCredits(pkgCredits + pkgBonus)} <span className="text-xs font-semibold text-gray-400">cr</span>
                         </p>
-                        <p className="text-xs text-gray-500 font-medium">£{pkg.price.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500 font-medium">{formatPrice(pkg.price)}</p>
                         {pkgBonus > 0 && (
                           <p className="text-[10px] font-bold text-emerald-500">+{fmtCredits(pkgBonus)} bonus</p>
                         )}
@@ -271,7 +273,7 @@ export function CreditsPage() {
                   >
                     <p className="text-sm font-bold text-gray-700 mb-2">Custom Amount</p>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">£</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">{currency.symbol}</span>
                       <input
                         type="number" min="1" value={customAmt}
                         onChange={(e) => { setCustomAmt(e.target.value); setSelectedId("custom"); }}
@@ -335,7 +337,7 @@ export function CreditsPage() {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500">{displayName}</span>
                   <span className="font-semibold text-gray-900">
-                    {basePrice > 0 ? `£${basePrice.toFixed(2)}` : "—"}
+                    {basePrice > 0 ? formatPrice(basePrice) : "—"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
@@ -358,7 +360,7 @@ export function CreditsPage() {
                       {totalCredits > 0 ? fmtCredits(totalCredits) : "—"}
                     </span>
                     {totalCredits > 0 && (
-                      <p className="text-[10px] text-gray-400">≈ £{(totalCredits / 100).toFixed(2)} value</p>
+                      <p className="text-[10px] text-gray-400">≈ {formatPrice(totalCredits / 100)} value</p>
                     )}
                   </div>
                 </div>
@@ -384,14 +386,14 @@ export function CreditsPage() {
                 {loading ? (
                   <><Loader2 className="w-5 h-5 animate-spin" /> Processing…</>
                 ) : (
-                  <><Coins className="w-5 h-5" />{basePrice > 0 ? `Buy ${fmtCredits(totalCredits)} Credits — £${basePrice.toFixed(2)}` : "Buy Credits"}</>
+                  <><Coins className="w-5 h-5" />{basePrice > 0 ? `Buy ${fmtCredits(totalCredits)} Credits — ${formatPrice(basePrice)}` : "Buy Credits"}</>
                 )}
               </button>
 
               <div className="flex items-start gap-2 mt-3">
                 <ShieldCheck className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-gray-400">
-                  Secure payment via Stripe. Credits added instantly after payment. 100 credits = £1.
+                  Secure payment via Stripe. Credits added instantly after payment. 100 credits = {formatPrice(1)}.
                 </p>
               </div>
 
