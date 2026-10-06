@@ -450,7 +450,7 @@ router.patch("/listings/:id", async (req, res) => {
     const updated = await db
       .update(listingsTable)
       .set(updates)
-      .where(and(eq(listingsTable.id, id), eq(listingsTable.sellerEmail, email)))
+      .where(and(eq(listingsTable.id, id), sql`LOWER(${listingsTable.sellerEmail}) = LOWER(${email})`))
       .returning();
     if (updated.length === 0) { res.status(404).json({ error: "Listing not found or not yours" }); return; }
     res.json(updated[0]);
