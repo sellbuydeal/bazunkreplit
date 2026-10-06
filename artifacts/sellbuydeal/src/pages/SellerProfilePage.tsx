@@ -5,6 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useSession } from "@clerk/react";
 import { useAuth } from "@/context/AuthContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 interface Reputation {
   reviews: { total: number; positive: number; neutral: number; negative: number; average: number };
@@ -31,6 +32,7 @@ function dispatchLabel(hours: number) {
 }
 
 export function SellerProfilePage() {
+  const { formatPrice, currency } = useCurrency();
   const { id } = useParams<{ id: string }>();
   const { session } = useSession();
   const { user } = useAuth();
@@ -119,7 +121,7 @@ export function SellerProfilePage() {
           <div className="grid lg:grid-cols-[1fr_320px] gap-6">
             <section className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
               <div className="flex items-center gap-2 mb-5"><ShoppingBag className="w-5 h-5 text-[#4A5CE8]" /><h2 className="font-black text-xl text-gray-900">Items for sale</h2><span className="text-sm text-gray-400">({listings.length})</span></div>
-              {listings.length === 0 ? <p className="text-sm text-gray-400 py-8 text-center">This seller has no active listings right now.</p> : <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">{listings.map(l => <Link key={l.id} href={`/listing/${l.publicId ?? l.public_id ?? l.id}`} className="rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow bg-white"><div className="aspect-square bg-gray-50">{l.image ? <img src={l.image} alt="" className="w-full h-full object-contain p-3" /> : <Package className="w-10 h-10 text-gray-200 m-auto mt-16" />}</div><div className="p-3"><p className="text-sm font-semibold text-gray-800 line-clamp-2">{l.title}</p><p className="font-black text-gray-900 mt-2">£{Number(l.price).toFixed(2)}</p></div></Link>)}</div>}
+              {listings.length === 0 ? <p className="text-sm text-gray-400 py-8 text-center">This seller has no active listings right now.</p> : <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">{listings.map(l => <Link key={l.id} href={`/listing/${l.publicId ?? l.public_id ?? l.id}`} className="rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow bg-white"><div className="aspect-square bg-gray-50">{l.image ? <img src={l.image} alt="" className="w-full h-full object-contain p-3" /> : <Package className="w-10 h-10 text-gray-200 m-auto mt-16" />}</div><div className="p-3"><p className="text-sm font-semibold text-gray-800 line-clamp-2">{l.title}</p><p className="font-black text-gray-900 mt-2">{formatPrice(Number(l.price))}</p></div></Link>)}</div>}
             </section>
 
             <aside className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 h-fit">
