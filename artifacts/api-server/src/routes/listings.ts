@@ -200,9 +200,27 @@ router.get("/listings/:id", async (req, res) => {
     let row;
     // Public IDs can begin with digits, so always try the exact public ID first.
     // Only fall back to the numeric primary key when the whole route segment is numeric.
-    [row] = await db.select().from(listingsTable).where(eq(listingsTable.publicId, rawId)).limit(1);
+    [row] = await db.select({
+      id: listingsTable.id, publicId: listingsTable.publicId, title: listingsTable.title,
+      price: listingsTable.price, category: listingsTable.category, subcategory: listingsTable.subcategory,
+      description: listingsTable.description, condition: listingsTable.condition, image: listingsTable.image,
+      views: listingsTable.views, watchers: listingsTable.watchers, status: listingsTable.status,
+      sellerEmail: listingsTable.sellerEmail, sellerName: listingsTable.sellerName, sellerUsername: listingsTable.sellerUsername,
+      tags: listingsTable.tags, extraCategories: listingsTable.extraCategories, specifications: listingsTable.specifications,
+      currency: listingsTable.currency, priceGbp: listingsTable.priceGbp,
+      createdAt: listingsTable.createdAt, updatedAt: listingsTable.updatedAt,
+    }).from(listingsTable).where(eq(listingsTable.publicId, rawId)).limit(1);
     if (!row && /^\\d+$/.test(rawId)) {
-      [row] = await db.select().from(listingsTable).where(eq(listingsTable.id, Number(rawId))).limit(1);
+      [row] = await db.select({
+      id: listingsTable.id, publicId: listingsTable.publicId, title: listingsTable.title,
+      price: listingsTable.price, category: listingsTable.category, subcategory: listingsTable.subcategory,
+      description: listingsTable.description, condition: listingsTable.condition, image: listingsTable.image,
+      views: listingsTable.views, watchers: listingsTable.watchers, status: listingsTable.status,
+      sellerEmail: listingsTable.sellerEmail, sellerName: listingsTable.sellerName, sellerUsername: listingsTable.sellerUsername,
+      tags: listingsTable.tags, extraCategories: listingsTable.extraCategories, specifications: listingsTable.specifications,
+      currency: listingsTable.currency, priceGbp: listingsTable.priceGbp,
+      createdAt: listingsTable.createdAt, updatedAt: listingsTable.updatedAt,
+    }).from(listingsTable).where(eq(listingsTable.id, Number(rawId))).limit(1);
     }
     if (!row) { res.status(404).json({ error: "not found" }); return; }
     if (row.status === "scheduled") {
