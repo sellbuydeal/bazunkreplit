@@ -14,6 +14,7 @@ import { CATEGORIES } from "@/data/categories";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { useCurrency, CURRENCIES, MARKET_COUNTRIES, type CurrencyCode } from "@/context/CurrencyContext";
+import { useLanguage, LANGUAGES, type LanguageCode } from "@/context/LanguageContext";
 import { MessageCenterOverlay } from "./MessageCenterOverlay";
 import { ThemeToggle } from "./ThemeToggle";
 import { useRawSettings } from "@/context/SiteSettingsContext";
@@ -100,6 +101,8 @@ export function Navbar() {
   const { user, logout } = useAuth();
   const { itemCount, openCart } = useCart();
   const { currency, setCurrency, formatPrice, country, setCountry } = useCurrency();
+  const { language, setLanguage, setLanguageForCountry, t } = useLanguage();
+  const changeCountry = (code: string) => { setCountry(code); setLanguageForCountry(code); };
   const featureSettings = useRawSettings();
   const visibleHref = (href:string) => { const f=featureForHref(href); return !f || isFeatureEnabled(featureSettings,f); };
   const [query, setQuery] = useState("");
@@ -199,9 +202,9 @@ export function Navbar() {
   const initial = user?.name?.charAt(0).toUpperCase() ?? "U";
 
   const primaryLinks = [
-    { href: "/browse", label: "Browse" },
-    { href: "/categories", label: "Categories" },
-    { href: "/live", label: "Live", live: true },
+    { href: "/browse", label: t("browse") },
+    { href: "/categories", label: t("categories") },
+    { href: "/live", label: t("live"), live: true },
   ].filter(x => visibleHref(x.href));
 
   return (
@@ -263,7 +266,7 @@ export function Navbar() {
                 data-testid="link-rewards"
               >
                 <Trophy className="w-3 h-3 text-amber-500" />
-                Rewards
+                {t("rewards")}
               </button>
               <AnimatePresence>
                 {rewardsPopover && !user && (
@@ -624,7 +627,7 @@ export function Navbar() {
           </div>
         </div>
         <form onSubmit={handleSubmit} className="lg:hidden px-4 pb-3 flex gap-2" role="search" aria-label="Search marketplace">
-          <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search listings…" aria-label="Search listings" className="min-w-0 flex-1 rounded-xl bg-gray-100 px-3 py-2 text-base text-gray-800" />
+          <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder={t("search")} aria-label="Search listings" className="min-w-0 flex-1 rounded-xl bg-gray-100 px-3 py-2 text-base text-gray-800" />
           <button type="submit" aria-label="Search" className="w-11 shrink-0 rounded-xl bg-[#4A5CE8] text-white flex items-center justify-center"><Search className="w-5 h-5" /></button>
         </form>
         {/* Brand colour accent */}
@@ -635,22 +638,26 @@ export function Navbar() {
       <div ref={currencyRef} className="fixed right-4 bottom-4 z-40 hidden md:block">
         <button onClick={() => setCurrencyOpen(!currencyOpen)}
           className="flex items-center gap-2 px-3.5 py-2 rounded-full border border-gray-200 text-sm font-semibold text-gray-700 bg-white shadow-lg hover:border-[#4A5CE8] hover:text-[#4A5CE8] transition-colors">
-          <span>{country.flag}</span><span>{country.name}</span><span className="text-gray-400">·</span><span>{currency.code} {currency.symbol}</span>
+          <span>{country.flag}</span><span>{country.name}</span><span className="text-gray-400">·</span><span>{currency.code} {currency.symbol}</span><span className="text-gray-400">·</span><span>{language.nativeName}</span>
           <ChevronDown className={`w-3 h-3 transition-transform ${currencyOpen ? "rotate-180" : ""}`} />
         </button>
         {currencyOpen && (
           <div className="absolute right-0 bottom-[calc(100%+8px)] w-72 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 p-3">
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Country</label>
-            <select value={country.code} onChange={e => setCountry(e.target.value)}
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{t("country")}</label>
+            <select value={country.code} onChange={e => changeCountry(e.target.value)}
               className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 mb-3">
               {MARKET_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}
             </select>
-            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Currency</label>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{t("currency")}</label>
             <select value={currency.code} onChange={e => setCurrency(e.target.value as CurrencyCode)}
               className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800">
               {(Object.values(CURRENCIES) as typeof CURRENCIES[CurrencyCode][]).map(c => <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.symbol})</option>)}
             </select>
-            <p className="mt-2 text-[11px] leading-relaxed text-gray-400">Changing country selects its normal currency automatically. You can override the currency afterwards.</p>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1 mt-3">{t("language")}</label>
+            <select value={language.code} onChange={e => setLanguage(e.target.value as LanguageCode)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800">
+              {Object.values(LANGUAGES).map(l => <option key={l.code} value={l.code}>{l.nativeName}</option>)}
+            </select>
+            <p className="mt-2 text-[11px] leading-relaxed text-gray-400">Changing country selects its normal currency and, until you choose a language yourself, its usual language. You can override both afterwards.</p>
           </div>
         )}
       </div>
@@ -776,7 +783,7 @@ export function Navbar() {
 
               <div className="px-5 py-3 border-t border-gray-100 flex items-center justify-between gap-3 shrink-0">
                 <ThemeToggle className="flex w-10 h-10 rounded-xl bg-gray-100 items-center justify-center" />
-                <div className="flex flex-col gap-1 text-xs text-gray-600"><label>Country<select value={country.code} onChange={e => setCountry(e.target.value)} className="ml-2 bg-gray-100 rounded-lg p-2 text-base">{MARKET_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select></label><label>Currency<select value={currency.code} onChange={e => setCurrency(e.target.value as CurrencyCode)} className="ml-2 bg-gray-100 rounded-lg p-2 text-base">{Object.values(CURRENCIES).map(c => <option key={c.code} value={c.code}>{c.code} {c.symbol}</option>)}</select></label></div>
+                <div className="flex flex-col gap-1 text-xs text-gray-600"><label>{t("country")}<select value={country.code} onChange={e => changeCountry(e.target.value)} className="ml-2 bg-gray-100 rounded-lg p-2 text-base">{MARKET_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.flag} {c.name}</option>)}</select></label><label>{t("currency")}<select value={currency.code} onChange={e => setCurrency(e.target.value as CurrencyCode)} className="ml-2 bg-gray-100 rounded-lg p-2 text-base">{Object.values(CURRENCIES).map(c => <option key={c.code} value={c.code}>{c.code} {c.symbol}</option>)}</select></label><label>{t("language")}<select value={language.code} onChange={e => setLanguage(e.target.value as LanguageCode)} className="ml-2 bg-gray-100 rounded-lg p-2 text-base">{Object.values(LANGUAGES).map(l => <option key={l.code} value={l.code}>{l.nativeName}</option>)}</select></label></div>
               </div>
               {/* Bottom auth actions */}
               {!user && (
