@@ -31,6 +31,12 @@ interface ApiListing {
   status: string;
   created_at: string;
   promotions?: string[];
+  publicId?: string | null;
+  public_id?: string | null;
+  shipOrigin?: string | null;
+  shipOriginOther?: string | null;
+  shipZone?: string | null;
+  shippingPrice?: string | number | null;
 }
 
 function mapApiListing(l: ApiListing): typeof ALL_PRODUCTS[0] & { subcategory?: string; promotions: string[] } {
@@ -42,11 +48,16 @@ function mapApiListing(l: ApiListing): typeof ALL_PRODUCTS[0] & { subcategory?: 
     category: l.category,
     subcategory: l.subcategory ?? undefined,
     promotions: l.promotions ?? [],
+    publicId: l.publicId ?? l.public_id ?? null,
+    shipOrigin: l.shipOrigin ?? null,
+    shipOriginOther: l.shipOriginOther ?? null,
+    shipZone: l.shipZone ?? null,
+    shippingPrice: l.shippingPrice ?? null,
     image: l.image ?? null,
     views: l.views ?? 0,
     watchers: l.watchers ?? 0,
     verified: false,
-    location: "UK",
+    location: l.shipOriginOther || l.shipOrigin || "UK",
     listed: l.created_at ?? new Date().toISOString(),
     seller: { name: l.seller_name ?? "Seller", verified: false, rating: 4.5, reviews: 0 },
     description: "",
