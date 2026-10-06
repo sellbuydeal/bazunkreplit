@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
+import { useCurrency } from "@/context/CurrencyContext";
 import { useState } from "react";
 
 const PILLS = [
@@ -73,6 +74,7 @@ const HERO_CATS = [
 ];
 
 export function Hero() {
+  const { currency, country } = useCurrency();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [sellOpen, setSellOpen] = useState(false);
@@ -105,18 +107,17 @@ export function Hero() {
           >
             <h1 className="sr-only">Buy, Sell, Deal, Get Rewarded on Bazunk</h1>
             <Link href="/welcome-new-buyers">
-              <a
-                className="block group rounded-2xl overflow-hidden mb-4 shadow-2xl shadow-black/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FACC15]"
-                aria-label="New buyer offer — learn more"
-              >
-                <img
-                  src="/new-buyer-home-banner.png"
-                  alt="New buyers: £5, $5 or €5 credit, first buyer protection fee covered by Bazunk, plus Buyer Protection"
-                  width={976}
-                  height={528}
-                  fetchPriority="high"
-                  className="block w-full aspect-[16/9] object-cover transition-transform duration-300 group-hover:scale-[1.01]"
-                />
+              <a className="block group rounded-2xl overflow-hidden mb-4 shadow-2xl shadow-black/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FACC15] bg-gradient-to-br from-[#061a4a] via-[#102c78] to-[#4a176f] text-white p-6 sm:p-8 min-h-[260px] flex items-center" aria-label="New buyer offer — learn more">
+                <div className="max-w-xl">
+                  <p className="text-xs sm:text-sm font-black tracking-[0.2em] text-yellow-300 uppercase">New buyers · {country.flag} {country.name}</p>
+                  <h2 className="mt-2 text-3xl sm:text-4xl font-black leading-tight">Get {currency.symbol}5 credit on us</h2>
+                  <p className="mt-2 text-white/80 font-semibold">For your 1st or 2nd qualifying purchase.</p>
+                  <div className="mt-5 space-y-2 text-sm sm:text-base text-white/90">
+                    <p>✓ Bazunk covers your Buyer Protection fee on your first qualifying purchase.</p>
+                    <p>✓ Buyer Protection applies if an eligible item doesn't arrive or isn't as described.</p>
+                  </div>
+                  <span className="inline-flex mt-6 rounded-full bg-yellow-400 text-slate-950 font-black px-5 py-2.5 group-hover:bg-yellow-300 transition-colors">Learn more →</span>
+                </div>
               </a>
             </Link>
 
