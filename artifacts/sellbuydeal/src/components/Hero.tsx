@@ -136,14 +136,6 @@ export function Hero() {
               </button>
             </div>
 
-            {/* Feature pills */}
-            <div className="flex flex-wrap gap-2">
-              {PILLS.map(({ icon: Icon, label }) => (
-                <span key={label} className="flex items-center gap-1.5 text-white/50 text-xs font-medium bg-white/5 border border-white/10 px-3 py-1.5 rounded-full hover:border-white/20 hover:text-white/70 transition-colors">
-                  <Icon className="w-3 h-3" /> {label}
-                </span>
-              ))}
-            </div>
           </motion.div>
 
           {/* ── Right panel — top categories ──────────── */}
@@ -151,8 +143,9 @@ export function Hero() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="hidden lg:grid grid-cols-3 gap-3 self-start"
+            className="hidden lg:flex flex-col gap-4 self-start"
           >
+            <div className="grid grid-cols-3 gap-3">
             {HERO_CATS.map(({ name, icon: Icon, color, href }, i) => (
               <motion.div
                 key={name}
@@ -175,6 +168,16 @@ export function Hero() {
                 </Link>
               </motion.div>
             ))}
+            </div>
+
+            {/* Marketplace type pills — aligned under categories */}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {PILLS.map(({ icon: Icon, label }) => (
+                <span key={label} className="flex items-center gap-1.5 text-white/50 text-xs font-medium bg-white/5 border border-white/10 px-3 py-1.5 rounded-full hover:border-white/20 hover:text-white/70 transition-colors">
+                  <Icon className="w-3 h-3" /> {label}
+                </span>
+              ))}
+            </div>
           </motion.div>
         </div>
       </div>
