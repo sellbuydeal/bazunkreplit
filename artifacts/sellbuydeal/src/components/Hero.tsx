@@ -86,7 +86,7 @@ export function Hero() {
   }
 
   return (
-    <section className="relative w-full overflow-hidden bg-[#1A1D2E] min-h-[560px] flex items-center">
+    <section className="relative w-full overflow-hidden bg-[#1A1D2E]">
       {/* Diagonal accent */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
         <div className="absolute -right-48 top-0 h-full w-[700px] bg-[#4A5CE8]/10"
@@ -94,8 +94,8 @@ export function Hero() {
         <div className="absolute right-32 -top-20 w-72 h-72 rounded-full bg-[#F26B21]/10 blur-3xl" />
       </div>
 
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-4 py-8 sm:py-12 lg:py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-12 items-center">
+      <div className="relative z-10 w-full max-w-6xl mx-auto px-4 py-7 lg:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)] gap-6 lg:gap-8 items-start">
 
           {/* ── Left panel ─────────────────────────────── */}
           <motion.div
@@ -110,16 +110,15 @@ export function Hero() {
               width={1672}
               height={941}
               fetchPriority="high"
-              className="block w-full h-auto rounded-2xl mb-6 shadow-2xl shadow-black/20"
+              className="block w-full aspect-[16/9] object-cover rounded-2xl mb-4 shadow-2xl shadow-black/20"
             />
 
-            <div className="flex flex-col sm:flex-row gap-3 mb-10">
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
               <Link href="/browse">
                 <button className="flex items-center justify-center gap-2 px-7 py-3.5 bg-[#F26B21] text-white font-black rounded-2xl hover:opacity-90 transition-opacity shadow-xl shadow-[#F26B21]/25 text-sm w-full sm:w-auto">
                   <ShoppingCart className="w-4 h-4" /> Start Shopping
                 </button>
               </Link>
-
 
 
               {/* Sell — flyout trigger */}
@@ -152,7 +151,7 @@ export function Hero() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="grid grid-flow-col auto-cols-[130px] overflow-x-auto pb-2 lg:pb-0 lg:overflow-visible lg:grid-flow-row lg:auto-cols-auto lg:grid-cols-3 gap-3"
+            className="hidden lg:grid grid-cols-3 gap-3 self-start"
           >
             {HERO_CATS.map(({ name, icon: Icon, color, href }, i) => (
               <motion.div
@@ -162,12 +161,12 @@ export function Hero() {
                 transition={{ delay: 0.3 + i * 0.05 }}
               >
                 <Link href={href}>
-                  <div className="bg-white/6 border border-white/10 rounded-2xl p-4 flex flex-col items-center gap-2.5 hover:bg-white/12 hover:border-white/25 hover:scale-105 transition-all duration-300 cursor-pointer group">
+                  <div className="bg-white/6 border border-white/10 rounded-2xl px-3 py-3.5 min-h-[96px] flex flex-col items-center justify-center gap-2 hover:bg-white/12 hover:border-white/25 hover:scale-[1.03] transition-all duration-300 cursor-pointer group">
                     <div
-                      className="w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
                       style={{ backgroundColor: color }}
                     >
-                      <Icon className="w-6 h-6 text-white" />
+                      <Icon className="w-5 h-5 text-white" />
                     </div>
                     <p className="text-white/65 text-[11px] font-semibold text-center leading-tight group-hover:text-white transition-colors">
                       {name}
@@ -200,7 +199,7 @@ export function Hero() {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
                 transition={{ duration: 0.2 }}
-                className="bg-white rounded-3xl shadow-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto"
+                className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Header */}
