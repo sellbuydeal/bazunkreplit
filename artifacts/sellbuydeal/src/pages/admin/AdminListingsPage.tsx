@@ -157,7 +157,9 @@ export function AdminListingsPage() {
               )}
               {!loading && listings.map(l => {
                 const isImported = l.public_id?.startsWith("BZK-DEMO-") ?? false;
-                const specs = parseSpecs(l.specifications);\n                const ebayItemId = specs.item_id ?? specs.own_ebay_item_id;\n                const ebayUrl = specs.ebay_url ?? (ebayItemId ? `https://www.ebay.co.uk/itm/${ebayItemId}` : undefined);
+                const specs = parseSpecs(l.specifications);
+                const ebayItemId = specs.item_id ?? specs.own_ebay_item_id;
+                const ebayUrl = specs.ebay_url ?? (ebayItemId ? `https://www.ebay.co.uk/itm/${ebayItemId}` : undefined);
                 return (
                   <tr key={l.id} className="border-t border-gray-50 hover:bg-gray-50/50">
                     {/* ID */}
