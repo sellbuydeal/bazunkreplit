@@ -5486,8 +5486,13 @@ export function DashboardPage() {
     const allIds = SIDEBAR_CATEGORIES.flatMap(c => c.items.length ? c.items.map(i => i.id) : [c.id]);
     return s && allIds.includes(s) ? s : "overview";
   });
+  const dashboardContentRef = useRef<HTMLElement>(null);
+  const [sectionNavigation, setSectionNavigation] = useState(0);
   const setActiveSection = (id: string) => {
     setActiveSectionRaw(id);
+    setSidebarOpen(false);
+    setActiveCategory(null);
+    setSectionNavigation(value => value + 1);
     setMobileExpandedCat(
       SIDEBAR_CATEGORIES.find(c => c.items.some(i => i.id === id))?.id ?? null
     );
@@ -5502,6 +5507,19 @@ export function DashboardPage() {
     return SIDEBAR_CATEGORIES.find(c => c.items.some(i => i.id === s))?.id ?? null;
   });
   const categoryMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!sectionNavigation || !window.matchMedia("(max-width: 1023px)").matches) return;
+    const frame = requestAnimationFrame(() => {
+      const content = dashboardContentRef.current;
+      if (!content) return;
+      const header = document.querySelector('[data-testid="link-logo"]')?.closest("nav");
+      const offset = (header?.getBoundingClientRect().height ?? 0) + 16;
+      window.scrollTo({ top: Math.max(0, content.getBoundingClientRect().top + window.scrollY - offset), behavior: "auto" });
+      content.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [sectionNavigation, activeSection]);
+
   useEffect(() => { const f=dashboardFeatureForItem[activeSection]; if (f && !isFeatureEnabled(rawSettings,f)) setActiveSectionRaw("overview"); }, [activeSection, rawSettings]);
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -5569,7 +5587,7 @@ export function DashboardPage() {
       <Navbar />
 
       {/* Mobile sticky sub-header */}
-      <div className="lg:hidden sticky top-0 z-20 flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shadow-sm">
+      <div className="lg:hidden relative z-20 flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 shadow-sm">
         <button
           onClick={() => {
             setSidebarOpen(true);
@@ -5596,7 +5614,7 @@ export function DashboardPage() {
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-[60] bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -5605,15 +5623,15 @@ export function DashboardPage() {
 
         {/* Sidebar — fixed drawer on mobile, static on desktop */}
         <aside className={`
-          fixed lg:static inset-y-0 left-0 z-40
-          w-72 lg:w-24 flex-shrink-0
+          fixed lg:static inset-y-0 left-0 z-[70] lg:z-40
+          w-72 max-w-[100vw] lg:w-24 flex-shrink-0
           flex flex-col
           bg-gray-100 lg:bg-transparent
           transition-transform duration-200
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
         `}>
           {/* Scrollable inner container */}
-          <div className="flex-1 overflow-y-auto overscroll-contain flex flex-col gap-3 pt-4 pb-8 px-4 lg:px-0 lg:pt-0 lg:pb-0 lg:overflow-visible">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col gap-3 pt-4 pb-8 px-4 lg:px-0 lg:pt-0 lg:pb-0 lg:overflow-visible">
 
             {/* Mobile close row */}
             <div className="lg:hidden flex items-center justify-between pb-1 flex-shrink-0">
@@ -5843,7 +5861,7 @@ export function DashboardPage() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 min-w-0">
+        <main ref={dashboardContentRef} tabIndex={-1} data-testid="dashboard-content" className="flex-1 min-w-0 focus:outline-none">
           <motion.div
             key={activeSection}
             initial={{ opacity: 0, y: 10 }}
