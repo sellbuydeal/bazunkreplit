@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useLanguage } from "@/context/LanguageContext";
 import { useSearch, useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -222,6 +223,7 @@ function ProductCard({ product, view, promotions = [] }: { product: typeof ALL_P
 }
 
 export function BrowsePage() {
+  const { t } = useLanguage();
   const rawSearch = useSearch();
   const [, setLocation] = useLocation();
 
@@ -1001,7 +1003,7 @@ export function BrowsePage() {
               className="fixed left-0 top-0 bottom-0 w-80 max-w-[100vw] bg-white z-50 overflow-y-auto overscroll-contain shadow-2xl md:hidden"
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-                <h2 className="font-bold text-gray-900">Filters</h2>
+                <h2 className="font-bold text-gray-900">{t("filters")}</h2>
                 <button onClick={() => setShowMobileFilters(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
                 </button>

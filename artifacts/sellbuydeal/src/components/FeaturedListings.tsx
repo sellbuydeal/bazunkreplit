@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { useLanguage } from "@/context/LanguageContext";
 import { motion } from "framer-motion";
 import { Heart, Eye, CheckCircle2, Flame, ArrowRight, Zap, Star, Crown, Package, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
@@ -66,6 +67,7 @@ function PromoBadge({ promotions }: { promotions: string[] }) {
 
 export function FeaturedListings() {
   const { formatPrice } = useCurrency();
+  const { t } = useLanguage();
   const [spotlightListings, setSpotlightListings] = useState<Listing[]>([]);
   const [recentListings, setRecentListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,7 +152,7 @@ export function FeaturedListings() {
               viewport={{ once: true }}
               className="text-xs font-black text-[#F26B21] uppercase tracking-widest mb-1"
             >
-              {hasSpotlight ? "Promoted Listings" : "Trending Today"}
+              {hasSpotlight ? t("promotedListings") : t("trendingToday")}
             </motion.p>
             <motion.h2
               initial={{ opacity: 0, y: 10 }}
@@ -158,7 +160,7 @@ export function FeaturedListings() {
               viewport={{ once: true }}
               className="text-2xl md:text-3xl font-black text-gray-900"
             >
-              {hasSpotlight ? "Homepage Spotlight" : "Featured Listings"}
+              {hasSpotlight ? t("homepageSpotlight") : t("featuredListings")}
             </motion.h2>
           </div>
 
@@ -181,7 +183,7 @@ export function FeaturedListings() {
 
             <Link href="/browse">
               <button className="flex items-center gap-1.5 text-sm font-bold text-[#4A5CE8] hover:text-[#3B4DD6] transition-colors ml-1">
-                Browse All <ArrowRight className="w-4 h-4" />
+                {t("browseAll")} <ArrowRight className="w-4 h-4" />
               </button>
             </Link>
           </div>
@@ -262,7 +264,7 @@ export function FeaturedListings() {
                 <ArrowRight className="w-5 h-5 text-[#4A5CE8]" />
               </div>
               <p className="text-sm font-bold text-gray-500 group-hover:text-[#4A5CE8] transition-colors text-center px-4">
-                Browse All Listings
+                {t("browseAllListings")}
               </p>
             </div>
           </Link>
