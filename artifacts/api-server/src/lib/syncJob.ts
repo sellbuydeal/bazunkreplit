@@ -22,7 +22,7 @@ interface ImportRow {
 
 export async function syncImport(importId: number): Promise<{ ok: boolean; error?: string }> {
   const rows = await db.execute(sql`
-    SELECT si.id, si.listing_id, si.supplier_id, si.supplier_source, si.markup_type, si.markup_value, si.supplier_url AS "supplierUrl", si.supplier_data AS "supplierData", l.seller_email AS "sellerEmail"
+    SELECT si.id, si.listing_id AS "listingId", si.supplier_id AS "supplierId", si.supplier_source AS "supplierSource", si.markup_type AS "markupType", si.markup_value AS "markupValue", si.supplier_url AS "supplierUrl", si.supplier_data AS "supplierData", l.seller_email AS "sellerEmail"
     FROM supplier_imports si JOIN listings l ON l.id=si.listing_id WHERE si.id = ${importId}
   `);
 
@@ -34,7 +34,7 @@ export async function syncImport(importId: number): Promise<{ ok: boolean; error
 
 export async function syncAllImports(): Promise<{ synced: number; errors: number }> {
   const rows = await db.execute(sql`
-    SELECT si.id, si.listing_id, si.supplier_id, si.supplier_source, si.markup_type, si.markup_value, si.supplier_url AS "supplierUrl", si.supplier_data AS "supplierData", l.seller_email AS "sellerEmail"
+    SELECT si.id, si.listing_id AS "listingId", si.supplier_id AS "supplierId", si.supplier_source AS "supplierSource", si.markup_type AS "markupType", si.markup_value AS "markupValue", si.supplier_url AS "supplierUrl", si.supplier_data AS "supplierData", l.seller_email AS "sellerEmail"
     FROM supplier_imports si JOIN listings l ON l.id=si.listing_id
     ORDER BY si.last_synced_at ASC NULLS FIRST
   `);
