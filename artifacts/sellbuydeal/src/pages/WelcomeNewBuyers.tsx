@@ -1,7 +1,10 @@
 import { Link } from "wouter";
 import { ArrowRight, ShieldCheck, Gift, BadgePercent } from "lucide-react";
+import { useCurrency } from "@/context/CurrencyContext";
 
 export default function WelcomeNewBuyers() {
+  const { currency } = useCurrency();
+  const credit = `${currency.symbol}5`;
   return (
     <main className="min-h-screen bg-[#071a42] text-white">
       <section className="max-w-6xl mx-auto px-4 py-8 md:py-12">
@@ -34,8 +37,8 @@ export default function WelcomeNewBuyers() {
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <Gift className="w-7 h-7 text-fuchsia-300 mb-3" />
-            <h2 className="font-black text-lg">£5 / $5 / €5 new-buyer credit</h2>
-            <p className="text-sm text-white/70 mt-1">Your local-currency credit is applied for your first or second qualifying purchase.</p>
+            <h2 className="font-black text-lg">{credit} new-buyer credit</h2>
+            <p className="text-sm text-white/70 mt-1">Your {credit} credit is applied for your first or second qualifying purchase.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <ShieldCheck className="w-7 h-7 text-emerald-300 mb-3" />
