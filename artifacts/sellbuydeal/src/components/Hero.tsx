@@ -8,6 +8,7 @@ import {
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { useState } from "react";
+import { NewBuyerPromo } from "./NewBuyerPromo";
 
 const PILLS = [
   { icon: Tag,       label: "Buy It Now"    },
@@ -180,6 +181,9 @@ export function Hero() {
             </div>
           </motion.div>
         </div>
+
+        {/* New-buyer incentive — visible before sign-up */}
+        <NewBuyerPromo />
       </div>
 
       {/* ── Sell flyout portal (escapes overflow-hidden) ── */}
