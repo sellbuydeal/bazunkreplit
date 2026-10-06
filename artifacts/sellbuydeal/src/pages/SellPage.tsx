@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { useCurrency } from "@/context/CurrencyContext";
 
 const SELL_OPTIONS = [
   {
@@ -170,7 +171,7 @@ function FeeCalculator() {
       </div>
 
       <div className="relative mb-5">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">£</span>
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">{currency.symbol}</span>
         <input
           type="number"
           min="0"
@@ -186,25 +187,25 @@ function FeeCalculator() {
         <div className="space-y-2.5">
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-500">Sale price</span>
-            <span className="font-bold text-gray-900">£{val.toFixed(2)}</span>
+            <span className="font-bold text-gray-900">{formatPrice(val)}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-500 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#F26B21] inline-block" />
               Private seller fee (0%)
             </span>
-            <span className="font-semibold text-[#F26B21]">£0.00</span>
+            <span className="font-semibold text-[#F26B21]">{formatPrice(0)}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
             <span className="text-gray-500 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#4A5CE8] inline-block" />
               Bazunk seller commission
             </span>
-            <span className="font-semibold text-[#4A5CE8]">£0.00</span>
+            <span className="font-semibold text-[#4A5CE8]">{formatPrice(0)}</span>
           </div>
           <div className="flex justify-between items-center text-sm font-bold border-t border-gray-100 pt-3 mt-1">
             <span className="text-gray-900">You receive</span>
-            <span className="text-emerald-600 text-base">£{net.toFixed(2)}</span>
+            <span className="text-emerald-600 text-base">{formatPrice(net)}</span>
           </div>
           <p className="text-xs text-gray-400 text-right">
             {val > 0 ? `${((net / val) * 100).toFixed(1)}% of sale price` : ""}
@@ -222,6 +223,7 @@ function FeeCalculator() {
 }
 
 export function SellPage() {
+  const { formatPrice, currency } = useCurrency();
   const rawSettings = useRawSettings();
   const mktRate = useMktRate(rawSettings);
   const mktRatePct = Math.round(mktRate * 100);
