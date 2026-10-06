@@ -27,7 +27,8 @@ interface Specs {
   asin?: string;
   source?: string;
   ebay_url?: string;
-  item_id?: string;\n  own_ebay_item_id?: string;
+  item_id?: string;
+  own_ebay_item_id?: string;
 }
 
 function parseSpecs(raw: string | null): Specs {
