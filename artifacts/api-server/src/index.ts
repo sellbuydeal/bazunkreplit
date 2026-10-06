@@ -93,6 +93,14 @@ async function runAppMigrations() {
       updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
     )
   `, "listings");
+  await run(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS ship_origin TEXT`, "listings.ship_origin");
+  await run(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS ship_origin_other TEXT`, "listings.ship_origin_other");
+  await run(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS ship_zone TEXT`, "listings.ship_zone");
+  await run(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS carrier TEXT`, "listings.carrier");
+  await run(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS shipping_price NUMERIC(10,2)`, "listings.shipping_price");
+  await run(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS handling_charge NUMERIC(10,2)`, "listings.handling_charge");
+  await run(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS quantity INTEGER`, "listings.quantity");
+  await run(sql`ALTER TABLE listings ADD COLUMN IF NOT EXISTS sku TEXT`, "listings.sku");
 
   await run(sql`
     CREATE TABLE IF NOT EXISTS listing_promotions (
