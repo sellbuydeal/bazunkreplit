@@ -338,14 +338,14 @@ function OffersSection() {
 }
 
 type ExtraCat = { category: string; subcategory: string };
-type StoredListing = { id: number; publicId?: string | null; title: string; price: number; views: number; watchers: number; image: string; status: string; description?: string; condition?: string; category?: string; subcategory?: string; extraCategories?: string; sellerEmail?: string };
+type StoredListing = { id: number; publicId?: string | null; title: string; price: number; views: number; watchers: number; image: string; status: string; description?: string; condition?: string; category?: string; subcategory?: string; extraCategories?: string; sellerEmail?: string; specifications?: string };
 
 async function fetchMyListings(email: string): Promise<StoredListing[]> {
   if (!email) return [];
   try {
     const res = await fetch(`/api/listings/mine?email=${encodeURIComponent(email)}`);
     if (!res.ok) return [];
-    const data: Array<{ id: number; publicId?: string | null; title: string; price: string; views: number; watchers: number; image: string | null; status: string; description?: string; condition?: string; category?: string; subcategory?: string; extraCategories?: string; seller_email?: string; sellerEmail?: string }> = await res.json();
+    const data: Array<{ id: number; publicId?: string | null; title: string; price: string; views: number; watchers: number; image: string | null; status: string; description?: string; condition?: string; category?: string; subcategory?: string; extraCategories?: string; seller_email?: string; sellerEmail?: string; specifications?: string }> = await res.json();
     return data.map((l) => ({
       id: l.id,
       publicId: l.publicId ?? null,
@@ -361,6 +361,7 @@ async function fetchMyListings(email: string): Promise<StoredListing[]> {
       subcategory: l.subcategory ?? "",
       extraCategories: l.extraCategories ?? "",
       sellerEmail: l.seller_email ?? l.sellerEmail,
+      specifications: l.specifications ?? "",
     }));
   } catch { return []; }
 }
@@ -811,11 +812,27 @@ function ListingActions({ listing, userEmail, onUpdated, onDeleted }: {
 function MyListingsSection({ userEmail }: { userEmail: string }) {
   const [listings, setListings] = useState<StoredListing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deletingBatch, setDeletingBatch] = useState(false);
 
   useEffect(() => {
     setLoading(true);
     fetchMyListings(userEmail).then((data) => { setListings(data); setLoading(false); });
   }, [userEmail]);
+
+  async function deleteSelected() {
+    if (!selectedIds.size || !confirm(`Delete ${selectedIds.size} selected listing${selectedIds.size === 1 ? "" : "s"}? This cannot be undone.`)) return;
+    setDeletingBatch(true);
+    const deleted: number[] = [];
+    for (const id of selectedIds) {
+      const res = await fetch(`/api/listings/${id}?email=${encodeURIComponent(userEmail)}`, { method: "DELETE" });
+      if (res.ok) deleted.push(id);
+    }
+    setListings(prev => prev.filter(l => !deleted.includes(l.id)));
+    setSelectedIds(prev => new Set([...prev].filter(id => !deleted.includes(id))));
+    setDeletingBatch(false);
+    if (deleted.length !== selectedIds.size) alert(`${deleted.length} deleted; ${selectedIds.size - deleted.length} could not be deleted.`);
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 flex flex-col" style={{ minHeight: 400 }}>
@@ -824,9 +841,12 @@ function MyListingsSection({ userEmail }: { userEmail: string }) {
           <h2 className="font-bold text-gray-900">My Listings</h2>
           <p className="text-xs text-gray-400 mt-0.5">{listings.length} listing{listings.length !== 1 ? "s" : ""}</p>
         </div>
-        <Link href="/sell/direct" className="flex items-center gap-1.5 text-sm font-semibold text-white bg-[#F26B21] px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && <button onClick={deleteSelected} disabled={deletingBatch} className="px-3 py-2 rounded-xl bg-red-50 text-red-600 text-sm font-semibold disabled:opacity-50">{deletingBatch ? "Deleting…" : `Delete selected (${selectedIds.size})`}</button>}
+          <Link href="/sell/direct" className="flex items-center gap-1.5 text-sm font-semibold text-white bg-[#F26B21] px-4 py-2 rounded-xl hover:opacity-90 transition-opacity">
           <Plus className="w-4 h-4" /> New Listing
-        </Link>
+          </Link>
+        </div>
       </div>
 
       {loading ? (
@@ -846,8 +866,19 @@ function MyListingsSection({ userEmail }: { userEmail: string }) {
         </div>
       ) : (
         <div className="divide-y divide-gray-50">
-          {listings.map((listing) => (
+          {listings.map((listing) => {
+            let source = "Bazunk";
+            try {
+              const specs = listing.specifications ? JSON.parse(listing.specifications) : {};
+              const raw = String(specs.source ?? "").toLowerCase();
+              if (raw.includes("ebay") || specs.ebay_url || specs.item_id || specs.own_ebay_item_id) source = "eBay";
+              else if (raw.includes("amazon") || specs.amazon_url || specs.asin) source = "Amazon";
+              else if (raw.includes("aliexpress")) source = "AliExpress";
+            } catch { /* keep Bazunk */ }
+            const imported = source !== "Bazunk" || (listing.publicId?.includes("-EBY-") ?? false);
+            return (
             <div key={listing.id} className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50/30 transition-colors group">
+              <input type="checkbox" aria-label={`Select ${listing.title}`} checked={selectedIds.has(listing.id)} onChange={e => setSelectedIds(prev => { const next=new Set(prev); e.target.checked ? next.add(listing.id) : next.delete(listing.id); return next; })} className="w-4 h-4 flex-shrink-0" />
               <Link href={`/listing/${listing.publicId ?? listing.id}`} className="w-14 h-14 rounded-xl bg-gray-50 border border-gray-100 flex-shrink-0 overflow-hidden block">
                 {listing.image ? (
                   <img src={listing.image} alt={listing.title} className="w-full h-full object-contain p-1.5" />
@@ -859,6 +890,10 @@ function MyListingsSection({ userEmail }: { userEmail: string }) {
               </Link>
               <Link href={`/listing/${listing.publicId ?? listing.id}`} className="flex-1 min-w-0 block">
                 <p className="text-sm font-semibold text-gray-800 line-clamp-1 group-hover:text-[#4A5CE8] transition-colors">{listing.title}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${imported ? "bg-blue-50 text-blue-700" : "bg-gray-100 text-gray-600"}`}>{imported ? "Imported" : "Bazunk listing"}</span>
+                  <span className="text-[10px] font-semibold text-gray-500">Source: {source}</span>
+                </div>
                 <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-3">
                   <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{listing.views} views</span>
                   <span className="flex items-center gap-1"><Users className="w-3 h-3" />{listing.watchers} watching</span>
@@ -879,7 +914,7 @@ function MyListingsSection({ userEmail }: { userEmail: string }) {
                 />
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
     </div>
