@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { useLanguage } from "@/context/LanguageContext";
 import { motion } from "framer-motion";
 import {
   Smartphone, Shirt, Armchair, Dumbbell, BookOpen, CarFront,
@@ -42,6 +43,8 @@ const BENTO = [
 ];
 
 export function CategorySection() {
+  const { t } = useLanguage();
+  const categoryKey: Record<string,string> = { "Electronics":"electronics", "Fashion":"fashion", "Gaming":"gaming", "Home & Garden":"homeGarden", "Sports":"sports", "Books":"books", "Collectibles":"collectibles", "Automotive":"automotive" };
   return (
     <section className="bg-gray-50 py-10 border-b border-gray-100">
       <div className="max-w-6xl mx-auto px-4">
@@ -61,7 +64,7 @@ export function CategorySection() {
                   <div className={`w-14 h-14 rounded-2xl ${bg} ring-4 ring-transparent group-hover:${ring} flex items-center justify-center shadow-sm group-hover:scale-105 transition-all`}>
                     <Icon className="w-6 h-6 text-white" />
                   </div>
-                  <p className="text-[11px] font-semibold text-gray-600 group-hover:text-gray-900 text-center leading-tight transition-colors">{name}</p>
+                  <p className="text-[11px] font-semibold text-gray-600 group-hover:text-gray-900 text-center leading-tight transition-colors">{t(categoryKey[name] || name, name)}</p>
                 </div>
               </Link>
             </motion.div>
@@ -77,7 +80,7 @@ export function CategorySection() {
                 <div className="w-14 h-14 rounded-2xl bg-gray-200 flex items-center justify-center group-hover:bg-gray-300 transition-colors">
                   <ArrowRight className="w-5 h-5 text-gray-600" />
                 </div>
-                <p className="text-[11px] font-semibold text-gray-500 group-hover:text-gray-900 text-center leading-tight transition-colors">All Categories</p>
+                <p className="text-[11px] font-semibold text-gray-500 group-hover:text-gray-900 text-center leading-tight transition-colors">{t("allCategories")}</p>
               </div>
             </Link>
           </motion.div>
@@ -106,7 +109,7 @@ export function CategorySection() {
                     </div>
                   </div>
                   <div className="relative z-10 flex items-center gap-1.5 text-white/80 text-xs font-bold group-hover:text-white transition-colors">
-                    Shop Now <ArrowRight className="w-3.5 h-3.5" />
+                    {t("shopNow")} <ArrowRight className="w-3.5 h-3.5" />
                   </div>
                 </div>
               </Link>
