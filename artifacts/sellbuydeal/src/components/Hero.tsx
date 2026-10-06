@@ -8,14 +8,15 @@ import {
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { useCurrency } from "@/context/CurrencyContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useState } from "react";
 
 const PILLS = [
-  { icon: Tag,       label: "Buy It Now"    },
-  { icon: Handshake, label: "Make an Offer" },
-  { icon: Gavel,     label: "Auctions"      },
-  { icon: Zap,       label: "Flash Sales"   },
-  { icon: Newspaper, label: "Classifieds"   },
+  { icon: Tag,       label: "buyNow"    },
+  { icon: Handshake, label: "makeOffer" },
+  { icon: Gavel,     label: "auctions"      },
+  { icon: Zap,       label: "flashSales"   },
+  { icon: Newspaper, label: "classifieds"   },
 ];
 
 const SELL_OPTIONS = [
@@ -75,6 +76,7 @@ const HERO_CATS = [
 
 export function Hero() {
   const { currency, country } = useCurrency();
+  const { t } = useLanguage();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [sellOpen, setSellOpen] = useState(false);
@@ -124,7 +126,7 @@ export function Hero() {
             <div className="flex flex-col sm:flex-row gap-3 mb-4">
               <Link href="/browse">
                 <button className="flex items-center justify-center gap-2 px-7 py-3.5 bg-[#F26B21] text-white font-black rounded-2xl hover:opacity-90 transition-opacity shadow-xl shadow-[#F26B21]/25 text-sm w-full sm:w-auto">
-                  <ShoppingCart className="w-4 h-4" /> Start Shopping
+                  <ShoppingCart className="w-4 h-4" /> {t("browse", "Start Shopping")}
                 </button>
               </Link>
 
@@ -134,7 +136,7 @@ export function Hero() {
                 onClick={handleSellClick}
                 className="flex items-center justify-center gap-2 px-7 py-3.5 border border-white/20 text-white font-bold rounded-2xl hover:bg-white/5 transition-colors text-sm w-full sm:w-auto"
               >
-                <Store className="w-4 h-4" /> Start Selling
+                <Store className="w-4 h-4" /> {t("directSale", "Start Selling")}
                 <svg
                   className={`w-3.5 h-3.5 ml-0.5 transition-transform duration-200 ${sellOpen ? "rotate-180" : ""}`}
                   fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -182,7 +184,7 @@ export function Hero() {
             <div className="flex flex-wrap gap-2 pt-1">
               {PILLS.map(({ icon: Icon, label }) => (
                 <span key={label} className="flex items-center gap-1.5 text-white/50 text-xs font-medium bg-white/5 border border-white/10 px-3 py-1.5 rounded-full hover:border-white/20 hover:text-white/70 transition-colors">
-                  <Icon className="w-3 h-3" /> {label}
+                  <Icon className="w-3 h-3" /> {t(label, label)}
                 </span>
               ))}
             </div>
