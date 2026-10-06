@@ -1008,7 +1008,7 @@ router.patch("/admin/listings/:id/image", async (req, res) => {
     const id = parseInt(req.params.id, 10);
     const image = typeof req.body?.image === "string" ? req.body.image.trim() : "";
     if (!Number.isInteger(id) || id < 1) { res.status(400).json({ error: "Invalid listing ID" }); return; }
-    if (image && !/^https:\\/\\//i.test(image)) { res.status(400).json({ error: "Image must be an HTTPS URL." }); return; }
+    if (image && !image.toLowerCase().startsWith("https://")) { res.status(400).json({ error: "Image must be an HTTPS URL." }); return; }
     if (image.length > 4000) { res.status(400).json({ error: "Image URL is too long." }); return; }
     const rows = await db.execute(sql`UPDATE listings SET image=${image || null}, updated_at=NOW() WHERE id=${id} RETURNING id,image`).then(r => r.rows);
     if (!rows.length) { res.status(404).json({ error: "Listing not found" }); return; }
