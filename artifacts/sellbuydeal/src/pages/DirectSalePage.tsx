@@ -32,6 +32,7 @@ import {
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { CATEGORIES } from "@/data/categories";
+import { useLanguage } from "@/context/LanguageContext";
 
 const CONDITIONS = [
   { id: "brand-new", label: "Brand New", desc: "Never used, in original packaging", icon: Tag },
@@ -130,6 +131,7 @@ export function DirectSalePage() {
   interface BuilderVariant { type: "size" | "colour"; options: BuilderOption[]; newLabel: string; newHex: string; newQty: string; }
 
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [title, setTitle] = useState("");
   const [currency, setCurrency] = useState("£ GBP");
   const [variantGroups, setVariantGroups] = useState<BuilderVariant[]>([]);
@@ -285,18 +287,18 @@ export function DirectSalePage() {
 
           {/* Header card */}
           <div className="rounded-t-2xl bg-gradient-to-r from-[#3B4FD8] to-[#1E3A8A] px-7 py-7 mb-0">
-            <h1 className="text-2xl font-bold text-white">Create Your Listing</h1>
-            <p className="text-blue-200 text-sm mt-1">Fill in the details below to list your item</p>
+            <h1 className="text-2xl font-bold text-white">{t("createListing")}</h1>
+            <p className="text-blue-200 text-sm mt-1">{t("fillDetails")}</p>
           </div>
 
           {/* Basic Information */}
           <section className="bg-white px-7 py-7 border-x border-b border-gray-100">
-            <h2 className="text-base font-bold text-gray-900 mb-5">Basic Information</h2>
+            <h2 className="text-base font-bold text-gray-900 mb-5">{t("basicInformation")}</h2>
 
             {/* Title */}
             <div className="mb-4">
               <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                Title <span className="text-red-500">*</span>
+                {t("title")} <span className="text-red-500">*</span>
               </label>
               <input
                 required
@@ -312,7 +314,7 @@ export function DirectSalePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-1">
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Currency & Price <span className="text-red-500">*</span>
+                  {t("currencyPrice")} <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
                   <div className="relative">
@@ -345,7 +347,7 @@ export function DirectSalePage() {
 
               <div>
                 <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Category <span className="text-red-500">*</span>
+                  {t("category")} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <select
@@ -355,7 +357,7 @@ export function DirectSalePage() {
                     className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2.5 pr-8 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]"
                     data-testid="select-category"
                   >
-                    <option value="">Select category</option>
+                    <option value="">{t("selectCategory")}</option>
                     {CATEGORIES.map((cat) => (
                       <option key={cat.slug} value={cat.slug}>{cat.name}</option>
                     ))}
@@ -1198,7 +1200,7 @@ export function DirectSalePage() {
                 data-testid="button-save-draft"
               >
                 <Save className="w-4 h-4" />
-                {draftSaved ? "Draft Saved!" : "Save Draft"}
+                {draftSaved ? "Draft Saved!" : "{t("saveDraft")}"}
               </button>
               <button
                 type="submit"
@@ -1207,7 +1209,7 @@ export function DirectSalePage() {
                 data-testid="button-publish-listing"
               >
                 <Bell className="w-4 h-4" />
-                {published ? "Published! Redirecting…" : publishing ? "Publishing…" : "Publish Listing"}
+                {published ? "Published! Redirecting…" : publishing ? "Publishing…" : "{t("publishListing")}"}
               </button>
             </div>
 
