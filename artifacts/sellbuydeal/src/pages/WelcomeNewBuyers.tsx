@@ -3,7 +3,7 @@ import { ArrowRight, ShieldCheck, Gift, BadgePercent } from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 
 export default function WelcomeNewBuyers() {
-  const { currency } = useCurrency();
+  const { currency, formatPrice } = useCurrency();
   const credit = `${currency.symbol}5`;
   return (
     <main className="min-h-screen bg-[#071a42] text-white">
@@ -32,7 +32,7 @@ export default function WelcomeNewBuyers() {
         <div className="grid md:grid-cols-3 gap-4 mt-6">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <BadgePercent className="w-7 h-7 text-sky-300 mb-3" />
-            <h2 className="font-black text-lg">First buyer protection fee: £0</h2>
+            <h2 className="font-black text-lg">First buyer protection fee: {formatPrice(0)}</h2>
             <p className="text-sm text-white/70 mt-1">Bazunk covers the buyer protection charge on your first qualifying purchase.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
