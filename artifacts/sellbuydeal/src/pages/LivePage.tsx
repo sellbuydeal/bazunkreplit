@@ -14,6 +14,7 @@ import { LiveKitViewer } from "@/components/LiveKitViewer";
 import { useCart } from "@/context/CartContext";
 import { LiveChat } from "@/components/LiveChat";
 import { AdSlot } from "@/components/AdSlot";
+import { useCurrency } from "@/context/CurrencyContext";
 
 function timeOnAir(startedAt: string): string {
   const mins = Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000);
@@ -167,6 +168,7 @@ type LiveProduct = { id: number; title: string; price: number | string; images: 
 
 /* ─── Live Room — /live/:id ─── */
 export function LivePage() {
+  const { formatPrice, currency } = useCurrency();
   const { id } = useParams<{ id: string }>();
   const { sessions, getFeatured } = useLiveStream();
   const { addToCart: addItem } = useCart();
@@ -477,11 +479,11 @@ export function LivePage() {
 
                   <div className="flex items-baseline gap-2 mb-2">
                     <p className="text-amber-400 font-black text-2xl">
-                      £{discountedPrice(featuredProduct.price, featuredItem.discount).toFixed(2)}
+                      {formatPrice(discountedPrice(featuredProduct.price, featuredItem.discount))}
                     </p>
                     {featuredItem.discount && (
                       <p className="text-gray-500 text-sm line-through">
-                        £{Number(featuredProduct.price).toFixed(2)}
+                        {formatPrice(Number(featuredProduct.price))}
                       </p>
                     )}
                   </div>
@@ -571,7 +573,7 @@ export function LivePage() {
                           {product.title}
                         </Link>
                         <p className="font-black text-[#F26B21] text-sm mt-0.5">
-                          £{Number(product.price).toFixed(2)}
+                          {formatPrice(Number(product.price))}
                         </p>
                         <p className="text-[10px] text-gray-500 capitalize mt-0.5">
                           {product.condition}
@@ -675,17 +677,17 @@ export function LivePage() {
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-white line-clamp-1">{offerProduct.title}</p>
                       <p className="text-xs text-[#F26B21] font-bold">
-                        Listed at £{Number(offerProduct.price).toFixed(2)}
+                        Listed at {formatPrice(Number(offerProduct.price))}
                       </p>
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-400 mb-1.5">
-                      Your offer (£)
+                      Your offer ({currency.symbol})
                     </label>
                     <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">£</span>
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">{currency.symbol}</span>
                       <input
                         type="number"
                         min="0"
@@ -698,7 +700,7 @@ export function LivePage() {
                       />
                     </div>
                     <p className="text-[10px] text-gray-500 mt-1">
-                      Suggested: £{(Number(offerProduct.price) * 0.7).toFixed(2)} – £{(Number(offerProduct.price) * 0.95).toFixed(2)}
+                      Suggested: {formatPrice(Number(offerProduct.price) * 0.7)} – {formatPrice(Number(offerProduct.price) * 0.95)}
                     </p>
                   </div>
 
