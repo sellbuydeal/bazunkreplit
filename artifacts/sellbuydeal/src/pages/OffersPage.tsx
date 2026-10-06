@@ -8,6 +8,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useOffers, type Offer, type OfferStatus } from "@/context/OfferContext";
 import { useAuth } from "@/context/AuthContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 const STATUS_CONFIG: Record<OfferStatus, { label: string; color: string; icon: typeof Clock }> = {
   pending:          { label: "Pending",          color: "bg-amber-100 text-amber-700 border-amber-200",   icon: Clock       },
@@ -73,16 +74,16 @@ function OfferCard({ offer }: { offer: Offer }) {
           <div className="flex flex-wrap gap-3 text-sm">
             <div>
               <p className="text-xs text-gray-400">Listed at</p>
-              <p className="font-bold text-gray-600 line-through">£{offer.listingPrice.toFixed(2)}</p>
+              <p className="font-bold text-gray-600 line-through">{formatPrice(offer.listingPrice)}</p>
             </div>
             <div>
               <p className="text-xs text-gray-400">Your offer</p>
-              <p className="font-black text-[#F26B21]">£{offer.offerPrice.toFixed(2)}</p>
+              <p className="font-black text-[#F26B21]">{formatPrice(offer.offerPrice)}</p>
             </div>
             {savings > 0 && (
               <div>
                 <p className="text-xs text-gray-400">Saving</p>
-                <p className="font-bold text-emerald-600">£{savings.toFixed(2)} ({savingsPct}%)</p>
+                <p className="font-bold text-emerald-600">{formatPrice(savings)} ({savingsPct}%)</p>
               </div>
             )}
           </div>
@@ -106,7 +107,7 @@ function OfferCard({ offer }: { offer: Offer }) {
             <MessageSquare className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <p className="text-xs font-semibold text-blue-700 mb-0.5">Seller made a counter offer</p>
-              <p className="text-sm font-black text-blue-800">£{offer.counterPrice.toFixed(2)}</p>
+              <p className="text-sm font-black text-blue-800">{formatPrice(offer.counterPrice)}</p>
               {offer.counterMessage && (
                 <p className="text-xs text-blue-600 mt-0.5 italic">"{offer.counterMessage}"</p>
               )}
@@ -117,7 +118,7 @@ function OfferCard({ offer }: { offer: Offer }) {
               onClick={() => respondToCounter(offer.id, true)}
               className="flex-1 py-2 rounded-xl bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition-colors"
             >
-              Accept £{offer.counterPrice.toFixed(2)}
+              Accept {formatPrice(offer.counterPrice)}
             </button>
             <button
               onClick={() => respondToCounter(offer.id, false)}
@@ -143,6 +144,7 @@ function OfferCard({ offer }: { offer: Offer }) {
 }
 
 export function OffersPage() {
+  const { formatPrice, currency } = useCurrency();
   const { user } = useAuth();
   const { offers } = useOffers();
   const [, setLocation] = useLocation();

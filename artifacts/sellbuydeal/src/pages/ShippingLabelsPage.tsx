@@ -9,6 +9,7 @@ import { useUser } from "@clerk/react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 type CarrierId = "inpost" | "evri" | "royal-mail";
 type ShipmentStatus =
@@ -188,6 +189,7 @@ function LabelModal({ shipment, onClose }: LabelModalProps) {
 type TabId = "pending" | "active" | "returns" | "history";
 
 export function ShippingLabelsPage() {
+  const { formatPrice, currency } = useCurrency();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { user: clerkUser } = useUser();
@@ -321,7 +323,7 @@ export function ShippingLabelsPage() {
                       </div>
                       <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
                         <span>→ {shipment.buyerName} · {shipment.buyerPostcode}</span>
-                        <span>£{shipment.saleAmount.toFixed(2)}</span>
+                        <span>{formatPrice(shipment.saleAmount)}</span>
                       </div>
                       {shipment.trackingNumber && (
                         <p className="text-xs font-mono text-[#4A5CE8] mt-1">

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Coins, TrendingUp, Gift, Star, Zap, Crown } from 'lucide-react';
+import { useCurrency } from '@/context/CurrencyContext';
 
 const TIERS = [
   {
@@ -7,7 +8,7 @@ const TIERS = [
     icon: '🏅',
     name: 'Bronze',
     rate: '1%',
-    spend: '£0+',
+    spendGbp: 0,
     perks: ['1% cashback on all purchases', 'Monthly payout to wallet', 'Access to Flash Sale early alerts'],
     color: 'from-amber-700 to-amber-900',
     border: 'border-amber-700/40',
@@ -18,7 +19,7 @@ const TIERS = [
     icon: '🥈',
     name: 'Silver',
     rate: '1.5%',
-    spend: '£250+',
+    spendGbp: 250,
     perks: ['1.5% cashback on all purchases', 'Weekly payout to wallet', 'Free listing boosts ×2/month', 'Priority buyer support'],
     color: 'from-slate-400 to-slate-600',
     border: 'border-slate-400/40',
@@ -29,7 +30,7 @@ const TIERS = [
     icon: '🥇',
     name: 'Gold',
     rate: '2%',
-    spend: '£750+',
+    spendGbp: 750,
     perks: ['2% cashback on all purchases', 'Instant payout on request', 'Exclusive Gold-only Flash Deals', 'Free listing boosts ×5/month', 'Dedicated account manager'],
     color: 'from-yellow-400 to-yellow-600',
     border: 'border-yellow-400/40',
@@ -41,7 +42,7 @@ const TIERS = [
     icon: '💎',
     name: 'Platinum',
     rate: '3%',
-    spend: '£2,000+',
+    spendGbp: 2000,
     perks: ['3% cashback on all purchases', 'Instant automated payouts', 'First access to new features', 'Unlimited free listing boosts', 'VIP support hotline', 'Exclusive Platinum auctions'],
     color: 'from-cyan-400 to-blue-600',
     border: 'border-cyan-400/40',
@@ -52,11 +53,12 @@ const TIERS = [
 const HOW_IT_WORKS = [
   { icon: Zap, title: 'Buy Anything', desc: 'Purchase any item on Bazunk — all categories qualify for cashback.' },
   { icon: TrendingUp, title: 'Cashback Accrues', desc: 'Your cashback % is automatically calculated and added to your rewards wallet.' },
-  { icon: Coins, title: 'Collect Your Cash', desc: 'Request a payout at any time (minimum £5). Funds hit your bank within 3 days.' },
+  { icon: Coins, title: 'Collect Your Cash', desc: 'Request a payout at any time. Funds hit your bank within 3 days.' },
   { icon: Crown, title: 'Climb the Tiers', desc: 'The more you spend, the higher your tier — and the more you earn back.' },
 ];
 
 export default function CashbackPage() {
+  const { formatPrice, currency } = useCurrency();
   const [calc, setCalc] = useState(100);
   const rate = calc >= 2000 ? 0.03 : calc >= 750 ? 0.02 : calc >= 250 ? 0.015 : 0.01;
   const earned = (calc * rate).toFixed(2);
@@ -119,13 +121,13 @@ export default function CashbackPage() {
           <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
             <label className="block text-white/50 text-sm mb-2">Monthly spend on Bazunk</label>
             <div className="flex items-center gap-3 mb-4">
-              <span className="text-white/50 font-bold">£</span>
+              <span className="text-white/50 font-bold">{currency.symbol}</span>
               <input
                 type="range" min={10} max={3000} value={calc}
                 onChange={e => setCalc(+e.target.value)}
                 className="flex-1 accent-[#F26B21]"
               />
-              <span className="text-white font-black w-20 text-right text-lg">£{calc}</span>
+              <span className="text-white font-black w-24 text-right text-lg">{formatPrice(calc)}</span>
             </div>
 
             <div className="bg-yellow-400/10 border border-yellow-400/20 rounded-xl p-5 mt-4">
@@ -135,11 +137,11 @@ export default function CashbackPage() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-white/60 text-sm">Monthly cashback</span>
-                <span className="text-yellow-400 font-black text-2xl">£{earned}</span>
+                <span className="text-yellow-400 font-black text-2xl">{formatPrice(+earned)}</span>
               </div>
               <div className="flex justify-between items-center mt-2 pt-2 border-t border-white/10">
                 <span className="text-white/60 text-sm">Annual cashback</span>
-                <span className="text-yellow-400 font-black text-xl">£{(+earned * 12).toFixed(2)}</span>
+                <span className="text-yellow-400 font-black text-xl">{formatPrice(+earned * 12)}</span>
               </div>
             </div>
           </div>
@@ -163,7 +165,7 @@ export default function CashbackPage() {
                 <div className="text-4xl mb-2">{tier.icon}</div>
                 <h3 className="text-white font-black text-2xl">{tier.name}</h3>
                 <div className="text-white font-black text-4xl mt-1">{tier.rate}</div>
-                <p className="text-white/70 text-sm">cashback · {tier.spend} spent</p>
+                <p className="text-white/70 text-sm">cashback · {formatPrice(tier.spendGbp)}+ spent</p>
               </div>
               <div className="p-5 flex-1">
                 <ul className="space-y-2.5">

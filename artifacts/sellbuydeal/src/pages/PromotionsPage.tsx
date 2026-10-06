@@ -10,6 +10,7 @@ import {
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
+import { useCurrency } from "@/context/CurrencyContext";
 import { ShareCardModal, type ShareListing } from "@/components/ShareCardModal";
 import { ListingAnalyticsModal } from "@/components/ListingAnalyticsModal";
 
@@ -252,7 +253,7 @@ const PROMOTIONS: Promotion[] = [
     perks: ["Set it and forget it", "Keeps your item fresh in search"],
   },
   {
-    id: "seller-promo", title: "Seller Promotions", description: "Buy 2 get 1, percentage off, spend £50 save £5 and multi-buy deals",
+    id: "seller-promo", title: "Seller Promotions", description: "Buy 2 get 1, percentage off, spend-based savings and multi-buy deals",
     credits: 199, duration: 30, icon: Percent, iconBg: "bg-red-50", iconColor: "text-red-500", mode: "soon",
     perks: ["Encourage buyers to buy more", "Set your own offers"],
   },
@@ -269,6 +270,7 @@ const PROMOTIONS: Promotion[] = [
 ];
 
 export function PromotionsPage() {
+  const { formatPrice } = useCurrency();
   const { user, refreshBalance } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -439,7 +441,7 @@ export function PromotionsPage() {
               <div className="inline-flex items-center gap-1.5 bg-white/20 text-white text-sm font-semibold px-3 py-1.5 rounded-lg">
                 <Coins className="w-4 h-4" />
                 {balanceLoading ? "…" : balanceCredits.toLocaleString()} credits available
-                <span className="text-white/60 text-xs font-normal">≈ £{(balanceCredits / 100).toFixed(2)}</span>
+                <span className="text-white/60 text-xs font-normal">≈ {formatPrice(balanceCredits / 100)}</span>
               </div>
               <Link
                 href="/credits"
@@ -511,7 +513,7 @@ export function PromotionsPage() {
                 <div className="flex items-center justify-between mb-4 mt-auto">
                   <div>
                     <span className="text-xl font-black text-gray-900">{promo.credits.toLocaleString()} cr</span>
-                    <span className="text-xs text-gray-400 ml-1.5">≈ £{(promo.credits / 100).toFixed(2)}</span>
+                    <span className="text-xs text-gray-400 ml-1.5">≈ {formatPrice(promo.credits / 100)}</span>
                   </div>
                   <span className="text-xs text-gray-400 font-medium">
                     {["follower-notify", "scheduled-listing", "reserve-auction", "auction-extension"].includes(promo.id) ? "one-off" : `${promo.duration} days`}
@@ -703,7 +705,7 @@ export function PromotionsPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-gray-900 truncate">{listing.title}</p>
                           <p className="text-xs text-gray-400 mt-0.5">
-                            £{parseFloat(listing.price).toFixed(2)} · {listing.category}
+                            {formatPrice(parseFloat(listing.price))} · {listing.category}
                           </p>
                         </div>
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
@@ -751,7 +753,7 @@ export function PromotionsPage() {
                     </div>
                     <div className="text-right flex-shrink-0 ml-3">
                       <p className="text-sm font-black text-[#4A5CE8]">{selectedPromo.credits.toLocaleString()} cr</p>
-                      <p className="text-[10px] text-gray-400">≈ £{(selectedPromo.credits / 100).toFixed(2)}</p>
+                      <p className="text-[10px] text-gray-400">≈ {formatPrice(selectedPromo.credits / 100)}</p>
                     </div>
                   </div>
                 )}

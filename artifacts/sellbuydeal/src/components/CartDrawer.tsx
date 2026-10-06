@@ -5,6 +5,7 @@ import {
   Shield, Truck, Tag, CheckCircle2,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useCurrency } from "@/context/CurrencyContext";
 
 const CONDITION_COLORS: Record<string, string> = {
   "new":      "bg-emerald-100 text-emerald-700",
@@ -17,6 +18,7 @@ const CONDITION_COLORS: Record<string, string> = {
 export function CartDrawer() {
   const { items, isOpen, closeCart, removeFromCart, updateQuantity, clearCart, itemCount, subtotal } = useCart();
   const [, setLocation] = useLocation();
+  const { formatPrice } = useCurrency();
 
   function goToCheckout() {
     closeCart();
@@ -151,7 +153,7 @@ export function CartDrawer() {
                         </div>
                         <div className="flex items-center justify-between mt-2">
                           <span className="text-sm font-bold text-gray-900">
-                            £{(item.product.price * item.quantity).toFixed(2)}
+                            {formatPrice(item.product.price * item.quantity)}
                           </span>
                           {/* Quantity stepper */}
                           <div className="flex items-center gap-1 bg-white rounded-lg border border-gray-200 p-0.5">
@@ -205,17 +207,17 @@ export function CartDrawer() {
                 <div className="space-y-1.5 text-sm">
                   <div className="flex justify-between text-gray-600">
                     <span>Subtotal ({itemCount} {itemCount === 1 ? "item" : "items"})</span>
-                    <span className="font-semibold text-gray-900">£{subtotal.toFixed(2)}</span>
+                    <span className="font-semibold text-gray-900">{formatPrice(subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-gray-600">
                     <span>Delivery</span>
                     <span className={`font-semibold ${delivery === 0 ? "text-emerald-600" : "text-gray-900"}`}>
-                      {delivery === 0 ? "FREE" : `£${delivery.toFixed(2)}`}
+                      {delivery === 0 ? "FREE" : formatPrice(delivery)}
                     </span>
                   </div>
                   <div className="flex justify-between text-base font-bold text-gray-900 pt-2 border-t border-gray-100">
                     <span>Total before Buyer Protection</span>
-                    <span>£{total.toFixed(2)}</span>
+                    <span>{formatPrice(total)}</span>
                   </div>
                   <div className="flex justify-between gap-3 text-gray-600">
                     <span>Buyer Protection</span>
