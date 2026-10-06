@@ -149,6 +149,7 @@ function buildFeeRows(mktRatePct: number) {
 }
 
 function FeeCalculator() {
+  const { formatPrice, currency } = useCurrency();
   const rawSettings = useRawSettings();
   const mktRate = useMktRate(rawSettings);
   const mktRatePct = Math.round(mktRate * 100);
