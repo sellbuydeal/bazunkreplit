@@ -5,7 +5,7 @@ import {
   Heart, Eye, Users, MapPin, CheckCircle2, Star, Share2,
   ShoppingCart, Tag, MessageSquare, Shield, Truck,
   ChevronLeft, ChevronRight, Package, Calendar, Flag, ArrowRight, Zap, TrendingUp,
-  BookOpen, Hash, Info, List, FileText, Flame, Phone, Mail,
+  BookOpen, Hash, Info, List, FileText, Flame, Phone, Mail, Globe2, Plane, Box, BadgeCheck,
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -186,7 +186,7 @@ function normaliseCondition(raw: unknown): string {
 }
 
 type SpecRow = { key: string; value: string };
-type ApiListingExtra = { _sellerEmail?: string; _sellerName?: string; _sellerUsername?: string; _publicId?: string | null; _promotions?: string[]; _tags?: string[]; _specifications?: SpecRow[]; subcategory?: string; extra_categories?: string };
+type ApiListingExtra = { _sellerEmail?: string; _sellerName?: string; _sellerUsername?: string; _publicId?: string | null; _promotions?: string[]; _tags?: string[]; _specifications?: SpecRow[]; subcategory?: string; extra_categories?: string; shipOrigin?: string; shipOriginOther?: string; shipZone?: string; carrier?: string; shippingPrice?: number; handlingCharge?: number; quantity?: number; sku?: string; listingCurrency?: string };
 
 const TAG_COLORS = [
   "bg-[#4A5CE8]/10 text-[#4A5CE8]",
@@ -213,7 +213,7 @@ function mapApiToProduct(l: Record<string, unknown>): typeof ALL_PRODUCTS[0] & A
     views: (l.views as number) ?? 0,
     watchers: (l.watchers as number) ?? 0,
     verified: (l.sellerVerified as boolean) ?? false,
-    location: "UK",
+    location: ((l.shipOriginOther as string) || (l.shipOrigin as string) || "UK"),
     listed: (l.createdAt as string) ?? new Date().toISOString(),
     description: (l.description as string) ?? "",
     extra_categories: (l.extraCategories as string) ?? "",
@@ -224,6 +224,15 @@ function mapApiToProduct(l: Record<string, unknown>): typeof ALL_PRODUCTS[0] & A
     _promotions: Array.isArray(l.promotions) ? (l.promotions as string[]) : [],
     _tags: tagsRaw,
     _specifications: parsedSpecs,
+    shipOrigin: (l.shipOrigin as string) ?? undefined,
+    shipOriginOther: (l.shipOriginOther as string) ?? undefined,
+    shipZone: (l.shipZone as string) ?? undefined,
+    carrier: (l.carrier as string) ?? undefined,
+    shippingPrice: l.shippingPrice != null ? Number(l.shippingPrice) : undefined,
+    handlingCharge: l.handlingCharge != null ? Number(l.handlingCharge) : undefined,
+    quantity: l.quantity != null ? Number(l.quantity) : undefined,
+    sku: (l.sku as string) ?? undefined,
+    listingCurrency: (l.currency as string) ?? undefined,
   } as unknown as typeof ALL_PRODUCTS[0] & ApiListingExtra;
 }
 
@@ -292,7 +301,7 @@ export function ListingPage() {
   const { addToCart, openCart } = useCart();
   const { addToWatchlist, removeFromWatchlist, isWatched } = useWatchlist();
   const { makeOffer } = useOffers();
-  const { formatPrice } = useCurrency();
+  const { formatPrice, country, currency } = useCurrency();
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [activeImg, setActiveImg] = useState(0);
   const [offerOpen, setOfferOpen] = useState(false);
@@ -685,6 +694,45 @@ export function ListingPage() {
                       </button>
                     </div>
                   </div>
+                </div>
+              );
+            })()}
+
+            {/* Shipping availability — based on the seller's Direct Sale choices */}
+            {(() => {
+              const x = product as typeof product & ApiListingExtra;
+              const origin = x.shipOriginOther || x.shipOrigin || product.location || "Not specified";
+              const domesticNames: Record<string, string> = { UK: "United Kingdom", US: "United States", EU: "European Union", CA: "Canada", AU: "Australia", Other: x.shipOriginOther || "seller's country" };
+              const zoneLabels: Record<string, string> = { domestic: domesticNames[x.shipOrigin || ""] || origin, europe: "Europe", worldwide: "Worldwide", international: "International" };
+              const destination = zoneLabels[x.shipZone || ""] || "Ask seller";
+              const domesticOnly = x.shipZone === "domestic";
+              const viewerMismatch = domesticOnly && country.name.toLowerCase() !== String(domesticNames[x.shipOrigin || ""] || origin).toLowerCase();
+              return (
+                <div className="rounded-2xl overflow-hidden border border-cyan-200 shadow-sm bg-white">
+                  <div className="bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-4 text-white">
+                    <h3 className="font-black flex items-center gap-2"><Globe2 className="w-5 h-5" /> Delivery & location</h3>
+                    <p className="text-xs text-white/85 mt-1">Check where this item is coming from before you buy</p>
+                  </div>
+                  <div className="p-5 grid sm:grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-cyan-50 border border-cyan-100 p-4"><p className="text-[11px] uppercase tracking-wider font-bold text-cyan-700">Ships from</p><p className="font-black text-gray-900 mt-1">{origin}</p></div>
+                    <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-4"><p className="text-[11px] uppercase tracking-wider font-bold text-indigo-700">Ships to</p><p className="font-black text-gray-900 mt-1">{destination}</p></div>
+                    {x.carrier && <div className="rounded-xl bg-violet-50 border border-violet-100 p-4"><p className="text-[11px] uppercase tracking-wider font-bold text-violet-700">Carrier</p><p className="font-bold text-gray-900 mt-1 capitalize">{x.carrier.replaceAll("-", " ")}</p></div>}
+                    <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-4"><p className="text-[11px] uppercase tracking-wider font-bold text-emerald-700">Postage</p><p className="font-black text-gray-900 mt-1">{x.shippingPrice == null || x.shippingPrice === 0 ? "Free / included" : formatPrice(x.shippingPrice)}</p></div>
+                  </div>
+                  {viewerMismatch && <div className="mx-5 mb-5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-900 font-semibold">You're browsing from {country.name}, but this seller currently ships this item only within {destination}. The price is still shown in {currency.code} for your convenience.</div>}
+                </div>
+              );
+            })()}
+
+            {/* Quick facts from the listing */}
+            {(() => {
+              const x = product as typeof product & ApiListingExtra;
+              return (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="rounded-2xl bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 p-4"><BadgeCheck className="w-5 h-5 text-orange-500 mb-2" /><p className="text-xs text-gray-500">Condition</p><p className="font-black text-gray-900 capitalize">{product.condition}</p></div>
+                  <div className="rounded-2xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-100 p-4"><Package className="w-5 h-5 text-violet-500 mb-2" /><p className="text-xs text-gray-500">Available</p><p className="font-black text-gray-900">{x.quantity ?? 1}</p></div>
+                  <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-100 p-4"><Box className="w-5 h-5 text-blue-500 mb-2" /><p className="text-xs text-gray-500">SKU</p><p className="font-bold text-gray-900 truncate">{x.sku || "Not specified"}</p></div>
+                  <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-4"><Plane className="w-5 h-5 text-emerald-500 mb-2" /><p className="text-xs text-gray-500">Listing currency</p><p className="font-black text-gray-900">{x.listingCurrency || "GBP"}</p></div>
                 </div>
               );
             })()}
