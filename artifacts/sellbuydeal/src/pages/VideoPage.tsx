@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 const videos = [
   { title: "Bazunk Promo", file: "bazunk-promo", description: "Discover buying, selling and rewards on Bazunk." },
   { title: "Bazunk, RIP Fluffy Advert", file: "bazunk-fluffy-advert", description: "Our first advert: a very special send-off for Fluffy." },
+  { title: "The Bazunk Chainsaw", file: "bazunk-chainsaw", description: "One branch. One chainsaw. Several extremely expensive consequences." },
 ];
 const asset = (name: string) => `${import.meta.env.BASE_URL}${name}`;
 
@@ -19,7 +20,7 @@ export default function VideoPage() {
       <main className="max-w-6xl mx-auto px-4 py-12 sm:py-16">
         <div className="rounded-3xl bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-700 p-8 sm:p-12 text-white mb-10">
           <Film className="w-10 h-10 text-yellow-300 mb-4" />
-          <h1 className="text-3xl sm:text-5xl font-black mb-3">Bazunk Videos</h1>
+          <h1 className="text-3xl sm:text-5xl font-black mb-3">Bazunk Promo Videos</h1>
           <p className="text-blue-100 text-lg">Meet the marketplace. Enjoy the adverts.</p>
         </div>
         <div className="grid gap-8 md:grid-cols-2">
