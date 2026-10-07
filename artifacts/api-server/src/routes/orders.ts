@@ -34,8 +34,8 @@ router.post("/orders", requireAdmin, async (req, res) => {
     VALUES (${id},${buyerEmail},${sellerEmail??null},${itemTitle},${itemImage??null},${parseFloat(price)},'pending',${address??null},${notes??null},NOW(),NOW())`);
   res.status(201).json({ id });
 });
-router.get("/orders", async (req,res)=>{ const email=req.query["email"] as string|undefined; if(!email){res.status(400).json({error:"email query param required"});return;} const rows=await db.execute(sql`SELECT o.*,(SELECT r.rating FROM reviews r WHERE r.order_id=o.id AND r.role='buyer_to_seller') AS my_review_rating FROM orders o WHERE o.buyer_email=${email} ORDER BY o.created_at DESC`);res.json(rows.rows); });
-router.get("/orders/:id", async(req,res)=>{const rows=await db.execute(sql`SELECT * FROM orders WHERE id=${req.params.id}`);if(!rows.rows.length){res.status(404).json({error:"Order not found"});return;}res.json(rows.rows[0]);});
+router.get("/orders", async (req,res)=>{ const email=await signedInEmail(req); if(!email){res.status(401).json({error:"Please sign in to view your orders"});return;} const rows=await db.execute(sql`SELECT o.*,(SELECT r.rating FROM reviews r WHERE r.order_id=o.id AND r.role='buyer_to_seller') AS my_review_rating FROM orders o WHERE LOWER(o.buyer_email)=LOWER(${email}) ORDER BY o.created_at DESC`);res.json(rows.rows); });
+router.get("/orders/:id", async(req,res)=>{const email=await signedInEmail(req);if(!email){res.status(401).json({error:"Please sign in"});return;}const rows=await db.execute(sql`SELECT * FROM orders WHERE id=${req.params.id} AND (LOWER(buyer_email)=LOWER(${email}) OR LOWER(COALESCE(seller_email,''))=LOWER(${email}))`);if(!rows.rows.length){res.status(404).json({error:"Order not found"});return;}res.json(rows.rows[0]);});
 
 router.post("/orders/:id/tracking/refresh", async(req,res)=>{
   if(!shippoEnabled()){res.status(503).json({error:"Shipment tracking is not configured yet"});return;}
