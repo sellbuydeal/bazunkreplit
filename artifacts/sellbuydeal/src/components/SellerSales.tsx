@@ -103,7 +103,7 @@ export function SellerSales() {
                 <div className="w-14 h-14 rounded-xl bg-gray-50 border border-gray-100 flex-shrink-0 overflow-hidden">
                   {s.item_image ? <img src={s.item_image} alt="" className="w-full h-full object-contain p-1.5" /> : <Package className="w-6 h-6 text-gray-300 m-4" />}
                 </div>
-                <div className="flex-1 min-w-[180px]">
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-gray-800 line-clamp-1">{s.item_title}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Buyer: {s.buyer_name} · {new Date(s.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
