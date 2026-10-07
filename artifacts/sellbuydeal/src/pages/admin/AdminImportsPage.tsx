@@ -1401,7 +1401,7 @@ export function AdminImportsPage() {
               </div>
               <h2 className="font-black text-gray-900 text-lg mb-2 text-center">AliExpress Importer</h2>
               <p className="text-sm text-gray-500 mb-5 text-center">
-                Paste an AliExpress product link, choose the category (same list as Quick Sell), set your markup and import it
+                Paste an AliExpress product link, choose the category (same list as Direct Sale), set your markup and import it
                 into the store of the seller below. Prices re-sync automatically.
               </p>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">Import into this seller's store</label>
