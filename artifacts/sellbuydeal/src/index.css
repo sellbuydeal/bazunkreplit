@@ -636,6 +636,34 @@
 
 }
 
+/* Native form controls: keep all plain inputs, textareas and selects readable in dark mode.
+   Explicit coloured/transparent controls can still override these rules with their own utilities. */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+.dark textarea {
+  background-color: hsl(var(--dk-card, 222 47% 14%));
+  color: hsl(43 60% 97%);
+  border-color: hsl(220 20% 28%);
+  color-scheme: dark;
+}
+.dark input:disabled,
+.dark textarea:disabled,
+.dark select:disabled {
+  opacity: .65;
+}
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus {
+  -webkit-text-fill-color: hsl(43 60% 97%);
+  -webkit-box-shadow: 0 0 0 1000px hsl(222 47% 14%) inset;
+  caret-color: hsl(43 60% 97%);
+}
+
+/* Tables and modal surfaces sometimes use browser/default backgrounds rather than
+   Tailwind utilities. Give them a safe dark baseline without changing branded rows. */
+.dark table { color: hsl(43 60% 97%); }
+.dark dialog,
+.dark [role="dialog"] { color: hsl(43 60% 97%); }
+
 /* Native dropdowns: permanent readable light/dark treatment.
    Custom popover/listbox components are unaffected because this targets only native select elements. */
 select {
