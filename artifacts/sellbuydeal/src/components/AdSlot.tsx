@@ -68,22 +68,29 @@ export function AdSlot({ slotKey, className = "" }: AdSlotProps) {
   if (slotKey === "browse_top") {
     if (!textTitle && !textBody) return null;
     return (
-      <div className={`w-full bg-amber-50 border-b border-amber-100 py-2 px-4 ${className}`}>
-        <div className="container mx-auto max-w-5xl flex items-center gap-3">
-          <span className="text-[9px] font-bold text-amber-400 tracking-widest uppercase flex-shrink-0">Ad</span>
-          <Megaphone className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-          {textTitle && <span className="font-bold text-sm text-gray-900 truncate">{textTitle}</span>}
-          {textBody && <span className="text-xs text-gray-500 truncate hidden sm:block">{textBody}</span>}
-          {textUrl && (
-            <a
-              href={textUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-auto flex-shrink-0 flex items-center gap-1 text-xs font-bold text-[#F26B21] hover:underline"
-            >
-              {textCta} <ExternalLink className="w-3 h-3" />
-            </a>
-          )}
+      <div className={`w-full py-4 px-4 ${className}`}>
+        <div className="container mx-auto max-w-6xl">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#4A4FF3] via-[#8B4FE8] to-[#EC3CB8] px-4 sm:px-6 py-4 sm:py-5 shadow-lg shadow-purple-950/15">
+            <div className="pointer-events-none absolute -right-10 -bottom-16 h-44 w-44 rounded-full bg-white/10" />
+            <div className="relative flex flex-col md:flex-row md:items-center gap-4">
+              <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+                <span className="rounded-md bg-yellow-300 px-2 py-1 text-[10px] font-black tracking-wide text-slate-900 flex-shrink-0">AD</span>
+                <span className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-2xl border border-white/20 bg-white/10 flex-shrink-0">
+                  <Megaphone className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                </span>
+                <div className="min-w-0 text-white">
+                  {textTitle && <p className="text-lg sm:text-xl font-black leading-tight">{textTitle}</p>}
+                  {textBody && <p className="mt-1 text-sm font-semibold text-white/90">{textBody}</p>}
+                </div>
+              </div>
+              {textUrl && (
+                <a href={textUrl} target={textUrl.startsWith("/") ? undefined : "_blank"} rel={textUrl.startsWith("/") ? undefined : "noopener noreferrer"}
+                  className="inline-flex min-h-12 flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-[#101C38] px-5 sm:px-7 py-3 text-sm font-black text-white shadow-md transition hover:bg-[#17264a]">
+                  {textCta} <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     );
