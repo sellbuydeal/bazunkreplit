@@ -452,7 +452,7 @@ export function AdminSettingsPage() {
                 <Megaphone className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-bold">Ad placements</p>
-                  <p className="text-xs text-blue-500 mt-0.5">Toggle each slot on to make it visible. Choose <strong>AdSense</strong> to paste Google AdSense code, or <strong>Text Ad</strong> for a built-in styled banner (no third-party script needed).</p>
+                  <p className="text-xs text-blue-500 mt-0.5">Toggle each slot on to make it visible. Choose <strong>Styled Banner</strong> to create a polished Bazunk promotional banner from the headline, body, link and button fields, or <strong>AdSense</strong> for Google advertising.</p>
                 </div>
               </div>
 
@@ -486,7 +486,7 @@ export function AdminSettingsPage() {
                           <label className="block text-sm font-semibold text-gray-700 mb-2">Ad Type</label>
                           <div className="flex gap-2">
                             {([
-                              { value: "text",    label: "Text Ad" },
+                              { value: "text",    label: "Styled Banner" },
                               { value: "adsense", label: "Google AdSense" },
                               { value: "custom",  label: "Custom HTML" },
                             ] as const).map(({ value: t, label }) => (
@@ -532,6 +532,16 @@ export function AdminSettingsPage() {
                           </div>
                         ) : (
                           <div className="space-y-3">
+                            <div className="rounded-2xl bg-gradient-to-r from-[#4A4FF3] via-[#8B4FE8] to-[#EC3CB8] p-4 text-white shadow-sm">
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[10px] font-black text-yellow-300 uppercase tracking-wider">AD · Live preview</p>
+                                  <p className="font-black text-lg mt-1">{s[`ad_${slot.key}_text_title`] || "Your headline"}</p>
+                                  <p className="text-sm text-white/85 mt-0.5">{s[`ad_${slot.key}_text_body`] || "Your supporting message appears here."}</p>
+                                </div>
+                                <span className="rounded-xl bg-[#101C38] px-5 py-3 text-sm font-black text-center">{s[`ad_${slot.key}_text_cta`] || "Learn More"} ›</span>
+                              </div>
+                            </div>
                             <div>
                               <label className="block text-sm font-semibold text-gray-700 mb-1.5">Headline</label>
                               <input
@@ -552,7 +562,7 @@ export function AdminSettingsPage() {
                                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#4A5CE8]/30 focus:border-[#4A5CE8]"
                               />
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div>
                                 <label className="block text-sm font-semibold text-gray-700 mb-1.5">Destination URL</label>
                                 <input
