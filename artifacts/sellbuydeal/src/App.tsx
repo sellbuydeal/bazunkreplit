@@ -35,6 +35,7 @@ import { SellPage } from "@/pages/SellPage";
 import { DirectSalePage } from "@/pages/DirectSalePage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { ImportersPage } from "@/pages/ImportersPage";
+import { ImporterWorkspacePage } from "@/pages/ImporterWorkspacePage";
 import { BrowsePage } from "@/pages/BrowsePage";
 import { ListingPage } from "@/pages/ListingPage";
 import { CheckoutPage } from "@/pages/CheckoutPage";
@@ -259,6 +260,7 @@ function Router() {
       <Route path="/sell/direct">{() => <FeatureGate feature="quick_sell" name="Direct Sale"><DirectSalePage /></FeatureGate>}</Route>
       <Route path="/sell/quick">{() => <FeatureGate feature="quick_sell" name="Direct Sale"><DirectSalePage /></FeatureGate>}</Route>
       <Route path="/dashboard" component={DashboardPage} />
+      <Route path="/importers/:source">{() => <FeatureGate feature="importers" name="Importers"><ImporterWorkspacePage /></FeatureGate>}</Route>
       <Route path="/importers">{() => <FeatureGate feature="importers" name="Importers"><ImportersPage /></FeatureGate>}</Route>
       <Route path="/browse" component={BrowsePage} />
       <Route path="/search" component={BrowsePage} />
