@@ -112,7 +112,8 @@ export async function sendOutbidNotification(opts: {
     <p>You can still win — the minimum next bid is <strong>£${minNextBid.toFixed(2)}</strong>.</p>
     <p><a class="btn" href="${SITE}/auctions/${auctionId}">Bid Again</a></p>
   `);
-  await send(email, `You've been outbid on "${auctionTitle}"`, html);
+  const t=await editableTemplate("outbid",`You\'ve been outbid on "{{auction_title}}"`,`You\'ve been outbid on {{auction_title}}.\n\nNew bid: £{{new_bid}}\nMinimum next bid: £{{min_next_bid}}\n\nBid again: {{auction_url}}`,{auction_title:auctionTitle,new_bid:newBidAmount.toFixed(2),min_next_bid:minNextBid.toFixed(2),auction_url:`${SITE}/auctions/${auctionId}`});
+  await send(email,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/auctions/${auctionId}">Bid Again</a></p>`));
 }
 
 export async function sendAuctionWonNotification(opts: {
