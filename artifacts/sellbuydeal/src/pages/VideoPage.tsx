@@ -27,7 +27,7 @@ export default function VideoPage() {
           {videos.map(video => (
             <article key={video.file} className="rounded-2xl bg-white shadow-sm border border-slate-200 overflow-hidden">
               <button type="button" aria-label={`Play ${video.title}`} onClick={() => { setFailed(false); setSelected(video); }} className="relative block w-full aspect-video group focus-visible:outline focus-visible:outline-4 focus-visible:outline-blue-600">
-                <img src={asset(`${video.file}-poster.jpg`)} alt={`Preview of ${video.title}`} width={960} height={540} className="w-full h-full object-cover" loading="lazy" />
+                <img src={asset(`${video.file}-poster.${video.file === "bazunk-chainsaw" ? "png" : "jpg"}`)} alt={`Preview of ${video.title}`} width={960} height={540} className="w-full h-full object-cover" loading="lazy" />
                 <span className="absolute inset-0 bg-black/15 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                   <span className="rounded-full bg-white text-blue-700 p-5 shadow-xl group-hover:scale-110 transition-transform"><Play className="w-7 h-7 fill-current" aria-hidden="true" /></span>
                 </span>
@@ -42,7 +42,7 @@ export default function VideoPage() {
         <DialogContent className="w-[calc(100%_-_2rem)] max-w-5xl bg-slate-950 border-slate-700 text-white p-4 sm:p-6 rounded-2xl max-h-[90dvh] overflow-y-auto">
           <DialogTitle className="pr-8">{selected?.title}</DialogTitle>
           <DialogDescription className="sr-only">Video player with playback, volume and fullscreen controls. Close with the close button or Escape.</DialogDescription>
-          {selected && <video key={selected.file} src={asset(`${selected.file}.mp4`)} poster={asset(`${selected.file}-poster.jpg`)} controls autoPlay playsInline preload="metadata" aria-label={selected.title} onError={() => setFailed(true)} className="w-full max-h-[70dvh] aspect-video object-contain bg-black rounded-lg">Your browser does not support video playback.</video>}
+          {selected && <video key={selected.file} src={asset(`${selected.file}.mp4`)} poster={asset(`${selected.file}-poster.${selected.file === "bazunk-chainsaw" ? "png" : "jpg"}`)} controls autoPlay playsInline preload="metadata" aria-label={selected.title} onError={() => setFailed(true)} className="w-full max-h-[70dvh] aspect-video object-contain bg-black rounded-lg">Your browser does not support video playback.</video>}
           {failed && <p role="alert" className="text-red-300">The video could not load. Please close the player and try again.</p>}
         </DialogContent>
       </Dialog>
