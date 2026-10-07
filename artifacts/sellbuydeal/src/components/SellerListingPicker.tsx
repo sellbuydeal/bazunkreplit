@@ -106,7 +106,7 @@ export function SellerListingPicker(props: Props) {
             <p className="text-xs text-gray-400">Add a listing first to import its details here</p>
           </div>
         </div>
-        <Link href="/sell/quick"
+        <Link href="/sell/direct"
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#4A5CE8] text-white text-xs font-bold hover:opacity-90 transition-opacity whitespace-nowrap flex-shrink-0">
           <Plus className="w-3 h-3" /> Add Listing
         </Link>
