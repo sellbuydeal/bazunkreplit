@@ -126,6 +126,7 @@ type MockOrder = {
   trackingNumber?: string; carrier?: string; estimatedDelivery?: string;
   address?: string; trackingStep: number;
   rawStatus?: string; reviewRating?: number | null;
+  trackingStatus?: string; trackingLastEvent?: string; trackingUpdatedAt?: string; trackingHistory?: any[];
 };
 type MockReturn = {
   id: string; orderId: string; title: string; price: number;
@@ -169,6 +170,10 @@ function toDashboardOrder(o: any): MockOrder {
     trackingStep: ui.step,
     rawStatus: String(o.status),
     reviewRating: o.my_review_rating ?? null,
+    trackingStatus: o.tracking_status ?? undefined,
+    trackingLastEvent: o.tracking_last_event ?? undefined,
+    trackingUpdatedAt: o.tracking_updated_at ?? undefined,
+    trackingHistory: Array.isArray(o.tracking_history) ? o.tracking_history : [],
   };
 }
 
@@ -3632,6 +3637,19 @@ function OrdersSection() {
                 )}
               </div>
             </div>
+
+            {/* Live carrier update */}
+            {(trackingOrder.trackingStatus || trackingOrder.trackingLastEvent) && (
+              <div className="mx-6 mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div><p className="text-xs font-black uppercase tracking-wider text-blue-600">Live carrier status</p>
+                  <p className="font-bold text-gray-900 mt-1">{trackingOrder.trackingStatus || "Tracking active"}</p></div>
+                  <Truck className="w-5 h-5 text-blue-500" />
+                </div>
+                {trackingOrder.trackingLastEvent && <p className="text-sm text-gray-600 mt-2">{trackingOrder.trackingLastEvent}</p>}
+                {trackingOrder.trackingUpdatedAt && <p className="text-xs text-gray-400 mt-2">Updated {new Date(trackingOrder.trackingUpdatedAt).toLocaleString("en-GB")}</p>}
+              </div>
+            )}
 
             {/* Timeline */}
             <div className="px-6 py-5">
