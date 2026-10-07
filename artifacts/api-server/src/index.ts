@@ -566,6 +566,11 @@ async function runAppMigrations() {
   // ── Reviews & seller reputation ──
   await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMP WITH TIME ZONE`, "orders.shipped_at");
   await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP WITH TIME ZONE`, "orders.delivered_at");
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_status TEXT`, "orders.tracking_status");
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_eta TIMESTAMP WITH TIME ZONE`, "orders.tracking_eta");
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_last_event TEXT`, "orders.tracking_last_event");
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_updated_at TIMESTAMP WITH TIME ZONE`, "orders.tracking_updated_at");
+  await run(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_history JSONB NOT NULL DEFAULT '[]'::jsonb`, "orders.tracking_history");
   await run(sql`
     CREATE TABLE IF NOT EXISTS reviews (
       id BIGSERIAL PRIMARY KEY,
