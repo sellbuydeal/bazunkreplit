@@ -2,9 +2,9 @@ import { useState, useMemo, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ChevronLeft, ChevronRight, Tag, Coins, CheckCircle2, X,
-  Lock, ShoppingBag, Truck, Shield, Gift,
-  Package, AlertCircle, Sparkles, Layers, Loader2,
+  ChevronLeft, ChevronRight, CheckCircle2,
+  Lock, ShoppingBag, Truck, Shield,
+  Package, AlertCircle, Loader2,
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -12,14 +12,6 @@ import { BuyerProtectionBadge } from "@/components/BuyerProtectionBadge";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { useCurrency } from "@/context/CurrencyContext";
-
-const PROMO_CODES: Record<string, { type: "percent" | "fixed"; value: number; label: string; source: "site" | "seller" }> = {
-  SAVE10:    { type: "percent", value: 10,  label: "10% off your order",           source: "site" },
-  WELCOME20: { type: "percent", value: 20,  label: "20% off for new members",      source: "site" },
-  SELLER5:   { type: "fixed",   value: 5,   label: "5-unit seller discount",     source: "seller" },
-  DEAL15:    { type: "percent", value: 15,  label: "15% off — Bazunk promo",  source: "site" },
-  NEWUSER:   { type: "fixed",   value: 10,  label: "10-unit new user credit",          source: "site" },
-};
 
 type Step = "summary" | "redirecting";
 
@@ -60,10 +52,6 @@ export function CheckoutPage() {
   const { formatPrice, currency } = useCurrency();
 
   const [step, setStep] = useState<Step>("summary");
-  const [promoCode, setPromoCode] = useState("");
-  const [promoInput, setPromoInput] = useState("");
-  const [promoError, setPromoError] = useState("");
-  const [useCredits, setUseCredits] = useState(false);
   const [placed, setPlaced] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
@@ -90,9 +78,6 @@ export function CheckoutPage() {
   const delivery=quote?.delivery??0;
   const buyerProtectionFee=quote?.buyerProtectionFee??0;
   const total=quote?.total??0;
-  const promoDiscount=0,creditsApplied=0;
-  const appliedPromo=null as {label:string;source:string}|null;
-  const userCredits=user?.balance??0;
 
   // Detect return from Stripe checkout
   useEffect(() => {
@@ -128,18 +113,6 @@ export function CheckoutPage() {
     if (placed && user?.email) refreshBalance();
   }, [placed, user?.email]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function applyPromo() {
-    setPromoError("");
-    const code = promoInput.trim().toUpperCase();
-    if (!code) return;
-    if (PROMO_CODES[code]) {
-      setPromoCode(code);
-      setPromoInput("");
-    } else {
-      setPromoError("Code not recognised. Try SAVE10 or SELLER5.");
-    }
-  }
-
   async function handleContinueToPayment() {
     const email = user?.email ?? guestEmail.trim();
     if (!/^\S+@\S+\.\S+$/.test(email)) {
@@ -167,7 +140,6 @@ export function CheckoutPage() {
             priceGbp: i.product.priceGbp,
           })),
           expectedTotal:total,
-          creditsApplied:0,
           deliveryGbp: delivery,
         }),
       });
@@ -332,7 +304,7 @@ export function CheckoutPage() {
 
                 {!user && (
                   <p className="text-center text-xs text-gray-400 mt-2">
-                    <Link href="/sign-in" className="text-[#4A5CE8] underline">Sign in</Link> to track your orders
+                    Checkout as a guest. After purchase, create or sign in to a Bazunk account using this same email address to see and track this order.
                   </p>
                 )}
               </motion.div>
@@ -368,18 +340,6 @@ export function CheckoutPage() {
                   <span>Subtotal</span>
                   <span className="font-semibold text-gray-900">{formatPrice(subtotal)}</span>
                 </div>
-                {appliedPromo && (
-                  <div className="flex justify-between text-emerald-600">
-                    <span className="flex items-center gap-1"><Tag className="w-3 h-3" /> {promoCode}</span>
-                    <span className="font-semibold">−{formatPrice(promoDiscount)}</span>
-                  </div>
-                )}
-                {useCredits && creditsApplied > 0 && (
-                  <div className="flex justify-between text-amber-600">
-                    <span className="flex items-center gap-1"><Coins className="w-3 h-3" /> {Math.round(creditsApplied * 100).toLocaleString()} credits</span>
-                    <span className="font-semibold">−{formatPrice(creditsApplied)}</span>
-                  </div>
-                )}
                 <div className="flex justify-between text-gray-600">
                   <span className="flex items-center gap-1">Buyer Protection <Link href="/buyer-protection" className="text-[#4A5CE8] underline text-xs">Learn more</Link></span>
                   <span className="font-semibold text-gray-900">{quoteLoading ? "Calculating…" : !quote ? "Unavailable" : buyerProtectionFee>0 ? formatPrice(buyerProtectionFee) : "Included"}</span>
@@ -397,12 +357,6 @@ export function CheckoutPage() {
                 </div>
               </div>
 
-              {(promoDiscount > 0 || creditsApplied > 0) && (
-                <div className="mt-3 bg-emerald-50 rounded-xl px-3 py-2 text-xs text-emerald-700 font-semibold flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  You're saving {formatPrice(promoDiscount + creditsApplied)} on this order!
-                </div>
-              )}
 
               <div className="mt-4 space-y-2">
                 {[
