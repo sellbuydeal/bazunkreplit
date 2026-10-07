@@ -636,6 +636,32 @@
 
 }
 
+/* Native dropdowns: permanent readable light/dark treatment.
+   Custom popover/listbox components are unaffected because this targets only native select elements. */
+select {
+  color-scheme: light;
+}
+select option,
+select optgroup {
+  background-color: #ffffff;
+  color: #111827;
+}
+.dark select {
+  color-scheme: dark;
+  background-color: #111827;
+  color: #f9fafb;
+  border-color: #374151;
+}
+.dark select option,
+.dark select optgroup {
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+}
+.dark select option:checked {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
 /* Soft cross-fade when switching (skipped for people who prefer less motion) */
 @media (prefers-reduced-motion: no-preference) {
   html.theme-switching, html.theme-switching *, html.theme-switching *::before, html.theme-switching *::after {
