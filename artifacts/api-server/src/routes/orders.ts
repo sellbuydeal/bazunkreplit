@@ -59,6 +59,23 @@ router.post("/orders/:id/tracking/refresh", async(req,res)=>{
 });
 router.patch("/orders/:id/status",async(req,res)=>{const {status,trackingNumber,carrier,estimatedDelivery,buyerEmail}=req.body as Record<string,string>;if(!status||!VALID_STATUSES.includes(status)){res.status(400).json({error:"Valid status required"});return;}await db.execute(sql`UPDATE orders SET status=${status},tracking_number=COALESCE(${trackingNumber??null},tracking_number),carrier=COALESCE(${carrier??null},carrier),estimated_delivery=COALESCE(${estimatedDelivery??null},estimated_delivery),shipped_at=CASE WHEN ${status} IN ('shipped','out_for_delivery','delivered') THEN COALESCE(shipped_at,NOW()) ELSE shipped_at END,delivered_at=CASE WHEN ${status}='delivered' THEN COALESCE(delivered_at,NOW()) ELSE delivered_at END,updated_at=NOW() WHERE id=${req.params.id} AND buyer_email=${buyerEmail??""}`);res.json({ok:true});});
 
+router.post("/admin/orders/test-sale", requireAdmin, async(req,res)=>{
+  const buyerEmail=String(req.body?.buyerEmail||"").trim().toLowerCase();
+  const sellerEmail=String(req.body?.sellerEmail||"").trim().toLowerCase();
+  const itemTitle=String(req.body?.itemTitle||"Shippo Tracking Test Item").trim().slice(0,200);
+  if(!buyerEmail||!sellerEmail){res.status(400).json({error:"Buyer and seller emails are required"});return;}
+  if(buyerEmail===sellerEmail){res.status(400).json({error:"Buyer and seller must be different accounts"});return;}
+  const users=await db.execute(sql`SELECT LOWER(email) email FROM users WHERE LOWER(email) IN (LOWER(${buyerEmail}),LOWER(${sellerEmail}))`);
+  const found=new Set((users.rows as any[]).map(x=>String(x.email)));
+  if(!found.has(buyerEmail)||!found.has(sellerEmail)){res.status(400).json({error:"Both emails must belong to existing Bazunk accounts"});return;}
+  const id=`TEST-${randomUUID().slice(0,8).toUpperCase()}`;
+  await db.execute(sql`INSERT INTO orders
+    (id,buyer_email,seller_email,item_title,price,status,notes,buyer_protection_fee,seller_fee,seller_net,delivery_fee,buyer_total,payout_status,created_at,updated_at)
+    VALUES(${id},${buyerEmail},${sellerEmail},${itemTitle},0,'confirmed','ADMIN TEST SALE — no Stripe charge or payout',0,0,0,0,0,'test_no_payout',NOW(),NOW())`);
+  await event(id,"test","Test sale created","No Stripe payment or seller payout was created.");
+  res.status(201).json({ok:true,id});
+});
+
 router.get("/admin/orders", requireAdmin, async (req,res)=>{
   const q=String(req.query.q??"").trim(); const status=String(req.query.status??"").trim();
   const rows=await db.execute(sql`SELECT o.*,
