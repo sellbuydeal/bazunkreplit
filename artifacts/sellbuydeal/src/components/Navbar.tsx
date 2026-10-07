@@ -66,20 +66,19 @@ const SELL_OPTIONS: Array<{
 ];
 
 const MORE_NAV = [
-  { href: "/videos", label: "Videos", icon: Film, color: "text-blue-600", bg: "bg-blue-50" },
   { href: "/auctions",          label: "Auctions",         icon: Gavel,           color: "text-amber-600",   bg: "bg-amber-50" },
   { href: "/flash-sales",       label: "Flash Sales",      icon: Flame,           color: "text-red-500",     bg: "bg-red-50" },
   { href: "/classifieds",       label: "Classifieds",      icon: Newspaper,       color: "text-purple-600",  bg: "bg-purple-50" },
   { href: "/buyer-protection",  label: "Buyer Protection", icon: ShieldCheck,     color: "text-emerald-600", bg: "bg-emerald-50" },
   { href: "/support",           label: "Support",          icon: HelpCircle,      color: "text-sky-600",     bg: "bg-sky-50" },
   { href: "/importers",         label: "Importers",        icon: ArrowDownToLine, color: "text-[#4A5CE8]",   bg: "bg-blue-50" },
+  { href: "/videos",            label: "Bazunk Promo Videos", icon: Film,          color: "text-blue-600",    bg: "bg-blue-50" },
 ];
 
 const MOBILE_NAV_LINKS = [
   { href: "/rewards", label: "Daily Rewards", icon: Gift },
   { href: "/dashboard?section=credits", label: "Credits & Milestones", icon: Trophy },
   { href: "/promotions", label: "Promotions", icon: Zap },
-  { href: "/videos", label: "Videos", icon: Film },
   { href: "/",            label: "Home",        icon: Home },
   { href: "/browse",      label: "Browse",      icon: Grid3X3 },
   { href: "/auctions",    label: "Auctions",    icon: Gavel },
@@ -95,6 +94,7 @@ const MOBILE_NAV_LINKS = [
   { href: "/buyer-protection", label: "Buyer Protection", icon: ShieldCheck },
   { href: "/importers",        label: "Importers",        icon: ArrowDownToLine },
   { href: "/support",          label: "Support",          icon: HelpCircle },
+  { href: "/videos",           label: "Bazunk Promo Videos", icon: Film },
 ];
 
 export function Navbar() {
