@@ -176,7 +176,12 @@ export async function sendOrderConfirmation(opts: {
       <tfoot><tr><td colspan="2" style="padding:8px 0;font-weight:700">Total</td><td style="padding:8px 0;font-weight:700;text-align:right">£${total.toFixed(2)}</td></tr></tfoot>
     </table>
     <p>The seller will be in touch to arrange delivery or collection.</p>
-    <p><a class="btn" href="${SITE}/dashboard">View My Orders</a></p>
+    <div style="margin:20px 0;padding:16px;background:#f3f5ff;border:1px solid #dfe3ff;border-radius:8px">
+      <p style="margin:0 0 8px"><strong>Bought as a guest?</strong></p>
+      <p style="margin:0">To see and track this order, create a Bazunk account using <strong>the same email address this confirmation was sent to</strong>. If you already have an account with this email, simply sign in. Once the email matches your Bazunk account, this purchase will appear automatically in your Dashboard — you do not need to enter an order number or claim the purchase manually.</p>
+    </div>
+    <p><a class="btn" href="${SITE}/sign-up">Create account / sign in</a></p>
+    <p style="font-size:13px;color:#666">Already signed in with this email? <a href="${SITE}/dashboard">View My Orders</a></p>
   `);
   await send(email, "Your Bazunk order is confirmed", html);
 }
