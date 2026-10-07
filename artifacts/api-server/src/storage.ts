@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { db, usersTable, creditTransactionsTable } from "@workspace/db";
 import { sendWelcomeMessage } from "./lib/systemMessages.js";
+import { sendWelcomeEmail } from "./email.js";
 
 export class Storage {
   async getUser(email: string) {
@@ -19,6 +20,7 @@ export class Storage {
       // Genuinely new user — mark the "Welcome to Bazunk!" milestone complete.
       await this.completeMilestone(email, "welcome-bonus").catch(() => {});
       void sendWelcomeMessage(email);
+      void sendWelcomeEmail(email, name);
       return inserted;
     }
 
