@@ -297,7 +297,7 @@ export function ShippingLabelsPage() {
               <Package className="w-10 h-10 text-gray-200 mx-auto mb-3" />
               <p className="text-gray-400 text-sm">{tabData[tab].emptyMsg}</p>
               {tab === "pending" && (
-                <Link href="/sell/quick" className="inline-block mt-4 px-4 py-2 rounded-xl bg-[#F26B21] text-white text-sm font-bold hover:opacity-90">
+                <Link href="/sell/direct" className="inline-block mt-4 px-4 py-2 rounded-xl bg-[#F26B21] text-white text-sm font-bold hover:opacity-90">
                   List an item
                 </Link>
               )}
