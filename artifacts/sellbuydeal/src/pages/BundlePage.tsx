@@ -163,7 +163,7 @@ export function BundlePage() {
             Add at least 2 listings to your store before creating a bundle deal.
           </p>
           <div className="flex items-center gap-3">
-            <Link href="/sell/quick"
+            <Link href="/sell/direct"
               className="flex items-center gap-2 px-6 py-3 rounded-xl bg-[#F26B21] text-white font-bold text-sm hover:opacity-90 transition-opacity">
               <Plus className="w-4 h-4" /> Add Your First Listing
             </Link>
