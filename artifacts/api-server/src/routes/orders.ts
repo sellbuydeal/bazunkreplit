@@ -6,6 +6,7 @@ import { requireAdmin } from "../middlewares/adminAuth.js";
 import { randomUUID } from "crypto";
 import { getUncachableStripeClient } from "../stripeClient.js";
 import { recordAdminAudit } from "../lib/adminAudit.js";
+import { getTracking, mapShippoStatus, shippoEnabled } from "../lib/shippo.js";
 
 const router = Router();
 const VALID_STATUSES = ["pending", "confirmed", "preparing", "shipped", "out_for_delivery", "delivered", "cancelled", "refunded"];
@@ -33,6 +34,25 @@ router.post("/orders", requireAdmin, async (req, res) => {
 });
 router.get("/orders", async (req,res)=>{ const email=req.query["email"] as string|undefined; if(!email){res.status(400).json({error:"email query param required"});return;} const rows=await db.execute(sql`SELECT o.*,(SELECT r.rating FROM reviews r WHERE r.order_id=o.id AND r.role='buyer_to_seller') AS my_review_rating FROM orders o WHERE o.buyer_email=${email} ORDER BY o.created_at DESC`);res.json(rows.rows); });
 router.get("/orders/:id", async(req,res)=>{const rows=await db.execute(sql`SELECT * FROM orders WHERE id=${req.params.id}`);if(!rows.rows.length){res.status(404).json({error:"Order not found"});return;}res.json(rows.rows[0]);});
+
+router.post("/orders/:id/tracking/refresh", async(req,res)=>{
+  if(!shippoEnabled()){res.status(503).json({error:"Shipment tracking is not configured yet"});return;}
+  const o=(await db.execute(sql`SELECT * FROM orders WHERE id=${req.params.id}`)).rows[0] as any;
+  if(!o){res.status(404).json({error:"Order not found"});return;}
+  if(!o.carrier||!o.tracking_number){res.status(400).json({error:"This order does not have a tracking number yet"});return;}
+  try{
+    const track:any=await getTracking(String(o.carrier),String(o.tracking_number));
+    const latest=track?.tracking_status||{}; const mapped=mapShippoStatus(latest.status);
+    const nextStatus=mapped==="delivered"?"delivered":(mapped==="shipped"&&!["delivered","out_for_delivery"].includes(String(o.status))?"shipped":String(o.status));
+    await db.execute(sql`UPDATE orders SET status=${nextStatus},tracking_status=${latest.status??null},
+      tracking_eta=${track?.eta??null},estimated_delivery=COALESCE(${track?.eta??null},estimated_delivery),
+      tracking_last_event=${latest.status_details??null},tracking_updated_at=NOW(),
+      tracking_history=${JSON.stringify(track?.tracking_history??[])}::jsonb,
+      delivered_at=CASE WHEN ${nextStatus}='delivered' THEN COALESCE(delivered_at,NOW()) ELSE delivered_at END,
+      updated_at=NOW() WHERE id=${o.id}`);
+    res.json({ok:true,status:nextStatus,trackingStatus:latest.status??null,eta:track?.eta??null,lastEvent:latest.status_details??null,history:track?.tracking_history??[]});
+  }catch(err:any){res.status(502).json({error:err?.message||"Could not refresh tracking"});}
+});
 router.patch("/orders/:id/status",async(req,res)=>{const {status,trackingNumber,carrier,estimatedDelivery,buyerEmail}=req.body as Record<string,string>;if(!status||!VALID_STATUSES.includes(status)){res.status(400).json({error:"Valid status required"});return;}await db.execute(sql`UPDATE orders SET status=${status},tracking_number=COALESCE(${trackingNumber??null},tracking_number),carrier=COALESCE(${carrier??null},carrier),estimated_delivery=COALESCE(${estimatedDelivery??null},estimated_delivery),shipped_at=CASE WHEN ${status} IN ('shipped','out_for_delivery','delivered') THEN COALESCE(shipped_at,NOW()) ELSE shipped_at END,delivered_at=CASE WHEN ${status}='delivered' THEN COALESCE(delivered_at,NOW()) ELSE delivered_at END,updated_at=NOW() WHERE id=${req.params.id} AND buyer_email=${buyerEmail??""}`);res.json({ok:true});});
 
 router.get("/admin/orders", requireAdmin, async (req,res)=>{
