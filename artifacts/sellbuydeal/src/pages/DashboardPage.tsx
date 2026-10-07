@@ -1368,12 +1368,15 @@ function CreditsSection({ user }: { user: { name: string; email: string; usernam
 
   useEffect(() => { loadMilestones(); }, [user.email]);
 
-  const displayMilestones = MILESTONES.map(m => ({
-    ...m,
-    progress: milestoneData[m.id]?.progress ?? m.progress,
-    completed: milestoneData[m.id]?.completed ?? m.completed,
-    claimed: milestoneData[m.id]?.claimed ?? false,
-  }));
+  const rawSettings = useRawSettings();
+  const displayMilestones = MILESTONES
+    .filter(m => m.id !== "first-live" || isFeatureEnabled(rawSettings, "live"))
+    .map(m => ({
+      ...m,
+      progress: milestoneData[m.id]?.progress ?? m.progress,
+      completed: milestoneData[m.id]?.completed ?? m.completed,
+      claimed: milestoneData[m.id]?.claimed ?? false,
+    }));
 
   const completedCount = displayMilestones.filter(m => m.completed).length;
 
@@ -5520,6 +5523,7 @@ function VerificationSection({ userEmail }: { userEmail: string }) {
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const rawSettings = useRawSettings();
+  const liveEnabled = isFeatureEnabled(rawSettings, "live");
   const dashboardFeatureForItem: Record<string,string> = {
     "my-bids":"auctions", "offers":"offers", "my-auctions":"auctions", "my-flash-sales":"flash_sales",
     "auto-accept":"offers", "go-live":"live", "open-importers":"importers", "credits":"credits",
