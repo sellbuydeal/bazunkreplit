@@ -116,8 +116,6 @@ export function AdminImportsPage() {
   const [syncDetailsMsg, setSyncDetailsMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // ── Demo clear state ──────────────────────────────────────────
-  const [clearingDemo, setClearingDemo] = useState(false);
-  const [demoMsg, setDemoMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // ── Listings table state ──────────────────────────────────────
   const [listings, setListings] = useState<AmazonListing[]>([]);
@@ -355,25 +353,6 @@ export function AdminImportsPage() {
       setSyncingDetails(false);
     }
   }
-
-  // ── Clear demo ────────────────────────────────────────────────
-  async function handleClearDemo() {
-    if (!confirm("Delete all BZK-DEMO-* demo listings from the site? This cannot be undone.")) return;
-    setClearingDemo(true);
-    setDemoMsg(null);
-    try {
-      const r = await authFetch("/api/admin/clear-demo-listings", { method: "DELETE" });
-      const d = await r.json() as { deleted?: number; error?: string };
-      setDemoMsg(r.ok
-        ? { ok: true, text: `Deleted ${d.deleted ?? 0} demo listings` }
-        : { ok: false, text: d.error ?? "Failed" }
-      );
-      if (r.ok) loadListings();
-    } finally {
-      setClearingDemo(false);
-    }
-  }
-
   // ── Clear all Amazon imports ──────────────────────────────────
   async function handleClearAll() {
     if (!confirm("Delete ALL Amazon UK imports? This cannot be undone.")) return;
@@ -618,28 +597,6 @@ export function AdminImportsPage() {
       <AnimatePresence mode="wait">
         {tab === "amazon" && (
           <motion.div key="amazon" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-5">
-
-            {/* Demo cleanup banner */}
-            <div className="bg-red-50 border border-red-200 rounded-2xl px-5 py-3 flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Trash2 className="w-4 h-4 text-red-400 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-bold text-red-800">Remove Demo Listings</p>
-                  <p className="text-xs text-red-500">Deletes all BZK-DEMO-* placeholder listings</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                {demoMsg && (
-                  <span className={`text-xs font-semibold ${demoMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{demoMsg.text}</span>
-                )}
-                <button onClick={handleClearDemo} disabled={clearingDemo}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 transition-colors disabled:opacity-50">
-                  {clearingDemo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                  {clearingDemo ? "Deleting…" : "Clear Demo Listings"}
-                </button>
-              </div>
-            </div>
-
             {/* ── Search & pick ─────────────────────────────────── */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
               <div className="px-5 py-4 border-b border-gray-100">
