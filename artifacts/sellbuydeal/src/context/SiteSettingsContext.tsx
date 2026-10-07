@@ -32,6 +32,7 @@ export interface SiteSettings {
 export interface SiteSettingsContextValue {
   settings: SiteSettings;
   rawSettings: Record<string, string>;
+  settingsLoaded: boolean;
 }
 
 const DEFAULTS: SiteSettings = {
@@ -66,11 +67,13 @@ const DEFAULTS: SiteSettings = {
 const SiteSettingsContext = createContext<SiteSettingsContextValue>({
   settings: DEFAULTS,
   rawSettings: {},
+  settingsLoaded: false,
 });
 
 export function SiteSettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<SiteSettings>(DEFAULTS);
   const [rawSettings, setRawSettings] = useState<Record<string, string>>({});
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
     const loadSettings = () => {
@@ -79,8 +82,9 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
         .then((data: Record<string, string>) => {
           setSettings({ ...DEFAULTS, ...data });
           setRawSettings(data);
+          setSettingsLoaded(true);
         })
-        .catch(() => {});
+        .catch(() => setSettingsLoaded(true));
     };
     loadSettings();
     window.addEventListener("bazunk-settings-updated", loadSettings);
@@ -95,7 +99,7 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
   }, [settings.primary_color, settings.secondary_color, settings.seo_title]);
 
   return (
-    <SiteSettingsContext.Provider value={{ settings, rawSettings }}>
+    <SiteSettingsContext.Provider value={{ settings, rawSettings, settingsLoaded }}>
       {children}
     </SiteSettingsContext.Provider>
   );
@@ -107,4 +111,8 @@ export function useSiteSettings() {
 
 export function useRawSettings() {
   return useContext(SiteSettingsContext).rawSettings;
+}
+
+export function useSettingsLoaded() {
+  return useContext(SiteSettingsContext).settingsLoaded;
 }
