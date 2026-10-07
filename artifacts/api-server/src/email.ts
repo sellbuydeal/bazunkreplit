@@ -1,8 +1,28 @@
 // Email via Resend. Set RESEND_API_KEY (and optionally EMAIL_FROM) in the environment.
 import { logger } from "./lib/logger.js";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 
 const FROM = process.env.EMAIL_FROM ?? "Bazunk <onboarding@resend.dev>";
 const SITE = process.env.PUBLIC_BASE_URL ?? "https://bazunk-web.onrender.com";
+
+
+function esc(v: unknown): string { return String(v ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"} as Record<string,string>)[ch]); }
+function fill(text: string, vars: Record<string, unknown>): string { return text.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_m,k) => String(vars[k] ?? "")); }
+async function editableTemplate(key:string, defaultSubject:string, defaultBody:string, vars:Record<string,unknown>) {
+  try {
+    const rows=(await db.execute(sql`SELECT key,value FROM site_settings WHERE key IN (${`email_subject_${key}`},${`email_body_${key}`})`)).rows as any[];
+    const values=Object.fromEntries(rows.map(r=>[String(r.key),String(r.value??"")]));
+    const subject=fill(values[`email_subject_${key}`]||defaultSubject,vars);
+    const bodyText=fill(values[`email_body_${key}`]||defaultBody,vars);
+    const bodyHtml=bodyText.split(/\n{2,}/).map(p=>`<p>${p.split("\n").map(esc).join("<br>")}</p>`).join("");
+    return {subject,bodyHtml};
+  } catch { return {subject:fill(defaultSubject,vars),bodyHtml:defaultBody.split(/\n{2,}/).map(p=>`<p>${p.split("\n").map(esc).join("<br>")}</p>`).join("")}; }
+}
+export async function sendWelcomeEmail(email:string,name?:string):Promise<void>{
+  const t=await editableTemplate("welcome","Welcome to Bazunk!","Hi {{name}},\n\nWelcome to Bazunk. Your account is ready. You can browse, make offers and sell.\n\nOpen your Dashboard: {{dashboard_url}}",{name:name||"there",dashboard_url:`${SITE}/dashboard`});
+  await send(email,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/dashboard">Open Dashboard</a></p>`));
+}
 
 async function send(to: string, subject: string, html: string): Promise<void> {
   try {
@@ -183,11 +203,13 @@ export async function sendOrderConfirmation(opts: {
     <p><a class="btn" href="${SITE}/sign-up">Create account / sign in</a></p>
     <p style="font-size:13px;color:#666">Already signed in with this email? <a href="${SITE}/dashboard">View My Orders</a></p>
   `);
-  await send(email, "Your Bazunk order is confirmed", html);
+  const t = await editableTemplate("order_confirmed","Your Bazunk order is confirmed","Hi {{name}},\n\nThanks for your purchase. Your Bazunk order is confirmed.\n\nTotal: £{{total}}\n\nIf you bought as a guest, create or sign in to Bazunk using this same email address. Your purchase will appear automatically in your Dashboard.\n\nView your orders: {{dashboard_url}}",{name:name??"there",total:total.toFixed(2),dashboard_url:`${SITE}/dashboard`});
+  await send(email, t.subject, base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<hr style="border:0;border-top:1px solid #eee;margin:20px 0"/><table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:16px"><tbody>${itemRows}</tbody></table><p><a class="btn" href="${SITE}/dashboard">View My Orders</a></p>`));
 }
 
 
 export async function sendSellerSaleNotification(opts: { email: string; items: Array<{ title: string; price: number; quantity: number }>; buyerEmail: string }): Promise<void> {
   const rows = opts.items.map(i => `<li>${i.title} × ${i.quantity} — £${(i.price*i.quantity).toFixed(2)}</li>`).join("");
-  await send(opts.email, "New Bazunk sale — action required", base(`<h2>You made a sale on Bazunk</h2><p>Buyer: ${opts.buyerEmail}</p><ul>${rows}</ul><p>Please open your seller dashboard to fulfil the order.</p><p><a class="btn" href="${SITE}/dashboard">Open seller dashboard</a></p>`));
+  const t=await editableTemplate("sale_made","New Bazunk sale — action required","You made a sale on Bazunk.\n\nBuyer: {{buyer_email}}\n\nOpen your seller Dashboard to fulfil the order: {{dashboard_url}}",{buyer_email:opts.buyerEmail,dashboard_url:`${SITE}/dashboard`});
+  await send(opts.email,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<ul>${rows}</ul><p><a class="btn" href="${SITE}/dashboard">Open seller dashboard</a></p>`));
 }
