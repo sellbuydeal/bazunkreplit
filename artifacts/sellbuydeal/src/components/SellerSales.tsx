@@ -9,6 +9,7 @@ import { useCurrency } from "@/context/CurrencyContext";
 interface SaleRow {
   id: string; item_title: string; item_image: string | null; price: string; status: string;
   tracking_number: string | null; carrier: string | null; address: string | null;
+  tracking_status?: string | null; tracking_last_event?: string | null; tracking_updated_at?: string | null;
   created_at: string; shipped_at: string | null; buyer_name: string; buyer_email: string;
   seller_fee?: string; seller_fee_rate?: string; seller_type?: string; seller_net?: string; payout_status?: string; stripe_transfer_id?: string; refunded_total?: string;
   my_review_rating: number | null; buyer_review_rating: number | null;
@@ -108,6 +109,7 @@ export function SellerSales() {
                     Buyer: {s.buyer_name} · {new Date(s.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                   <p className="text-xs text-gray-400">{s.id}{s.tracking_number ? ` · ${s.carrier ?? "Tracking"}: ${s.tracking_number}` : ""}</p>
+                  {s.tracking_status && <p className="text-xs font-bold text-blue-600 mt-1">Carrier: {s.tracking_status}{s.tracking_last_event ? ` · ${s.tracking_last_event}` : ""}</p>}
                   {s.buyer_review_rating !== null && (
                     <p className="text-xs text-amber-500 mt-0.5 flex items-center gap-1"><Star className="w-3 h-3 fill-amber-400" /> Buyer rated you {s.buyer_review_rating}/5</p>
                   )}
