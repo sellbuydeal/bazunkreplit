@@ -70,6 +70,7 @@ import { FeatureGate, FeatureVisible } from "@/components/FeatureGate";
 import { AdminPaymentsPage } from "@/pages/admin/AdminPaymentsPage";
 import { AdminOrdersPage } from "@/pages/admin/AdminOrdersPage";
 import { AdminSettingsPage } from "@/pages/admin/AdminSettingsPage";
+import { AdminEmailsPage } from "@/pages/admin/AdminEmailsPage";
 import { AdminProductsPage } from "@/pages/admin/AdminProductsPage";
 import { AdminListingsPage } from "@/pages/admin/AdminListingsPage";
 import { AdminImportsPage } from "@/pages/admin/AdminImportsPage";
@@ -296,6 +297,7 @@ function Router() {
       <Route path="/admin/returns" component={AdminReturnsPage} />
       <Route path="/admin/auctions" component={AdminAuctionsPage} />
       <Route path="/admin/settings" component={AdminSettingsPage} />
+      <Route path="/admin/emails" component={AdminEmailsPage} />
       <Route path="/auctions/create">{() => <FeatureGate feature="auctions" name="Auctions"><CreateAuctionPage /></FeatureGate>}</Route>
       <Route path="/auctions/:id">{() => <FeatureGate feature="auctions" name="Auctions"><AuctionDetailPage /></FeatureGate>}</Route>
       <Route path="/auctions">{() => <FeatureGate feature="auctions" name="Auctions"><AuctionsPage /></FeatureGate>}</Route>
