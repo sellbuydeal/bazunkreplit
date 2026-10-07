@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/adminAuth.js";
 import { logger } from "../lib/logger.js";
 import { sendSystemMessage } from "../lib/systemMessages.js";
+import { registerTracking, shippoEnabled } from "../lib/shippo.js";
 
 const router = Router();
 
@@ -322,6 +323,22 @@ router.post("/orders/:id/dispatch", async (req, res) => {
         updated_at = NOW()
       WHERE id = ${order.id}
     `);
+    if (trackingNumber?.trim() && carrier?.trim() && shippoEnabled()) {
+      try {
+        const track:any=await registerTracking(carrier.trim(),trackingNumber.trim(),order.id);
+        const latest=track?.tracking_status;
+        await db.execute(sql`UPDATE orders SET
+          tracking_status=${latest?.status??null},
+          tracking_eta=${track?.eta??null},
+          estimated_delivery=COALESCE(${track?.eta??null},estimated_delivery),
+          tracking_last_event=${latest?.status_details??null},
+          tracking_updated_at=NOW(),
+          tracking_history=${JSON.stringify(track?.tracking_history??[])}::jsonb
+          WHERE id=${order.id}`);
+      } catch (err) {
+        logger.warn({err,orderId:order.id},"Order dispatched but Shippo tracking registration failed");
+      }
+    }
     void sendSystemMessage(order.buyer_email, {
       category: "Orders",
       subject: "Your order is on its way",
