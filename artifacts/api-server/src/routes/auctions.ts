@@ -108,6 +108,8 @@ router.get("/auctions/:id", async (req, res) => {
     }
     // Send winner/seller end notifications (fire-and-forget)
     if (!reserveMissed && a["winner_email"] && a["winner_name"] && a["winner_bid"]) {
+      void sendSystemMessage(a["winner_email"] as string,{category:"Auctions",subject:`You won "${a["title"]}"!`,body:`Congratulations — your winning bid was £${parseFloat(a["winner_bid"] as string).toFixed(2)}.`});
+      void sendSystemMessage(a["seller_email"] as string,{category:"Auctions",subject:`Your auction "${a["title"]}" has ended`,body:`Winner: ${a["winner_name"]}. Winning bid: £${parseFloat(a["winner_bid"] as string).toFixed(2)}.`});
       void sendAuctionWonNotification({
         winnerEmail: a["winner_email"] as string,
         winnerName: a["winner_name"] as string,
@@ -234,7 +236,8 @@ router.post("/auctions/:id/bid", async (req, res) => {
   }
   const newBidCount = (auction["bid_count"] as number ?? 0) + 1;
   const nextMinBid = bidAmount + increment;
-  // Notify seller (fire-and-forget)
+  // Notify seller by email and in-app inbox.
+  void sendSystemMessage(auction["seller_email"] as string,{category:"Auctions",subject:`New bid on "${auction["title"]}"`,body:`${bidderName} bid £${bidAmount.toFixed(2)}. Open the auction to review the latest bid.`});
   void sendNewBidNotification({
     sellerEmail: auction["seller_email"] as string,
     sellerName: auction["seller_name"] as string,
@@ -246,6 +249,7 @@ router.post("/auctions/:id/bid", async (req, res) => {
   });
   // Notify outbid previous winner (if different from new bidder)
   if (prevWinnerEmail && prevWinnerEmail !== bidderEmail) {
+    void sendSystemMessage(prevWinnerEmail,{category:"Auctions",subject:`You\'ve been outbid on "${auction["title"]}"`,body:`The new bid is £${bidAmount.toFixed(2)}. The minimum next bid is £${nextMinBid.toFixed(2)}.`});
     void sendOutbidNotification({
       email: prevWinnerEmail,
       name: prevWinnerName ?? prevWinnerEmail,
