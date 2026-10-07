@@ -14,7 +14,7 @@ export function ImportersPage(){
  if(!user)return <div className="max-w-5xl mx-auto px-4 py-16 text-center"><h1 className="text-3xl font-black">Importer Hub</h1><p className="mt-3 text-gray-500">Sign in to use Bazunk importers.</p></div>;
  return <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-indigo-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-indigo-950/20">
   <div className="max-w-7xl mx-auto px-4 py-10">
-   <Link href="/" className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-xl border bg-white/80 dark:bg-slate-900 text-sm font-bold hover:border-indigo-400"><ArrowLeft className="w-4 h-4"/>Back to Home</Link>
+   <Link href="/" className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-xl border bg-white/90 text-slate-800 dark:bg-slate-900 dark:text-white text-sm font-bold hover:border-indigo-400"><ArrowLeft className="w-4 h-4"/>Back to Home</Link>
    <section className="relative overflow-hidden rounded-[2rem] bg-[#171a2b] text-white p-7 md:p-10 mb-8 shadow-xl">
     <div className="absolute -right-20 -top-24 w-72 h-72 rounded-full bg-indigo-500/30 blur-3xl"/><div className="absolute right-40 -bottom-32 w-64 h-64 rounded-full bg-orange-500/20 blur-3xl"/>
     <div className="relative max-w-3xl"><div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black uppercase tracking-wider"><Sparkles className="w-4 h-4 text-orange-400"/>Bazunk Importer Hub</div><h1 className="text-4xl md:text-5xl font-black mt-4 tracking-tight">Bring your inventory to Bazunk.</h1><p className="text-white/65 mt-4 text-lg">Choose a marketplace below. Each importer now has its own workspace, making it easier to add more sources without cluttering this page.</p>
