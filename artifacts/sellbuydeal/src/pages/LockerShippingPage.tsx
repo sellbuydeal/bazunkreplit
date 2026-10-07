@@ -217,7 +217,7 @@ export function LockerShippingPage() {
             Drop off and collect parcels at 20,000+ InPost, Evri, and Royal Mail points across the UK — no home address needed, 24/7 access, prepaid labels.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link href="/sell/quick"
+            <Link href="/sell/direct"
               className="px-6 py-3 rounded-2xl bg-[#F26B21] text-white font-bold hover:opacity-90 transition-opacity flex items-center gap-2">
               <Package className="w-4 h-4" /> List & Ship via Locker
             </Link>
@@ -421,7 +421,7 @@ export function LockerShippingPage() {
             List your first item with locker shipping and let us handle the label, tracking, and returns automatically.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link href="/sell/quick"
+            <Link href="/sell/direct"
               className="px-6 py-3 rounded-2xl bg-[#F26B21] text-white font-bold hover:opacity-90 transition-opacity">
               List an Item
             </Link>
