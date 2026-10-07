@@ -151,74 +151,46 @@ function buildFeeRows(mktRatePct: number) {
 function FeeCalculator() {
   const { formatPrice, currency } = useCurrency();
   const rawSettings = useRawSettings();
-  const mktRate = useMktRate(rawSettings);
-  const mktRatePct = Math.round(mktRate * 100);
+  const businessRate = useMktRate(rawSettings);
+  const businessRatePct = businessRate * 100;
+  const buyerPct = (parseFloat(rawSettings["buyer_protection_rate"] ?? rawSettings["buyer_protection_percent"] ?? "5") || 5) / 100;
+  const buyerFixedGBP = parseFloat(rawSettings["buyer_protection_fixed_gbp"] ?? rawSettings["buyer_protection_fixed"] ?? "0.70") || 0.70;
   const [amount, setAmount] = useState("50");
-  const val = parseFloat(amount) || 0;
-  const mktFee = 0;
-  const stripeFee = 0;
-  const net = Math.max(0, val - mktFee - stripeFee);
+  const [sellerType, setSellerType] = useState<"private"|"business">("private");
+  const val = Math.max(0, parseFloat(amount) || 0);
+  const buyerProtection = sellerType === "private" ? val * buyerPct + (val > 0 ? buyerFixedGBP : 0) : 0;
+  const buyerPays = val + buyerProtection;
+  const sellerFee = sellerType === "business" ? val * businessRate : 0;
+  const sellerReceives = Math.max(0, val - sellerFee);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-5">
-        <div className="w-9 h-9 rounded-xl bg-[#4A5CE8]/10 flex items-center justify-center">
-          <Calculator className="w-4 h-4 text-[#4A5CE8]" />
-        </div>
-        <div>
-          <p className="font-bold text-gray-900 text-sm">Fee Calculator</p>
-          <p className="text-xs text-gray-400">See exactly what you'll receive</p>
-        </div>
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 sm:p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-9 h-9 rounded-xl bg-[#4A5CE8]/10 flex items-center justify-center"><Calculator className="w-4 h-4 text-[#4A5CE8]" /></div>
+        <div><p className="font-bold text-gray-900 text-sm">Buyer & Seller Fee Calculator</p><p className="text-xs text-gray-400">See what the buyer pays and seller receives</p></div>
       </div>
-
-      <div className="relative mb-5">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">{currency.symbol}</span>
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="Enter sale price"
-          className="w-full pl-8 pr-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-[#4A5CE8] focus:ring-2 focus:ring-[#4A5CE8]/10"
-        />
+      <div className="grid grid-cols-2 gap-2 mb-4 rounded-xl bg-gray-50 p-1">
+        <button type="button" onClick={()=>setSellerType("private")} className={`rounded-lg px-3 py-2.5 text-sm font-bold transition ${sellerType==="private"?"bg-white text-[#4A5CE8] shadow-sm":"text-gray-500"}`}>Private seller</button>
+        <button type="button" onClick={()=>setSellerType("business")} className={`rounded-lg px-3 py-2.5 text-sm font-bold transition ${sellerType==="business"?"bg-white text-[#4A5CE8] shadow-sm":"text-gray-500"}`}>Business seller</button>
       </div>
-
-      {val > 0 && (
-        <div className="space-y-2.5">
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-gray-500">Sale price</span>
-            <span className="font-bold text-gray-900">{formatPrice(val)}</span>
-          </div>
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-gray-500 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#F26B21] inline-block" />
-              Private seller fee (0%)
-            </span>
-            <span className="font-semibold text-[#F26B21]">{formatPrice(0)}</span>
-          </div>
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-gray-500 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#4A5CE8] inline-block" />
-              Bazunk seller commission
-            </span>
-            <span className="font-semibold text-[#4A5CE8]">{formatPrice(0)}</span>
-          </div>
-          <div className="flex justify-between items-center text-sm font-bold border-t border-gray-100 pt-3 mt-1">
-            <span className="text-gray-900">You receive</span>
-            <span className="text-emerald-600 text-base">{formatPrice(net)}</span>
-          </div>
-          <p className="text-xs text-gray-400 text-right">
-            {val > 0 ? `${((net / val) * 100).toFixed(1)}% of sale price` : ""}
-          </p>
-        </div>
-      )}
-
-      {val <= 0 && (
-        <div className="text-center py-4 text-sm text-gray-400">
-          Enter a sale price above to see your payout
-        </div>
-      )}
+      <label className="block text-xs font-bold text-gray-500 mb-1.5">Item sale price</label>
+      <div className="relative mb-5"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">{currency.symbol}</span><input type="number" min="0" step="0.01" value={amount} onChange={e=>setAmount(e.target.value)} className="w-full pl-8 pr-4 py-3 border border-gray-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-[#4A5CE8] focus:ring-2 focus:ring-[#4A5CE8]/10"/></div>
+      {val>0 ? <div className="space-y-2.5">
+        <div className="flex justify-between text-sm"><span className="text-gray-500">Item price</span><b>{formatPrice(val)}</b></div>
+        {sellerType==="private" ? <>
+          <div className="flex justify-between gap-3 text-sm"><span className="text-gray-500">Buyer Protection ({(buyerPct*100).toFixed(1).replace(".0","")}% + {formatPrice(buyerFixedGBP)})</span><b className="text-[#4A5CE8]">+{formatPrice(buyerProtection)}</b></div>
+          <div className="flex justify-between border-t pt-3 text-sm"><span className="font-black text-gray-900">Buyer pays</span><span className="font-black text-[#4A5CE8] text-base">{formatPrice(buyerPays)}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-gray-500">Private seller fee</span><b className="text-emerald-600">{formatPrice(0)} (0%)</b></div>
+          <div className="flex justify-between border-t pt-3 text-sm"><span className="font-black">Seller receives</span><span className="font-black text-emerald-600 text-base">{formatPrice(sellerReceives)}</span></div>
+          <p className="text-xs text-gray-400">Buyer Protection is paid by the buyer. The private seller keeps 100% of the item price. Delivery is excluded from this example.</p>
+        </> : <>
+          <div className="flex justify-between gap-3 text-sm"><span className="text-gray-500">Buyer Protection</span><b className="text-emerald-600">Included · {formatPrice(0)} extra</b></div>
+          <div className="flex justify-between border-t pt-3 text-sm"><span className="font-black">Buyer pays</span><span className="font-black text-[#4A5CE8] text-base">{formatPrice(buyerPays)}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-gray-500">Business selling fee ({businessRatePct.toFixed(1).replace(".0","")}%)</span><b className="text-[#F26B21]">−{formatPrice(sellerFee)}</b></div>
+          <div className="flex justify-between border-t pt-3 text-sm"><span className="font-black">Business seller receives</span><span className="font-black text-emerald-600 text-base">{formatPrice(sellerReceives)}</span></div>
+          <p className="text-xs text-gray-400">Protection and support are included in the business selling fee, so the buyer pays no additional Buyer Protection charge. Category rates may differ. Delivery is excluded.</p>
+        </>}
+      </div> : <div className="text-center py-4 text-sm text-gray-400">Enter an item price to calculate the transaction</div>}
     </div>
   );
 }
