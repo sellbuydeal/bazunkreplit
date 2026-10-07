@@ -1,9 +1,9 @@
 import { Link } from "wouter";
-import { useRawSettings } from "@/context/SiteSettingsContext";
+import { useRawSettings, useSettingsLoaded } from "@/context/SiteSettingsContext";
 import { Power } from "lucide-react";
 
 export function isFeatureEnabled(settings: Record<string,string>, key:string){ return settings[`feature_${key}`] !== "false"; }
-export function useFeature(key:string){ return isFeatureEnabled(useRawSettings(), key); }
+export function useFeature(key:string){ const settings=useRawSettings(); const loaded=useSettingsLoaded(); return loaded && isFeatureEnabled(settings, key); }
 export function FeatureVisible({feature,children}:{feature:string;children:React.ReactNode}){ return useFeature(feature) ? <>{children}</> : null; }
 export function featureForHref(href:string):string|undefined {
   const path=href.split("?")[0];
