@@ -35,23 +35,23 @@ export function BuyerProtectionBadge({ compact = false }: { compact?: boolean })
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-6 text-white">
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
-                  <Shield className="w-7 h-7" />
+          <div className="bg-white rounded-3xl w-full max-w-xl max-h-[calc(100dvh-2rem)] shadow-2xl overflow-y-auto">
+            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 px-5 py-4 text-white">
+              <div className="flex items-start justify-between mb-1">
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                  <Shield className="w-6 h-6" />
                 </div>
                 <button onClick={() => setOpen(false)} className="text-white/70 hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <h2 className="text-xl font-black mt-2">Bazunk Buyer Protection</h2>
+              <h2 className="text-lg font-black mt-1">Bazunk Buyer Protection</h2>
               <p className="text-emerald-100 text-sm mt-1">Every purchase is protected. Shop with complete confidence.</p>
             </div>
 
-            <div className="p-6">
+            <div className="p-5">
               <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">What's covered</h3>
-              <div className="space-y-2.5 mb-5">
+              <div className="grid sm:grid-cols-2 gap-x-5 gap-y-2 mb-4">
                 {COVERED.map((item) => (
                   <div key={item.title} className="flex items-start gap-3">
                     <item.icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${item.color}`} />
@@ -63,9 +63,9 @@ export function BuyerProtectionBadge({ compact = false }: { compact?: boolean })
                 ))}
               </div>
 
-              <div className="bg-gray-50 rounded-2xl p-4 mb-5">
+              <div className="bg-gray-50 rounded-2xl p-4 mb-4">
                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">How disputes work</h3>
-                <div className="space-y-3">
+                <div className="grid sm:grid-cols-2 gap-x-5 gap-y-3">
                   {STEPS.map((step, i) => (
                     <div key={step.label} className="flex items-start gap-3">
                       <div className="w-6 h-6 rounded-full bg-[#4A5CE8] text-white flex items-center justify-center text-[10px] font-black flex-shrink-0">
@@ -86,7 +86,7 @@ export function BuyerProtectionBadge({ compact = false }: { compact?: boolean })
 
               <button
                 onClick={() => setOpen(false)}
-                className="mt-4 w-full py-3 rounded-xl bg-[#4A5CE8] text-white font-bold text-sm hover:opacity-90 transition-opacity"
+                className="mt-3 w-full py-2.5 rounded-xl bg-[#4A5CE8] text-white font-bold text-sm hover:opacity-90 transition-opacity"
               >
                 Got it
               </button>
