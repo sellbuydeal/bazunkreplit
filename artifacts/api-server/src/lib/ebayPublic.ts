@@ -1,4 +1,5 @@
 import { logger } from "./logger.js";
+// Deployment marker: redeploy the current eBay public importer after the previous Render deploy was cancelled.
 export interface PublicEbayItem { itemId:string;url:string;title:string;price:number;currency:string;image:string|null;condition:string;description:string;shipping:number|null;shippingLabel:string|null;available:boolean;categoryPath:string[] }
 const ITEM_ID_RE=/(?:\/itm\/(?:[^/?#]+\/)?|item=)(\d{9,15})/i;
 export function ebayItemId(input:string):string|null{const s=input.trim();if(/^\d{9,15}$/.test(s))return s;try{const u=new URL(s);return u.pathname.match(ITEM_ID_RE)?.[1]??u.searchParams.get("item")?.match(/^\d{9,15}$/)?.[0]??null}catch{return s.match(ITEM_ID_RE)?.[1]??null}}
