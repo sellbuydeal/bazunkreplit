@@ -221,7 +221,7 @@ export function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportM
               </div>
             </div>
 
-            {/* Subcategory (same list as Quick Sell) */}
+            {/* Subcategory (same list as Direct Sale) */}
             {subcategories.length > 0 && (
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Subcategory <span className="text-gray-400 font-normal">(optional)</span></label>
