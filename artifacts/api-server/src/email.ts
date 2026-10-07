@@ -91,7 +91,8 @@ export async function sendNewBidNotification(opts: {
     <p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>
     <p>Good luck with your sale!</p>
   `);
-  await send(sellerEmail, `New bid on "${auctionTitle}"`, html);
+  const t=await editableTemplate("new_bid",`New bid on "{{auction_title}}"`,`{{bidder_name}} placed a bid of £{{bid_amount}} on {{auction_title}}.\n\nTotal bids: {{bid_count}}\n\nView auction: {{auction_url}}`,{auction_title:auctionTitle,bidder_name:bidderName,bid_amount:bidAmount.toFixed(2),bid_count:currentBidCount,auction_url:`${SITE}/auctions/${auctionId}`});
+  await send(sellerEmail,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>`));
 }
 
 export async function sendOutbidNotification(opts: {
@@ -130,7 +131,8 @@ export async function sendAuctionWonNotification(opts: {
     <p>The seller <strong>${sellerName}</strong> will be in touch to arrange delivery or collection.</p>
     <p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>
   `);
-  await send(winnerEmail, `You won "${auctionTitle}"!`, html);
+  const t=await editableTemplate("auction_won",`You won "{{auction_title}}"!`,`Congratulations {{name}} — you won {{auction_title}} with a bid of £{{winning_bid}}.\n\nView auction: {{auction_url}}`,{name:winnerName,auction_title:auctionTitle,winning_bid:winningBid.toFixed(2),auction_url:`${SITE}/auctions/${auctionId}`});
+  await send(winnerEmail,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>`));
 }
 
 export async function sendAuctionEndedSellerNotification(opts: {
@@ -151,7 +153,8 @@ export async function sendAuctionEndedSellerNotification(opts: {
     <p>Please arrange delivery or collection with the winner.</p>
     <p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>
   `);
-  await send(sellerEmail, `Your auction "${auctionTitle}" has ended`, html);
+  const t=await editableTemplate("auction_ended",`Your auction "{{auction_title}}" has ended`,`Your auction {{auction_title}} ended with a winning bid of £{{winning_bid}}.\n\nWinner: {{winner_name}} ({{winner_email}})\n\nOpen auction: {{auction_url}}`,{auction_title:auctionTitle,winning_bid:winningBid.toFixed(2),winner_name:winnerName,winner_email:winnerEmail,auction_url:`${SITE}/auctions/${auctionId}`});
+  await send(sellerEmail,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>`));
 }
 
 export async function sendCreditsConfirmation(opts: {
@@ -169,7 +172,8 @@ export async function sendCreditsConfirmation(opts: {
     <p>Use your credits to buy listings or boost your auctions on Bazunk.</p>
     <p><a class="btn" href="${SITE}/dashboard">Go to Dashboard</a></p>
   `);
-  await send(email, "Your Bazunk credits have been added", html);
+  const t=await editableTemplate("credits_added","Your Bazunk credits have been added","Hi {{name}},\n\n{{credits}} credits have been added to your Bazunk account.\n\nYour new balance is {{balance}}.\n\nOpen Dashboard: {{dashboard_url}}",{name:name??"there",credits:creditsAdded.toFixed(2),balance:newBalance.toFixed(2),dashboard_url:`${SITE}/dashboard`});
+  await send(email,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/dashboard">Go to Dashboard</a></p>`));
 }
 
 export async function sendOrderConfirmation(opts: {
