@@ -1,5 +1,6 @@
 import { refundOrder, releaseOrderPayout } from "../lib/orderSettlement.js";
 import { Router } from "express";
+import { clerkClient, getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/adminAuth.js";
@@ -10,6 +11,7 @@ import { getTracking, mapShippoStatus, shippoEnabled } from "../lib/shippo.js";
 
 const router = Router();
 const VALID_STATUSES = ["pending", "confirmed", "preparing", "shipped", "out_for_delivery", "delivered", "cancelled", "refunded"];
+async function signedInEmail(req:any){const {isAuthenticated,userId}=getAuth(req);if(!isAuthenticated||!userId)return null;const u=await clerkClient.users.getUser(userId);return u.primaryEmailAddress?.emailAddress?.trim().toLowerCase()??null;}
 
 async function ensureEvents() {
   await db.execute(sql`CREATE TABLE IF NOT EXISTS order_admin_events (
@@ -39,6 +41,8 @@ router.post("/orders/:id/tracking/refresh", async(req,res)=>{
   if(!shippoEnabled()){res.status(503).json({error:"Shipment tracking is not configured yet"});return;}
   const o=(await db.execute(sql`SELECT * FROM orders WHERE id=${req.params.id}`)).rows[0] as any;
   if(!o){res.status(404).json({error:"Order not found"});return;}
+  const email=await signedInEmail(req); if(!email){res.status(401).json({error:"Please sign in"});return;}
+  if(email!==String(o.buyer_email||"").toLowerCase()&&email!==String(o.seller_email||"").toLowerCase()){res.status(403).json({error:"That is not your order"});return;}
   if(!o.carrier||!o.tracking_number){res.status(400).json({error:"This order does not have a tracking number yet"});return;}
   try{
     const track:any=await getTracking(String(o.carrier),String(o.tracking_number));
