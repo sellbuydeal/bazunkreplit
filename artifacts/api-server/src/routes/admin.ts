@@ -9,7 +9,6 @@ import { logger } from "../lib/logger.js";
 import { syncMilestonesFor } from "../lib/milestones.js";
 import { sendSystemMessage } from "../lib/systemMessages.js";
 import { clerkClient } from "@clerk/express";
-import { DEMO_PRODUCTS } from "../demoSeedData.js";
 import { fetchAmazonDetails, buildAmazonDescription } from "../lib/amazon.js";
 import { fetchEbayDetails, buildEbayDescription } from "../lib/ebay.js";
 import {
@@ -1280,20 +1279,6 @@ router.patch("/admin/bulk-markup", async (req, res) => {
     res.status(500).json({ error: "Bulk markup failed" });
   }
 });
-
-// DELETE /api/admin/clear-demo-listings — wipe all BZK-DEMO-* listings
-router.delete("/admin/clear-demo-listings", async (req, res) => {
-  try {
-    const result = await db.execute(sql`DELETE FROM listings WHERE public_id LIKE 'BZK-DEMO-%'`);
-    const deleted = (result as unknown as { rowCount: number }).rowCount ?? 0;
-    logger.info({ deleted }, "Demo listings cleared");
-    res.json({ deleted });
-  } catch (err) {
-    logger.error({ err }, "Clear demo listings failed");
-    res.status(500).json({ error: "Failed to clear demo listings" });
-  }
-});
-
 // DELETE /api/admin/clear-amazon-imports — wipe all BZK-AMZ-* listings
 router.delete("/admin/clear-amazon-imports", async (req, res) => {
   try {
@@ -1717,58 +1702,6 @@ router.delete("/admin/clear-ebay-imports", async (req, res) => {
     res.status(500).json({ error: "Failed to clear eBay imports" });
   }
 });
-
-// POST /api/admin/seed-demo — idempotently inserts 200 demo listings
-router.post("/admin/seed-demo", async (req, res) => {
-  try {
-    const existing = await db.execute(
-      sql`SELECT COUNT(*) AS cnt FROM listings WHERE public_id LIKE 'BZK-DEMO-%'`
-    ).then(r => parseInt(String((r.rows[0] as Record<string, unknown>)?.cnt ?? "0")));
-
-    if (existing >= 200) {
-      res.json({ seeded: 0, existing, message: "Demo listings already present" });
-      return;
-    }
-
-    const SELLER_EMAIL = "bazunkdeals@gmail.com";
-    const SELLER_USERNAME = "superdeals";
-    const SELLER_NAME = "Super Deals UK";
-    const MARKUP = 1.30;
-    let inserted = 0;
-
-    for (let i = 0; i < DEMO_PRODUCTS.length; i++) {
-      const p = DEMO_PRODUCTS[i];
-      const num = String(i + 1).padStart(3, "0");
-      const publicId = `BZK-DEMO-${num}`;
-      const alreadyExists = await db.execute(
-        sql`SELECT id FROM listings WHERE public_id = ${publicId}`
-      ).then(r => r.rows.length > 0);
-      if (alreadyExists) continue;
-
-      const priceGbp = parseFloat((p.base * MARKUP).toFixed(2));
-      const specs = JSON.stringify({ source: "Amazon UK", asin: p.asin, amazon_url: `https://www.amazon.co.uk/dp/${p.asin}` });
-
-      await db.execute(sql`
-        INSERT INTO listings (public_id, title, price, price_gbp, currency, category, subcategory,
-          description, condition, image, seller_email, seller_username, seller_name,
-          tags, specifications, status, created_at, updated_at)
-        VALUES (
-          ${publicId}, ${p.title}, ${priceGbp}, ${priceGbp}, 'GBP', ${p.cat}, ${p.sub},
-          ${p.desc}, ${p.cond}, ${p.img}, ${SELLER_EMAIL}, ${SELLER_USERNAME}, ${SELLER_NAME},
-          ${p.tags}, ${specs}, 'active', NOW(), NOW()
-        )
-      `);
-      inserted++;
-    }
-
-    logger.info({ inserted }, "Demo seed completed");
-    res.json({ seeded: inserted, existing, message: `Seeded ${inserted} demo listings` });
-  } catch (err) {
-    logger.error({ err }, "Demo seed failed");
-    res.status(500).json({ error: "Seed failed", detail: String(err) });
-  }
-});
-
 // ── Gumtree scraper helpers ────────────────────────────────────────────────
 
 interface GumtreeListing {
