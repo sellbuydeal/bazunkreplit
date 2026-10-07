@@ -594,7 +594,7 @@ function ListingActions({ listing, userEmail, onUpdated, onDeleted }: {
                 </div>
 
                 {/* Price + Condition */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-semibold text-gray-600 mb-1 block">Price</label>
                     <div className="relative">
@@ -624,7 +624,7 @@ function ListingActions({ listing, userEmail, onUpdated, onDeleted }: {
                 {/* Category */}
                 <div>
                   <label className="text-xs font-semibold text-gray-600 mb-1 block">Category</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <select
                       value={draft.categoryTop}
                       onChange={(e) => {
@@ -1816,7 +1816,7 @@ function AddressesSection() {
             {editId === addr.id ? (
               <div className="p-4">
                 <p className="text-sm font-bold text-gray-900 mb-3">Edit Address</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {([ { key: "label", placeholder: "Label (e.g. Home)", span: 1 }, { key: "name", placeholder: "Full Name", span: 1 }, { key: "line1", placeholder: "Address Line 1", span: 1 }, { key: "line2", placeholder: "Address Line 2 (optional)", span: 1 }, { key: "city", placeholder: "City", span: 1 }, { key: "postcode", placeholder: "Postcode", span: 1 } ] as { key: keyof typeof editAddr; placeholder: string; span: number }[]).map(({ key, placeholder, span }) => (
                     <input key={key} placeholder={placeholder} value={editAddr[key]}
                       onChange={(e) => setEditAddr((p) => ({ ...p, [key]: e.target.value }))}
@@ -1863,7 +1863,7 @@ function AddressesSection() {
         {showAdd && (
           <div className="rounded-xl border-2 border-dashed border-[#4A5CE8]/30 p-5 bg-blue-50/20">
             <p className="text-sm font-bold text-gray-900 mb-3">New Address</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {(
                 [
                   { key: "label", placeholder: "Label (e.g. Home)", span: 1 },
@@ -2358,7 +2358,7 @@ function PaymentSection({ defaultTab = "payouts" }: { defaultTab?: "payouts" | "
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:border-[#4A5CE8] bg-white"
                 maxLength={19}
               />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   placeholder="MM / YY"
                   value={newCard.expiry}
@@ -2776,7 +2776,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-2">Business Type</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[["individual","Individual Seller"],["registered","Registered Business"],["llc","Limited Liability Co."],["corporation","Corporation"]].map(([val, label]) => (
                   <label key={val} className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-colors ${businessType === val ? "border-[#4A5CE8] bg-blue-50/40" : "border-gray-200 hover:border-gray-300"}`}>
                     <input type="radio" value={val} checked={businessType === val} onChange={() => setBusinessType(val)} className="accent-[#4A5CE8]" />
@@ -3362,7 +3362,7 @@ function MyStoreSection({ onNavigate }: { onNavigate: (section: string) => void 
                     <span className="text-xs text-gray-400">Your active items</span>
                   </div>
                   {!myListings.some(item => item.status === "active") && <p className="text-sm text-muted-foreground py-5">No active listings yet. Create your first Direct Sale to get started.</p>}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {myListings.filter(item => item.status === "active").slice(0, 6).map((p) => (
                       <div key={p.id} className="bg-gray-50 rounded-2xl overflow-hidden border border-gray-100 hover:border-gray-200 transition-colors">
                         <div className="aspect-square bg-white flex items-center justify-center p-3">
@@ -3758,7 +3758,7 @@ function OrdersSection() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1.5">Item condition</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {Object.entries(CONDITION_LABELS).map(([v, l]) => (
                       <button
                         key={v}
