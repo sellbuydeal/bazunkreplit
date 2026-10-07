@@ -3446,7 +3446,8 @@ function OrdersSection() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/orders?email=${encodeURIComponent(user.email)}`);
+        const token = await session.getToken();
+        const res = await fetch(`/api/orders`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
         if (res.ok) {
           const rows = await res.json();
           if (!cancelled) setOrders(rows.map(toDashboardOrder));
