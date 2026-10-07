@@ -7,6 +7,7 @@ import { CheckCircle2, ExternalLink, Link2, Loader2, Package, Percent, RefreshCw
 type Item={itemId:string;url:string;title:string;price:number;currency:string;image:string|null;condition:string;description:string;shipping:number|null;shippingLabel:string|null;available:boolean;categoryPath:string[]};
 const categories=CATEGORIES.filter(c=>c.slug!=="digital-products");
 const money=(currency:string,n:number)=>new Intl.NumberFormat(undefined,{style:"currency",currency:currency||"GBP"}).format(n);
+const API_BASE=(import.meta.env.VITE_API_URL||import.meta.env.VITE_API_BASE_URL||"https://bazunk-api.onrender.com").replace(/\/$/,"");
 
 type ImportRow={id:number;title:string;bazunk_price:string;supplier_price:string;supplier_currency:string;last_synced_at:string|null;sync_status:string;sync_error:string|null;public_id:string;image:string|null;listing_status:string};
 export function FreeEbayImporter(){
@@ -16,7 +17,7 @@ export function FreeEbayImporter(){
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[message,setMessage]=useState(""),[failures,setFailures]=useState<{input:string;error:string}[]>([]),[imports,setImports]=useState<ImportRow[]>([]),[syncing,setSyncing]=useState<number|null>(null);
  const subs=category==="digital"?[...CATEGORIES.find(c=>c.slug==="digital")!.subcategories,...CATEGORIES.find(c=>c.slug==="digital-products")!.subcategories.filter(s=>!CATEGORIES.find(c=>c.slug==="digital")!.subcategories.some(t=>t.name===s.name))]:categories.find(c=>c.slug===category)?.subcategories??[];
  const urls=useMemo(()=>input.split(/\r?\n|,\s*/).map(x=>x.trim()).filter(Boolean),[input]);
- async function af(url:string,init:RequestInit={}){const token=await getToken();return fetch(url,{...init,headers:{"Content-Type":"application/json",...(init.headers||{}),...(token?{Authorization:`Bearer ${token}`}:{})}})}
+ async function af(url:string,init:RequestInit={}){const token=await getToken();const target=url.startsWith("/api/")?`${API_BASE}${url}`:url;return fetch(target,{...init,headers:{"Content-Type":"application/json",...(init.headers||{}),...(token?{Authorization:`Bearer ${token}`}:{})}})}
  async function loadImports(){if(!user?.email)return;try{const r=await af(`/api/supplier/imports?email=${encodeURIComponent(user.email)}`);if(r.ok){const rows=await r.json();setImports((rows as ImportRow[]).filter((x:any)=>x.supplier_source==="ebay-public"))}}catch{}}
  useEffect(()=>{void loadImports()},[user?.email]);
  async function syncOne(id:number){setSyncing(id);setError("");try{const r=await af(`/api/supplier/imports/${id}/sync`,{method:"POST"}),d=await r.json();if(!r.ok)throw new Error(d.error||"Sync failed.");await loadImports();setMessage("Listing synced.")}catch(e){setError(e instanceof Error?e.message:"Sync failed.")}finally{setSyncing(null)}}
