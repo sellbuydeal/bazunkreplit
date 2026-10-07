@@ -258,7 +258,7 @@ function Router() {
       <Route path="/categories" component={CategoriesPage} />
       <Route path="/sell" component={SellPage} />
       <Route path="/sell/direct">{() => <FeatureGate feature="quick_sell" name="Direct Sale"><DirectSalePage /></FeatureGate>}</Route>
-      <Route path="/sell/quick">{() => <FeatureGate feature="quick_sell" name="Direct Sale"><DirectSalePage /></FeatureGate>}</Route>
+      <Route path="/sell/quick">{() => <Redirect to="/sell/direct" />}</Route>
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/importers/:source">{() => <FeatureGate feature="importers" name="Importers"><ImporterWorkspacePage /></FeatureGate>}</Route>
       <Route path="/importers">{() => <FeatureGate feature="importers" name="Importers"><ImportersPage /></FeatureGate>}</Route>
@@ -273,7 +273,7 @@ function Router() {
       <Route path="/credits">{() => <FeatureGate feature="credits" name="Credits"><CreditsPage /></FeatureGate>}</Route>
       <Route path="/promotions">{() => <FeatureGate feature="promotions" name="Promotions"><PromotionsPage /></FeatureGate>}</Route>
       <Route path="/support" component={SupportPage} />
-      <Route path="/faq" component={SupportPage} />
+      <Route path="/faq">{() => <Redirect to="/support" />}</Route>
       <Route path="/terms" component={TermsPage} />
       <Route path="/privacy" component={PrivacyPage} />
       <Route path="/offers">{() => <FeatureGate feature="offers" name="Make an Offer"><OffersPage /></FeatureGate>}</Route>
@@ -312,10 +312,10 @@ function Router() {
       <Route path="/admin/verification" component={AdminVerificationPage} />
       <Route path="/setup" component={SetupWizardPage} />
       <Route path="/videos" component={VideoPage} />
-      <Route path="/video" component={VideoPage} />
+      <Route path="/video">{() => <Redirect to="/videos" />}</Route>
       <Route path="/rewards/referrals">{() => <FeatureGate feature="referrals" name="Referrals"><ReferralsPage /></FeatureGate>}</Route>
       <Route path="/rewards">{() => <FeatureGate feature="games" name="Rewards Arcade"><RewardsPage /></FeatureGate>}</Route>
-      <Route path="/treasure-hunt">{() => { window.location.replace("/rewards"); return null; }}</Route>
+      <Route path="/treasure-hunt">{() => <Redirect to="/rewards" />}</Route>
       <Route path="/buyer-protection">{() => <FeatureGate feature="buyer_protection" name="Buyer Protection"><BuyerProtectionPage /></FeatureGate>}</Route>
       <Route path="/cashback">{() => <FeatureGate feature="cashback" name="Cashback"><CashbackPage /></FeatureGate>}</Route>
       <Route path="/welcome-new-buyers" component={WelcomeNewBuyers} />
