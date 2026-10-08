@@ -56,8 +56,12 @@ app.use(
 
 // Restrict browsers to your frontend(s). CORS_ORIGINS = comma-separated list.
 // If unset, any origin is allowed (fine while testing, tighten for production).
-const allowedOrigins = (process.env.CORS_ORIGINS ?? "")
-  .split(",").map((o) => o.trim().replace(/\/$/, "")).filter(Boolean);
+const allowedOrigins = [...new Set([
+  ...(process.env.CORS_ORIGINS ?? "").split(","),
+  "https://bazunk.com",
+  "https://www.bazunk.com",
+  "https://bazunk-web.onrender.com",
+].map((o) => o.trim().replace(/\/$/, "")).filter(Boolean))];
 app.use(
   cors({
     credentials: true,
