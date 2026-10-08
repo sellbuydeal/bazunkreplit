@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Radio, Users, ChevronRight } from "lucide-react";
 import { useLiveStream } from "@/context/LiveStreamContext";
 import { PLATFORM_META } from "@/data/livestreams";
+import { useFeature } from "@/components/FeatureGate";
 
 function timeOnAir(startedAt: string): string {
   const mins = Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000);
@@ -12,7 +13,8 @@ function timeOnAir(startedAt: string): string {
 
 export function LiveNowStrip() {
   const { liveSessions } = useLiveStream();
-  if (liveSessions.length === 0) return null;
+  const liveEnabled = useFeature("live");
+  if (!liveEnabled || liveSessions.length === 0) return null;
 
   return (
     <section className="py-8 bg-white border-b border-gray-100">
