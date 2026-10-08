@@ -236,37 +236,45 @@ router.post("/stripe/confirm-cart-payment", async (req, res) => {
 
 // ── Stripe Connect (seller payouts) ──────────────────────────────────────────
 
+// Stripe Accounts v2 recipient/Express integration. v2 account IDs remain compatible
+// with Stripe-hosted Account Links and Express login links.
+async function connectSellerEmail(req: import("express").Request): Promise<string | null> {
+  const auth = getAuth(req);
+  if (!auth.isAuthenticated || !auth.userId) return null;
+  const account = await clerkClient.users.getUser(auth.userId);
+  return account.primaryEmailAddress?.emailAddress?.toLowerCase() ?? null;
+}
+
 router.post("/stripe/connect/onboard", async (req, res) => {
   try {
-    const { email, name, returnUrl } = req.body as { email: string; name?: string; returnUrl?: string };
-    if (!email) { res.status(400).json({ error: "email required" }); return; }
-
+    const email = await connectSellerEmail(req);
+    if (!email) { res.status(401).json({ error: "Sign in to connect seller payouts." }); return; }
+    const { name } = (req.body || {}) as { name?: string };
     await storage.upsertUser(email, name);
     const stripe = await getUncachableStripeClient();
-
     let accountId = await storage.getStripeAccountId(email);
-
     if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: "express",
-        email,
-        capabilities: { transfers: { requested: true }, card_payments: { requested: true } },
-        business_type: "individual",
+      // Recipient-only: Bazunk takes payment on its platform and transfers the
+      // seller proceeds. Express requires the platform to collect fees/losses.
+      const account = await stripe.v2.core.accounts.create({
+        contact_email: email,
+        display_name: name || email.split("@")[0],
+        dashboard: "express",
+        configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } } },
+        defaults: { responsibilities: { fees_collector: "application", losses_collector: "application" } },
         metadata: { bazunk_email: email },
-      });
+      } as any);
       accountId = account.id;
       await storage.setStripeAccountId(email, accountId);
     }
-
-    const origin = returnUrl ?? resolveOrigin(req);
+    const origin = resolveOrigin(req);
     const link = await stripe.accountLinks.create({
       account: accountId,
       refresh_url: `${origin}/dashboard?section=seller-payouts&connect=refresh`,
-      return_url:  `${origin}/dashboard?section=seller-payouts&connect=success`,
+      return_url: `${origin}/dashboard?section=seller-payouts&connect=success`,
       type: "account_onboarding",
     });
-
-    res.json({ url: link.url, accountId });
+    res.json({ url: link.url });
   } catch (err) {
     logger.error({ err }, "Failed to create Connect onboarding link");
     res.status(503).json({ error: "Seller payouts are temporarily unavailable. Please try again later." });
@@ -275,45 +283,40 @@ router.post("/stripe/connect/onboard", async (req, res) => {
 
 router.get("/stripe/connect/status/:email", async (req, res) => {
   try {
-    const email = decodeURIComponent(req.params.email);
+    const email = await connectSellerEmail(req);
+    if (!email) { res.status(401).json({ error: "Sign in required." }); return; }
+    if (decodeURIComponent(req.params.email).toLowerCase() !== email) { res.status(403).json({ error: "Forbidden" }); return; }
     const accountId = await storage.getStripeAccountId(email);
-
-    if (!accountId) {
-      res.json({ connected: false, chargesEnabled: false, payoutsEnabled: false, accountId: null });
-      return;
-    }
-
+    if (!accountId) { res.json({ connected: false, chargesEnabled: false, payoutsEnabled: false, accountId: null }); return; }
     const stripe = await getUncachableStripeClient();
-    const account = await stripe.accounts.retrieve(accountId);
-
+    const account = await stripe.v2.core.accounts.retrieve(accountId, { include: ["configuration.recipient", "requirements"] } as any);
+    const recipient = (account as any).configuration?.recipient;
+    const transfers = recipient?.capabilities?.stripe_balance?.stripe_transfers;
+    const payouts = recipient?.capabilities?.stripe_balance?.payouts;
+    const active = transfers?.status === "active";
     res.json({
-      connected: true,
-      chargesEnabled: account.charges_enabled,
-      payoutsEnabled: account.payouts_enabled,
-      accountId,
-      detailsSubmitted: account.details_submitted,
+      connected: true, chargesEnabled: active, payoutsEnabled: active && (payouts == null || payouts.status === "active"),
+      accountId, detailsSubmitted: active,
     });
   } catch (err) {
     logger.error({ err }, "Failed to get Connect status");
-    res.status(500).json({ error: "Failed to get connect status", message: String(err) });
+    res.status(503).json({ error: "Could not check payout status." });
   }
 });
 
 router.get("/stripe/connect/dashboard-link/:email", async (req, res) => {
   try {
-    const email = decodeURIComponent(req.params.email);
+    const email = await connectSellerEmail(req);
+    if (!email) { res.status(401).json({ error: "Sign in required." }); return; }
+    if (decodeURIComponent(req.params.email).toLowerCase() !== email) { res.status(403).json({ error: "Forbidden" }); return; }
     const accountId = await storage.getStripeAccountId(email);
-
-    if (!accountId) {
-      res.status(404).json({ error: "No connected account" }); return;
-    }
-
+    if (!accountId) { res.status(404).json({ error: "No connected account" }); return; }
     const stripe = await getUncachableStripeClient();
     const link = await stripe.accounts.createLoginLink(accountId);
     res.json({ url: link.url });
   } catch (err) {
     logger.error({ err }, "Failed to create dashboard link");
-    res.status(500).json({ error: "Failed to get dashboard link", message: String(err) });
+    res.status(503).json({ error: "Could not open Stripe payout dashboard." });
   }
 });
 
