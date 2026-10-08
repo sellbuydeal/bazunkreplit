@@ -269,7 +269,7 @@ router.post("/stripe/connect/onboard", async (req, res) => {
     res.json({ url: link.url, accountId });
   } catch (err) {
     logger.error({ err }, "Failed to create Connect onboarding link");
-    res.status(500).json({ error: "Failed to start onboarding", message: String(err) });
+    res.status(503).json({ error: "Seller payouts are temporarily unavailable. Please try again later." });
   }
 });
 
