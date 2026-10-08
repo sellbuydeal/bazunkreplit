@@ -10,6 +10,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useState } from "react";
+import { useRawSettings } from "@/context/SiteSettingsContext";
+import { featureForHref, isFeatureEnabled } from "@/components/FeatureGate";
 
 const PILLS = [
   { icon: Tag,       label: "buyNow"    },
@@ -80,6 +82,9 @@ export function Hero() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [sellOpen, setSellOpen] = useState(false);
+  const featureSettings = useRawSettings();
+  const visibleSellOptions = SELL_OPTIONS.filter((option) => { const feature = featureForHref(option.href); return !feature || isFeatureEnabled(featureSettings, feature); });
+  const visiblePills = PILLS.filter((pill) => { const feature = pill.label === "auctions" ? "auctions" : pill.label === "flashSales" ? "flash_sales" : pill.label === "classifieds" ? "classifieds" : pill.label === "makeOffer" ? "offers" : undefined; return !feature || isFeatureEnabled(featureSettings, feature); });
 
   function handleSellClick() {
     if (!user) {
@@ -182,7 +187,7 @@ export function Hero() {
 
             {/* Marketplace type pills — aligned under categories */}
             <div className="flex flex-wrap gap-2 pt-1">
-              {PILLS.map(({ icon: Icon, label }) => (
+              {visiblePills.map(({ icon: Icon, label }) => (
                 <span key={label} className="flex items-center gap-1.5 text-white/50 text-xs font-medium bg-white/5 border border-white/10 px-3 py-1.5 rounded-full hover:border-white/20 hover:text-white/70 transition-colors">
                   <Icon className="w-3 h-3" /> {t(label, label)}
                 </span>
@@ -249,7 +254,7 @@ export function Hero() {
 
                 {/* Options */}
                 <div className="p-4 space-y-2">
-                  {SELL_OPTIONS.map(({ icon: Icon, label, desc, href, color, hover }) => (
+                  {visibleSellOptions.map(({ icon: Icon, label, desc, href, color, hover }) => (
                     <Link key={href} href={href} onClick={() => setSellOpen(false)}>
                       <div className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-gray-100 ${hover} transition-all cursor-pointer group`}>
                         <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
