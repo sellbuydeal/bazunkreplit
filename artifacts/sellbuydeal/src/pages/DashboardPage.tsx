@@ -964,6 +964,9 @@ function OverviewContent({ user, onNavigate }: { user: { name: string; email: st
           <p className="text-sm text-gray-500 mt-0.5 hidden sm:block">Manage your account, orders, and marketplace activity</p>
         </div>
         <div className="hidden lg:flex items-center gap-2">
+          <a href="https://data.bazunk.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#4A5CE8]/10 hover:bg-[#4A5CE8]/20 transition-colors text-[#4A5CE8] border border-[#4A5CE8]/20 text-sm font-semibold" title="Open Bazunk Data Platform">
+            <ExternalLink className="w-4 h-4" /> Bazunk Data Platform
+          </a>
           <Link href="/rewards" className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F26B21]/10 hover:bg-[#F26B21]/20 transition-colors text-[#F26B21] border border-[#F26B21]/20 text-sm font-semibold">
             <Gift className="w-4 h-4" /> Rewards
           </Link>
