@@ -249,7 +249,9 @@ router.post("/stripe/connect/onboard", async (req, res) => {
   try {
     const email = await connectSellerEmail(req);
     if (!email) { res.status(401).json({ error: "Sign in to connect seller payouts." }); return; }
-    const { name } = (req.body || {}) as { name?: string };
+    const { name, country } = (req.body || {}) as { name?: string; country?: string };
+    const sellerCountry = typeof country === "string" ? country.trim().toUpperCase() : "";
+    if (!/^[A-Z]{2}$/.test(sellerCountry)) { res.status(400).json({ error: "Choose your country of residence before connecting payouts." }); return; }
     await storage.upsertUser(email, name);
     const stripe = await getUncachableStripeClient();
     let accountId = await storage.getStripeAccountId(email);
@@ -258,6 +260,7 @@ router.post("/stripe/connect/onboard", async (req, res) => {
       // seller proceeds. Express requires the platform to collect fees/losses.
       const account = await stripe.v2.core.accounts.create({
         contact_email: email,
+        identity: { country: sellerCountry },
         display_name: name || email.split("@")[0],
         dashboard: "express",
         configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } } },
