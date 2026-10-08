@@ -45,6 +45,8 @@ router.post("/webhooks/shippo/tracking", async (req, res) => {
     res.status(400).json({error:"Invalid tracking event"}); return;
   }
   const status = String(latest.status).toUpperCase();
+  const substatus = String(latest?.substatus?.code || latest?.substatus || "").toLowerCase();
+  const outForDelivery = status === "TRANSIT" && ["out_for_delivery","out-for-delivery"].includes(substatus);
   if (!["UNKNOWN","PRE_TRANSIT","TRANSIT","DELIVERED","RETURNED","FAILURE"].includes(status)) {
     res.status(400).json({error:"Unsupported tracking status"}); return;
   }
@@ -58,6 +60,7 @@ router.post("/webhooks/shippo/tracking", async (req, res) => {
       // Never regress a delivered order because of delayed or duplicated webhooks.
       if (String(order.status)==="delivered" && status!=="DELIVERED") continue;
       const next = status==="DELIVERED" ? "delivered"
+        : outForDelivery && String(order.status)!=="delivered" ? "out_for_delivery"
         : status==="TRANSIT" && !["delivered","out_for_delivery"].includes(String(order.status)) ? "shipped"
         : String(order.status);
       const history = Array.isArray(track.tracking_history) ? track.tracking_history.slice(-100) : [];
@@ -70,8 +73,9 @@ router.post("/webhooks/shippo/tracking", async (req, res) => {
         updated_at=NOW() WHERE id=${order.id}`);
       if (previous !== status) await event(String(order.id),"tracking",
         status==="DELIVERED" ? "Shippo confirmed delivery" :
+        outForDelivery ? "Shippo: out for delivery" :
         ["RETURNED","FAILURE"].includes(status) ? "Shippo delivery exception" : "Shippo tracking updated",
-        [status,detail].filter(Boolean).join(" · "));
+        [outForDelivery ? "OUT_FOR_DELIVERY" : status,detail].filter(Boolean).join(" · "));
       updated++;
     }
     res.json({ok:true,updated});
