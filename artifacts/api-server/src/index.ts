@@ -685,7 +685,12 @@ app.listen(port, (err?: Error) => {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
-  logger.info({ port }, "Server listening");
+  const shippoToken = process.env.SHIPPO_API_TOKEN?.trim() || "";
+  logger.info({
+    port,
+    shippoConfigured: shippoToken.length > 0,
+    shippoTokenLength: shippoToken.length,
+  }, "Server listening");
 });
 
 runAppMigrations()
