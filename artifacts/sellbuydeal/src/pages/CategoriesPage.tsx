@@ -10,6 +10,8 @@ import { CATEGORIES } from "@/data/categories";
 import * as LucideIcons from "lucide-react";
 import { useCurrency } from "@/context/CurrencyContext";
 
+const API_BASE=(import.meta.env.VITE_API_URL||import.meta.env.VITE_API_BASE_URL||"https://bazunk-api.onrender.com").replace(/\/$/,"");
+
 type LucideIconName = keyof typeof LucideIcons;
 
 interface CategoryCount {
@@ -84,7 +86,7 @@ export function CategoriesPage() {
   const [counts, setCounts] = useState<CategoryCount[]>([]);
 
   useEffect(() => {
-    fetch("/api/listings/category-counts")
+    fetch("${API_BASE}/api/listings/category-counts")
       .then((r) => r.json())
       .then((data: CategoryCount[]) => setCounts(Array.isArray(data) ? data : []))
       .catch(() => {});
