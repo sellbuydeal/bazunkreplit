@@ -71,14 +71,13 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   });
   const [currencyCode, setCurrencyCode] = useState<CurrencyCode>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY) as CurrencyCode | null;
-      if (saved && saved in CURRENCIES) return saved as CurrencyCode;
-      // Default to locale-matched currency, fallback to USD
-      const lang = navigator.language ?? "";
-      if (lang.includes("GB") || lang.includes("en-GB")) return "GBP";
-      return "USD";
+      const savedCountry = localStorage.getItem(COUNTRY_KEY);
+      if (savedCountry && MARKET_COUNTRIES.some(c => c.code === savedCountry)) return countryToCurrency(savedCountry);
+      const locale = (navigator.language || "").toUpperCase();
+      const hit = MARKET_COUNTRIES.find(c => locale.endsWith(`-${c.code}`));
+      return countryToCurrency(hit?.code ?? "GB");
     } catch {
-      return "USD";
+      return "GBP";
     }
   });
 
@@ -88,8 +87,9 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   function setCountry(code: string) {
     if (!MARKET_COUNTRIES.some(c => c.code === code)) return;
     setCountryCode(code);
+    setCurrencyCode(countryToCurrency(code));
     try { localStorage.setItem(COUNTRY_KEY, code); } catch {}
-    setCurrency(countryToCurrency(code));
+    try { localStorage.setItem(STORAGE_KEY, countryToCurrency(code)); } catch {}
   }
 
   function setCurrency(code: CurrencyCode) {
