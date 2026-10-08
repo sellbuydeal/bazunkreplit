@@ -22,6 +22,8 @@ import { useSession } from "@clerk/react";
 import { SellerProfileCard } from "@/components/SellerProfileCard";
 import { useLanguage } from "@/context/LanguageContext";
 
+const API_BASE=(import.meta.env.VITE_API_URL||import.meta.env.VITE_API_BASE_URL||"https://bazunk-api.onrender.com").replace(/\/$/,"");
+
 const CONDITION_COLORS: Record<string, string> = {
   "new":        "bg-emerald-100 text-emerald-700 border-emerald-200",
   "brand-new":  "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -247,7 +249,7 @@ export function ListingPage() {
   useEffect(() => {
     if (!staticProduct && id) {
       setLoading(true);
-      fetch(`/api/listings/${id}`)
+      fetch(`${API_BASE}/api/listings/${id}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => { if (data?.id) setApiProduct(mapApiToProduct(data)); setLoading(false); })
         .catch(() => setLoading(false));
@@ -292,7 +294,7 @@ export function ListingPage() {
     else if (/(google|bing|duckduckgo|yahoo|ecosia|baidu)/.test(host)) source = "search";
     else if (host && host === window.location.hostname) source = "internal";
     else if (host) source = "referral";
-    fetch(`/api/listings/${apiProduct.id}/view`, {
+    fetch(`${API_BASE}/api/listings/${apiProduct.id}/view`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source, visitor }),
