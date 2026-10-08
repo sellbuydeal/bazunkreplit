@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 
 const ADMIN_TOKEN_KEY = "sbd_admin_token";
+const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || "https://bazunk-api.onrender.com").replace(/\/$/, "");
+const apiUrl = (path: string) => path.startsWith("/api/") ? `${API_BASE}${path}` : path;
 
 interface AdminContextValue {
   token: string | null;
@@ -15,7 +17,7 @@ const AdminContext = createContext<AdminContextValue>({
   login: async () => false,
   logout: () => {},
   isAdmin: false,
-  authFetch: async (path) => fetch(path),
+  authFetch: async (path) => fetch(apiUrl(path)),
 });
 
 export function AdminProvider({ children }: { children: React.ReactNode }) {
@@ -31,7 +33,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
   async function login(email: string, password: string): Promise<boolean> {
     try {
-      const res = await fetch("/api/admin/login", {
+      const res = await fetch(apiUrl("/api/admin/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -56,7 +58,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     const headers = new Headers(options.headers);
     headers.set("Authorization", `Bearer ${requestToken ?? ""}`);
     if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-    const response = await fetch(path, { ...options, headers });
+    const response = await fetch(apiUrl(path), { ...options, headers });
     // Do not let an old request sign out a newly authenticated session.
     if (response.status === 401 && currentToken.current === requestToken) logout();
     return response;
