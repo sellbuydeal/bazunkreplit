@@ -2027,6 +2027,7 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
   const [status, setStatus] = useState<ConnectStatus>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState("");
   const [dashLoading, setDashLoading] = useState(false);
   const { getToken } = useClerkAuth();
   const [feeCategory,setFeeCategory]=useState("");
@@ -2050,13 +2051,20 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
 
   async function handleConnect() {
     setConnecting(true);
+    setConnectError("");
     try {
+      const token = await getToken();
       const res = await fetch("/api/stripe/connect/onboard", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ email: user.email, name: user.name }),
       });
-      if (res.ok) { const { url } = await res.json(); window.location.href = url; }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Seller payouts are temporarily unavailable. Please try again later.");
+      if (!data.url) throw new Error("Stripe onboarding is temporarily unavailable. Please try again later.");
+      window.location.href = data.url;
+    } catch (err: any) {
+      setConnectError(err?.message || "Seller payouts are temporarily unavailable. Please try again later.");
     } finally { setConnecting(false); }
   }
 
@@ -2106,6 +2114,7 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
             {connecting ? <><RefreshCw className="w-4 h-4 animate-spin" />Redirecting to Stripe…</> : <><ExternalLink className="w-4 h-4" />Connect Bank Account via Stripe</>}
           </button>
         )}
+        {connectError && <div className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{connectError}</div>}
         {status?.chargesEnabled && (
           <button onClick={handleDashboard} disabled={dashLoading}
             className="mt-4 w-full py-2.5 rounded-xl border border-emerald-300 text-emerald-700 hover:bg-emerald-100 font-semibold text-sm transition-colors flex items-center justify-center gap-2">
