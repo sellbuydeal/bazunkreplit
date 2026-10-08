@@ -33,7 +33,7 @@ export function AdminOrdersPage(){const {authFetch}=useAdmin();const [orders,set
      const d=await readResponse(r,message);await load();await open(id);if(d?.warning)setError(d.warning);
    }catch(e:any){setError(e.message||message)}finally{setBusy(false)}
  }
- async function refreshTracking(){if(!detail||busy)return;const id=detail.order.id;setBusy(true);setError("");try{const r=await authFetch(`/api/admin/orders/${id}/tracking/refresh`,{method:"POST"});await readResponse(r,"Shippo tracking refresh failed.");await load();await open(id);}catch(e:any){setError(e.message||"Shippo tracking refresh failed.")}finally{setBusy(false)}}
+ async function refreshTracking(){if(!detail||busy)return;const id=detail.order.id;setBusy(true);setError("");try{const r=await authFetch(`https://bazunk-api.onrender.com/api/admin/orders/${id}/tracking/refresh`,{method:"POST"});await readResponse(r,"Shippo tracking refresh failed.");await load();await open(id);}catch(e:any){setError(e.message||"Shippo tracking refresh failed.")}finally{setBusy(false)}}
  async function save(){if(!detail)return;const o=detail.order;await action("","PATCH",{status:o.status,trackingNumber:o.tracking_number,carrier:o.carrier,estimatedDelivery:o.estimated_delivery},"Save failed. Please retry.")}
  async function cancel(){if(!detail||busy||!confirm("Cancel this order? This does not automatically refund the payment."))return;await action("/cancel","POST",{},"Cancel failed. Please retry.")}
  async function releasePayout(){if(!detail||busy||!confirm("Transfer this order's net proceeds to the seller's connected Stripe account, or retry a pending reversal?"))return;await action("/release-payout","POST",{},"Payout release failed. Please check the order before retrying.")}
