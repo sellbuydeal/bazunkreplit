@@ -48,6 +48,7 @@ import { PromotionsPage } from "@/pages/PromotionsPage";
 import { SupportPage } from "@/pages/SupportPage";
 import { TermsPage } from "@/pages/TermsPage";
 import { PrivacyPage } from "@/pages/PrivacyPage";
+import { EmailPreferencesPage } from "@/pages/EmailPreferencesPage";
 import { OffersPage } from "@/pages/OffersPage";
 import { LivePage, LiveHubPage } from "@/pages/LivePage";
 import { LiveNowStrip } from "@/components/LiveNowStrip";
@@ -277,6 +278,7 @@ function Router() {
       <Route path="/faq">{() => <Redirect to="/support" />}</Route>
       <Route path="/terms" component={TermsPage} />
       <Route path="/privacy" component={PrivacyPage} />
+      <Route path="/settings/notifications" component={EmailPreferencesPage} />
       <Route path="/offers">{() => <FeatureGate feature="offers" name="Make an Offer"><OffersPage /></FeatureGate>}</Route>
       <Route path="/live">{() => <FeatureGate feature="live" name="Live selling"><LiveHubPage /></FeatureGate>}</Route>
       <Route path="/live/:id">{() => <FeatureGate feature="live" name="Live selling"><LivePage /></FeatureGate>}</Route>
