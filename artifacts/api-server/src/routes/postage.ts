@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Router } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
 import { db } from "@workspace/db";
@@ -40,6 +41,7 @@ const address=(a:any)=>({
 });
 function valid(a:any){return a.name&&a.street1&&a.city&&a.zip&&/^[A-Z]{2}$/.test(a.country);}
 router.post("/orders/:id/postage/quote",async(req,res)=>{
+ if(process.env.SHIPPO_LABEL_PURCHASES_ENABLED!=="true"){res.status(503).json({error:"Postage labels are not yet enabled"});return;}
  try{
   const seller=await email(req);if(!seller){res.status(401).json({error:"Sign in required"});return;}
   const order=(await db.execute(sql`SELECT id,seller_email,status FROM orders WHERE id=${req.params.id}`)).rows[0] as any;
@@ -55,6 +57,7 @@ router.post("/orders/:id/postage/quote",async(req,res)=>{
  }catch(err){logger.error({err},"Postage quote failed");res.status(502).json({error:"Could not retrieve postage rates. Check addresses and try again."});}
 });
 router.post("/orders/:id/postage/checkout",async(req,res)=>{
+ if(process.env.SHIPPO_LABEL_PURCHASES_ENABLED!=="true"){res.status(503).json({error:"Postage labels are not yet enabled"});return;}
  try{
   const seller=await email(req);if(!seller){res.status(401).json({error:"Sign in required"});return;}
   const order=(await db.execute(sql`SELECT id,seller_email,status FROM orders WHERE id=${req.params.id}`)).rows[0] as any;
@@ -66,11 +69,11 @@ router.post("/orders/:id/postage/checkout",async(req,res)=>{
   const token=process.env.SHIPPO_API_TOKEN;if(!token){res.status(503).json({error:"Postage unavailable"});return;}
   const r=await fetch(BASE+"/rates/"+encodeURIComponent(rateId),{headers:{Authorization:"ShippoToken "+token}});
   const rate:any=await r.json().catch(()=>({}));
-  if(!r.ok||rate.shipment!==shipmentId||rate.currency!=="GBP"){res.status(400).json({error:"Quote expired or invalid. Request new rates."});return;}
+  if(!r.ok||(typeof rate.shipment==="string"?rate.shipment:rate.shipment?.object_id)!==shipmentId||rate.currency!=="GBP"){res.status(400).json({error:"Quote expired or invalid. Request new rates."});return;}
   const amount=Math.round(Number(rate.amount)*100);
   if(!Number.isSafeInteger(amount)||amount<50||amount>100000){res.status(400).json({error:"Invalid postage amount"});return;}
   await table();
-  const id=crypto.randomUUID();
+  const id=randomUUID();
   await db.execute(sql`INSERT INTO shippo_label_orders(id,order_id,seller_email,shipment_id,rate_id,amount_pence,status)
    VALUES(${id},${order.id},${seller},${shipmentId},${rateId},${amount},'quoted')`);
   const stripe=await getUncachableStripeClient();
