@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useRawSettings } from "@/context/SiteSettingsContext";
+import { featureForHref, isFeatureEnabled } from "@/components/FeatureGate";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import {
@@ -230,7 +231,7 @@ export function SellPage() {
       {/* Selling option cards */}
       <section className="container mx-auto px-4 py-14">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {SELL_OPTIONS.map((option, i) => {
+          {SELL_OPTIONS.filter(option => { const feature=featureForHref(option.href); return !feature || isFeatureEnabled(rawSettings,feature); }).map((option, i) => {
             const Icon = option.icon;
             return (
               <motion.div
