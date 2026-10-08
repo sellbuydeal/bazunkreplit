@@ -419,6 +419,22 @@ router.post("/user/import-ebay", async (req, res) => {
 });
 
 
+// Shopify URL preview for signed-in Bazunk sellers. Only the URL host itself is fetched; redirects are rejected.
+router.post("/user/shopify-public/preview", async (req,res)=>{
+ const email=await requestEmail(req);if(!email){res.status(401).json({error:"Sign in to import Shopify products."});return;}
+ try{
+  const raw=String(req.body.url??"").trim();const u=new URL(/^https?:\/\//i.test(raw)?raw:`https://${raw}`);
+  if(u.protocol!=="https:"||!u.hostname.includes(".")||u.username||u.password){res.status(400).json({error:"Enter a valid HTTPS Shopify store URL."});return;}
+  const host=u.hostname.toLowerCase();if(host==="localhost"||host.endsWith(".local")||/^\d+(\.\d+){3}$/.test(host)){res.status(400).json({error:"Private/local hosts are not allowed."});return;}
+  const product=u.pathname.match(/^\/products\/([^/?#]+)/),collection=u.pathname.match(/^\/collections\/([^/?#]+)/);
+  const endpoint=`https://${host}${product?`/products/${encodeURIComponent(product[1])}.js`:collection?`/collections/${encodeURIComponent(collection[1])}/products.json?limit=100`:"/products.json?limit=100"}`;
+  const r=await fetch(endpoint,{headers:{accept:"application/json"},redirect:"error",signal:AbortSignal.timeout(12000)});
+  if(!r.ok)throw new Error(`Shopify storefront returned ${r.status}`);const j:any=await r.json();const rows=product?[j]:(j.products??[]);
+  const items=rows.slice(0,100).map((p:any)=>{const variants=Array.isArray(p.variants)?p.variants:[],v=variants[0],amount=Number(v?.price??0);return{provider:"shopify",externalId:String(p.handle||p.id),sourceUrl:`https://${host}/products/${p.handle}`,title:String(p.title||"Shopify product"),description:String(p.body_html||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim(),brand:p.vendor||undefined,category:p.product_type||undefined,price:{amount:Number.isFinite(amount)?amount:0,currency:String(req.body.currency||"GBP").toUpperCase()},images:(p.images??[]).map((x:any)=>({url:typeof x==="string"?x:String(x.src||"")})).filter((x:any)=>/^https:\/\//.test(x.url)),variants:variants.map((x:any)=>({id:String(x.id),name:String(x.title||"Default"),value:String(x.title||"Default"),available:x.available!==false,price:{amount:Number(x.price||0),currency:String(req.body.currency||"GBP").toUpperCase()}})),availability:variants.some((x:any)=>x.available!==false)?"in_stock":"out_of_stock"}});
+  res.json({store:host,kind:product?"product":collection?"collection":"store",items});
+ }catch(e){res.status(422).json({error:e instanceof Error?e.message:"Could not read this Shopify storefront."});}
+});
+
 // Shopify public storefront -> Bazunk listings. Product data is normalized by Data Platform before posting here.
 router.post("/user/import-shopify-public", async (req, res) => {
  try {
