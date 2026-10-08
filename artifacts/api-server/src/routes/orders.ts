@@ -8,6 +8,7 @@ import { randomUUID, timingSafeEqual } from "crypto";
 import { getUncachableStripeClient } from "../stripeClient.js";
 import { recordAdminAudit } from "../lib/adminAudit.js";
 import { getTracking, mapShippoStatus, shippoEnabled, shippoCarrier } from "../lib/shippo.js";
+import { sendSystemMessage } from "../lib/systemMessages.js";
 
 const router = Router();
 const VALID_STATUSES = ["pending", "confirmed", "preparing", "shipped", "out_for_delivery", "delivered", "cancelled", "refunded"];
@@ -51,7 +52,7 @@ router.post("/webhooks/shippo/tracking", async (req, res) => {
     res.status(400).json({error:"Unsupported tracking status"}); return;
   }
   try {
-    const matches = (await db.execute(sql`SELECT id, status, carrier, tracking_number, tracking_status, tracking_history
+    const matches = (await db.execute(sql`SELECT id, status, carrier, tracking_number, tracking_status, tracking_history, buyer_email, seller_email, item_title
       FROM orders WHERE tracking_number=${number} AND status NOT IN ('cancelled','refunded')`)).rows as any[];
     let updated = 0;
     for (const order of matches) {
@@ -71,11 +72,23 @@ router.post("/webhooks/shippo/tracking", async (req, res) => {
         estimated_delivery=COALESCE(${track.eta??null},estimated_delivery),
         delivered_at=CASE WHEN ${next}='delivered' THEN COALESCE(delivered_at,NOW()) ELSE delivered_at END,
         updated_at=NOW() WHERE id=${order.id}`);
-      if (previous !== status) await event(String(order.id),"tracking",
-        status==="DELIVERED" ? "Shippo confirmed delivery" :
-        outForDelivery ? "Shippo: out for delivery" :
-        ["RETURNED","FAILURE"].includes(status) ? "Shippo delivery exception" : "Shippo tracking updated",
-        [outForDelivery ? "OUT_FOR_DELIVERY" : status,detail].filter(Boolean).join(" · "));
+      if (previous !== status) {
+        await event(String(order.id),"tracking",
+          status==="DELIVERED" ? "Shippo confirmed delivery" :
+          outForDelivery ? "Shippo: out for delivery" :
+          ["RETURNED","FAILURE"].includes(status) ? "Shippo delivery exception" : "Shippo tracking updated",
+          [outForDelivery ? "OUT_FOR_DELIVERY" : status,detail].filter(Boolean).join(" · "));
+        const title=String(order.item_title||"your order"), buyer=String(order.buyer_email||""), seller=String(order.seller_email||"");
+        if(outForDelivery) void sendSystemMessage(buyer,{category:"Delivery update",subject:"Out for delivery: "+title,body:"Your Bazunk order "+order.id+" is out for delivery."+(detail?" "+detail:"")});
+        else if(status==="DELIVERED"){
+          void sendSystemMessage(buyer,{category:"Delivery update",subject:"Delivered: "+title,body:"Shippo has confirmed that your Bazunk order "+order.id+" was delivered."});
+          void sendSystemMessage(seller,{category:"Sale update",subject:"Delivered: "+title,body:"Shippo has confirmed delivery of Bazunk order "+order.id+"."});
+        } else if(["RETURNED","FAILURE"].includes(status)){
+          const body="There is a delivery problem with Bazunk order "+order.id+"."+(detail?" "+detail:"")+" Please check the order tracking for the latest information.";
+          void sendSystemMessage(buyer,{category:"Delivery problem",subject:"Delivery problem: "+title,body});
+          void sendSystemMessage(seller,{category:"Delivery problem",subject:"Delivery problem: "+title,body});
+        }
+      }
       updated++;
     }
     res.json({ok:true,updated});
