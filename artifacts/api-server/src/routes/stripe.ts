@@ -263,7 +263,7 @@ router.post("/stripe/connect/onboard", async (req, res) => {
         configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } } },
         defaults: { responsibilities: { fees_collector: "application", losses_collector: "application" } },
         metadata: { bazunk_email: email },
-      } as any);
+      } as any, { stripeVersion: "2026-09-30.endive" as any });
       accountId = account.id;
       await storage.setStripeAccountId(email, accountId);
     }
@@ -289,7 +289,7 @@ router.get("/stripe/connect/status/:email", async (req, res) => {
     const accountId = await storage.getStripeAccountId(email);
     if (!accountId) { res.json({ connected: false, chargesEnabled: false, payoutsEnabled: false, accountId: null }); return; }
     const stripe = await getUncachableStripeClient();
-    const account = await stripe.v2.core.accounts.retrieve(accountId, { include: ["configuration.recipient", "requirements"] } as any);
+    const account = await stripe.v2.core.accounts.retrieve(accountId, { include: ["configuration.recipient", "requirements"] } as any, { stripeVersion: "2026-09-30.endive" as any });
     const recipient = (account as any).configuration?.recipient;
     const transfers = recipient?.capabilities?.stripe_balance?.stripe_transfers;
     const payouts = recipient?.capabilities?.stripe_balance?.payouts;
