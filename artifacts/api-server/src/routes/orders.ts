@@ -4,10 +4,10 @@ import { clerkClient, getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/adminAuth.js";
-import { randomUUID } from "crypto";
+import { randomUUID, timingSafeEqual } from "crypto";
 import { getUncachableStripeClient } from "../stripeClient.js";
 import { recordAdminAudit } from "../lib/adminAudit.js";
-import { getTracking, mapShippoStatus, shippoEnabled } from "../lib/shippo.js";
+import { getTracking, mapShippoStatus, shippoEnabled, shippoCarrier } from "../lib/shippo.js";
 
 const router = Router();
 const VALID_STATUSES = ["pending", "confirmed", "preparing", "shipped", "out_for_delivery", "delivered", "cancelled", "refunded"];
@@ -25,6 +25,60 @@ async function event(orderId:string, type:string, title:string, detail?:string|n
   await db.execute(sql`INSERT INTO order_admin_events(id,order_id,event_type,title,detail,admin_email,created_at)
     VALUES(${randomUUID()},${orderId},${type},${title},${detail??null},${admin??null},NOW())`);
 }
+
+// Shippo sends track_updated events to this endpoint. A separate random secret in
+// the webhook URL prevents unauthenticated parties from changing order status.
+// Configure SHIPPO_WEBHOOK_SECRET in Render and use the same value in Shippo's URL.
+router.post("/webhooks/shippo/tracking", async (req, res) => {
+  const secret = process.env.SHIPPO_WEBHOOK_SECRET?.trim();
+  const supplied = typeof req.query.key === "string" ? req.query.key : "";
+  if (!secret || secret.length < 32) { res.status(503).json({error:"Shippo webhook not configured"}); return; }
+  const a = Buffer.from(secret), b = Buffer.from(supplied);
+  if (a.length !== b.length || !timingSafeEqual(a,b)) { res.status(401).json({error:"Unauthorized"}); return; }
+  const payload:any = req.body;
+  if (payload?.event !== "track_updated") { res.json({ok:true,ignored:true}); return; }
+  const track:any = payload?.data;
+  const number = String(track?.tracking_number || "").trim();
+  const carrier = String(track?.carrier || "").trim();
+  const latest = track?.tracking_status;
+  if (!number || !carrier || !latest || typeof latest.status !== "string") {
+    res.status(400).json({error:"Invalid tracking event"}); return;
+  }
+  const status = String(latest.status).toUpperCase();
+  if (!["UNKNOWN","PRE_TRANSIT","TRANSIT","DELIVERED","RETURNED","FAILURE"].includes(status)) {
+    res.status(400).json({error:"Unsupported tracking status"}); return;
+  }
+  try {
+    const matches = (await db.execute(sql`SELECT id, status, carrier, tracking_number, tracking_status, tracking_history
+      FROM orders WHERE tracking_number=${number} AND status NOT IN ('cancelled','refunded')`)).rows as any[];
+    let updated = 0;
+    for (const order of matches) {
+      if (shippoCarrier(String(order.carrier),number) !== shippoCarrier(carrier,number)) continue;
+      const previous = String(order.tracking_status || "").toUpperCase();
+      // Never regress a delivered order because of delayed or duplicated webhooks.
+      if (String(order.status)==="delivered" && status!=="DELIVERED") continue;
+      const next = status==="DELIVERED" ? "delivered"
+        : status==="TRANSIT" && !["delivered","out_for_delivery"].includes(String(order.status)) ? "shipped"
+        : String(order.status);
+      const history = Array.isArray(track.tracking_history) ? track.tracking_history.slice(-100) : [];
+      const detail = String(latest.status_details || "").slice(0,1000);
+      await db.execute(sql`UPDATE orders SET status=${next},tracking_status=${status},
+        tracking_eta=${track.eta??null},tracking_last_event=${detail},
+        tracking_updated_at=NOW(),tracking_history=${JSON.stringify(history)}::jsonb,
+        estimated_delivery=COALESCE(${track.eta??null},estimated_delivery),
+        delivered_at=CASE WHEN ${next}='delivered' THEN COALESCE(delivered_at,NOW()) ELSE delivered_at END,
+        updated_at=NOW() WHERE id=${order.id}`);
+      if (previous !== status) await event(String(order.id),"tracking",
+        status==="DELIVERED" ? "Shippo confirmed delivery" :
+        ["RETURNED","FAILURE"].includes(status) ? "Shippo delivery exception" : "Shippo tracking updated",
+        [status,detail].filter(Boolean).join(" · "));
+      updated++;
+    }
+    res.json({ok:true,updated});
+  } catch (err) {
+    res.status(500).json({error:"Tracking update failed"});
+  }
+});
 
 router.post("/orders", requireAdmin, async (req, res) => {
   const { buyerEmail, sellerEmail, itemTitle, itemImage, price, address, notes } = req.body as Record<string, string>;
