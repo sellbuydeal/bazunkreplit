@@ -90,6 +90,32 @@ router.get("/admin/orders", requireAdmin, async (req,res)=>{
   res.json({orders:data.map(o=>{const s=cache.get(String(o.stripe_session_id));return {...o,payment_status:s?.payment_status??(o.stripe_session_id?"unknown":"manual"),payment_currency:s?.currency?.toUpperCase?.()??"GBP",payment_total:s?.amount_total!=null?s.amount_total/100:null};})});
 });
 
+router.post("/admin/orders/:id/tracking/refresh", requireAdmin, async(req,res)=>{
+  if(!shippoEnabled()){res.status(503).json({error:"Shippo is not configured on the API service"});return;}
+  const o=(await db.execute(sql`SELECT * FROM orders WHERE id=${req.params.id}`)).rows[0] as any;
+  if(!o){res.status(404).json({error:"Order not found"});return;}
+  if(!o.carrier||!o.tracking_number){res.status(400).json({error:"This order does not have a carrier and tracking number"});return;}
+  try{
+    const track:any=await getTracking(String(o.carrier),String(o.tracking_number));
+    const latest=track?.tracking_status||{};
+    const mapped=mapShippoStatus(latest.status);
+    const nextStatus=mapped==="delivered"?"delivered":(mapped==="shipped"&&!["delivered","out_for_delivery"].includes(String(o.status))?"shipped":String(o.status));
+    const history=track?.tracking_history??[];
+    await db.execute(sql`UPDATE orders SET status=${nextStatus},tracking_status=${latest.status??null},
+      tracking_eta=${track?.eta??null},estimated_delivery=COALESCE(${track?.eta??null},estimated_delivery),
+      tracking_last_event=${latest.status_details??null},tracking_updated_at=NOW(),
+      tracking_history=${JSON.stringify(history)}::jsonb,
+      delivered_at=CASE WHEN ${nextStatus}='delivered' THEN COALESCE(delivered_at,NOW()) ELSE delivered_at END,
+      updated_at=NOW() WHERE id=${o.id}`);
+    await event(o.id,"tracking","Shippo tracking refreshed",[`Status: ${latest.status||"unknown"}`,latest.status_details].filter(Boolean).join(" · "));
+    res.json({ok:true,status:nextStatus,trackingStatus:latest.status??null,eta:track?.eta??null,lastEvent:latest.status_details??null,history});
+  }catch(err:any){
+    const message=err?.message||"Shippo tracking refresh failed";
+    await event(o.id,"tracking_error","Shippo tracking error",message).catch(()=>{});
+    res.status(502).json({error:message});
+  }
+});
+
 router.get("/admin/orders/:id/command", requireAdmin, async(req,res)=>{
   await ensureEvents(); const id=req.params.id;
   const o=(await db.execute(sql`SELECT * FROM orders WHERE id=${id}`)).rows[0] as any; if(!o){res.status(404).json({error:"Order not found"});return;}
