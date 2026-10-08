@@ -33,6 +33,7 @@ import { ALL_PRODUCTS } from "@/data/products";
 
 import { StoreToolkit } from "@/components/StoreToolkit";
 import { SellerSales } from "@/components/SellerSales";
+import { SellerShipping } from "@/components/SellerShipping";
 import { ReviewModal } from "@/components/ReviewModal";
 import { CATEGORIES as SITE_CATEGORIES } from "@/data/categories";
 
@@ -69,6 +70,7 @@ const SIDEBAR_CATEGORIES: SidebarCategory[] = [
       { id: "my-store",      label: "My Store",      icon: Store,     iconBg: "bg-[#F26B21]" },
       { id: "my-listings",   label: "My Listings",   icon: Package,   iconBg: "bg-[#F26B21]" },
       { id: "sales",         label: "Sales",         icon: BarChart2, iconBg: "bg-[#F26B21]" },
+      { id: "shipping-centre", label: "Shipping", icon: Truck, iconBg: "bg-[#4A5CE8]" },
       { id: "my-auctions",   label: "My Auctions",   icon: Gavel,     iconBg: "bg-[#F26B21]" },
       { id: "my-flash-sales",label: "Flash Sales",   icon: Zap,       iconBg: "bg-[#F26B21]" },
       { id: "auto-accept",   label: "Auto-Accept",   icon: Zap,       iconBg: "bg-amber-500"  },
@@ -5983,6 +5985,7 @@ export function DashboardPage() {
             )}
             {activeSection === "orders" && <OrdersSection />}
             {activeSection === "sales" && <SellerSales />}
+            {activeSection === "shipping-centre" && <SellerShipping />}
             {activeSection === "watchlist" && (
               <div className="bg-white rounded-2xl border border-gray-100 flex flex-col" style={{ minHeight: 400 }}>
                 <div className="p-5 border-b border-gray-100 flex items-center justify-between">
