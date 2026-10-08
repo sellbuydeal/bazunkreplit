@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health.js";
+import emailPreferencesRouter from "./emailPreferences.js";
 import stripeRouter from "./stripe.js";
 import adminRouter from "./admin.js";
 import setupRouter from "./setup.js";
@@ -31,6 +32,7 @@ const router: IRouter = Router();
 router.use(featureGate);
 
 router.use(healthRouter);
+router.use(emailPreferencesRouter);
 router.use(stripeRouter);
 router.use(adminRouter);
 router.use(setupRouter);

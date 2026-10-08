@@ -2,6 +2,7 @@
 import { logger } from "./lib/logger.js";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { createHmac } from "node:crypto";
 
 const FROM = process.env.EMAIL_FROM ?? "Bazunk <onboarding@resend.dev>";
 const SITE = process.env.PUBLIC_BASE_URL ?? "https://bazunk-web.onrender.com";
@@ -24,7 +25,13 @@ export async function sendWelcomeEmail(email:string,name?:string):Promise<void>{
   await send(email,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/dashboard">Open Dashboard</a></p>`));
 }
 
-async function send(to: string, subject: string, html: string): Promise<void> {
+function tokenFor(email:string):string { const secret=process.env.EMAIL_PREFERENCES_SECRET||process.env.SESSION_SECRET; if(!secret)return "";const data=Buffer.from(email.toLowerCase().trim()).toString("base64url");return data+"."+createHmac("sha256",secret).update(data).digest("base64url"); }
+async function send(to: string, subject: string, html: string, category?: string): Promise<void> {
+  if(category){try{const result=await db.execute(sql`SELECT enabled FROM email_notification_preferences WHERE email=${to.toLowerCase().trim()} AND category=${category}`);if(result.rows[0]?.enabled===false)return;}catch(e){logger.warn({err:e,category},"Could not check optional email preference");return;}}
+
+  const token=tokenFor(to);
+  if(token){const url=`${SITE}/settings/notifications?token=${encodeURIComponent(token)}`;html=html.replace("</body>",`<div style="max-width:560px;margin:0 auto 20px;text-align:center;font:12px Arial;color:#777"><a href="${url}">Manage notifications</a> · <a href="${url}&unsubscribe=marketing">Unsubscribe from marketing</a></div></body>`);}
+
   try {
     if (!process.env.RESEND_API_KEY) {
       logger.warn({ to, subject }, "RESEND_API_KEY not set — email skipped");
@@ -67,7 +74,7 @@ function base(content: string): string {
 <div class="wrap">
   <div class="header"><span class="logo">Baz<span>unk</span></span></div>
   <div class="body">${content}</div>
-  <div class="footer">© ${new Date().getFullYear()} Bazunk · UK Peer-to-Peer Marketplace</div>
+  <div class="footer">© ${new Date().getFullYear()} Bazunk · UK Peer-to-Peer Marketplace<br><a href="${SITE}/terms">Terms &amp; Conditions</a> · <a href="${SITE}/privacy">Privacy Policy</a></div>
 </div>
 </body></html>`;
 }
@@ -92,7 +99,7 @@ export async function sendNewBidNotification(opts: {
     <p>Good luck with your sale!</p>
   `);
   const t=await editableTemplate("new_bid",`New bid on "{{auction_title}}"`,`{{bidder_name}} placed a bid of £{{bid_amount}} on {{auction_title}}.\n\nTotal bids: {{bid_count}}\n\nView auction: {{auction_url}}`,{auction_title:auctionTitle,bidder_name:bidderName,bid_amount:bidAmount.toFixed(2),bid_count:currentBidCount,auction_url:`${SITE}/auctions/${auctionId}`});
-  await send(sellerEmail,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>`));
+  await send(sellerEmail,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>`), "auction_bids");
 }
 
 export async function sendOutbidNotification(opts: {
@@ -113,7 +120,7 @@ export async function sendOutbidNotification(opts: {
     <p><a class="btn" href="${SITE}/auctions/${auctionId}">Bid Again</a></p>
   `);
   const t=await editableTemplate("outbid",`You\'ve been outbid on "{{auction_title}}"`,`You\'ve been outbid on {{auction_title}}.\n\nNew bid: £{{new_bid}}\nMinimum next bid: £{{min_next_bid}}\n\nBid again: {{auction_url}}`,{auction_title:auctionTitle,new_bid:newBidAmount.toFixed(2),min_next_bid:minNextBid.toFixed(2),auction_url:`${SITE}/auctions/${auctionId}`});
-  await send(email,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/auctions/${auctionId}">Bid Again</a></p>`));
+  await send(email,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/auctions/${auctionId}">Bid Again</a></p>`), "auction_bids");
 }
 
 export async function sendAuctionWonNotification(opts: {
@@ -155,7 +162,7 @@ export async function sendAuctionEndedSellerNotification(opts: {
     <p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>
   `);
   const t=await editableTemplate("auction_ended",`Your auction "{{auction_title}}" has ended`,`Your auction {{auction_title}} ended with a winning bid of £{{winning_bid}}.\n\nWinner: {{winner_name}} ({{winner_email}})\n\nOpen auction: {{auction_url}}`,{auction_title:auctionTitle,winning_bid:winningBid.toFixed(2),winner_name:winnerName,winner_email:winnerEmail,auction_url:`${SITE}/auctions/${auctionId}`});
-  await send(sellerEmail,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>`));
+  await send(sellerEmail,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/auctions/${auctionId}">View Auction</a></p>`), "auction_bids");
 }
 
 export async function sendCreditsConfirmation(opts: {
@@ -174,7 +181,7 @@ export async function sendCreditsConfirmation(opts: {
     <p><a class="btn" href="${SITE}/dashboard">Go to Dashboard</a></p>
   `);
   const t=await editableTemplate("credits_added","Your Bazunk credits have been added","Hi {{name}},\n\n{{credits}} credits have been added to your Bazunk account.\n\nYour new balance is {{balance}}.\n\nOpen Dashboard: {{dashboard_url}}",{name:name??"there",credits:creditsAdded.toFixed(2),balance:newBalance.toFixed(2),dashboard_url:`${SITE}/dashboard`});
-  await send(email,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/dashboard">Go to Dashboard</a></p>`));
+  await send(email,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/dashboard">Go to Dashboard</a></p>`), "rewards");
 }
 
 export async function sendOrderConfirmation(opts: {
