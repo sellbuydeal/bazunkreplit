@@ -2031,6 +2031,7 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState("");
+  const [payoutCountry, setPayoutCountry] = useState("");
   const [dashLoading, setDashLoading] = useState(false);
   const { getToken } = useClerkAuth();
   const [feeCategory,setFeeCategory]=useState("");
@@ -2061,7 +2062,7 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
       const res = await fetch("/api/stripe/connect/onboard", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ email: user.email, name: user.name }),
+        body: JSON.stringify({ email: user.email, name: user.name, country: payoutCountry }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Seller payouts are temporarily unavailable. Please try again later.");
@@ -2114,7 +2115,16 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
           </div>
         </div>
         {!loading && !status?.chargesEnabled && (
-          <button onClick={handleConnect} disabled={connecting}
+          <label className="mt-4 block text-xs font-semibold text-gray-600">Country of residence for payouts
+            <select value={payoutCountry} onChange={e => setPayoutCountry(e.target.value)} className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900">
+              <option value="">Select your country</option>
+              <option value="GB">United Kingdom</option><option value="IE">Ireland</option><option value="US">United States</option><option value="CA">Canada</option><option value="AU">Australia</option>
+              <option value="DE">Germany</option><option value="FR">France</option><option value="ES">Spain</option><option value="IT">Italy</option><option value="NL">Netherlands</option><option value="BE">Belgium</option><option value="PT">Portugal</option><option value="AT">Austria</option><option value="PL">Poland</option>
+            </select>
+          </label>
+        )}
+        {!loading && !status?.chargesEnabled && (
+          <button onClick={handleConnect} disabled={connecting || !payoutCountry} disabled={connecting}
             className="mt-4 w-full py-3 rounded-xl bg-[#4A5CE8] hover:bg-[#3B4FD8] text-white font-bold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
             {connecting ? <><RefreshCw className="w-4 h-4 animate-spin" />Redirecting to Stripe…</> : <><ExternalLink className="w-4 h-4" />Connect Bank Account via Stripe</>}
           </button>
