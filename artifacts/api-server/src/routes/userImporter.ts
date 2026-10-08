@@ -418,4 +418,40 @@ router.post("/user/import-ebay", async (req, res) => {
   res.json({ imported: inserted, message: `Imported ${inserted} product${inserted !== 1 ? "s" : ""} to your listings` });
 });
 
+
+// Shopify public storefront -> Bazunk listings. Product data is normalized by Data Platform before posting here.
+router.post("/user/import-shopify-public", async (req, res) => {
+ try {
+  const email=await requestEmail(req); if(!email){res.status(401).json({error:"Sign in to import Shopify products."});return;}
+  const items=Array.isArray(req.body.items)?req.body.items:[];
+  if(!items.length||items.length>100){res.status(400).json({error:"Choose between 1 and 100 Shopify products."});return;}
+  const category=String(req.body.category??""),subcategory=String(req.body.subcategory??"");
+  if(!/^[a-z0-9-]{1,80}$/.test(category)||(subcategory&&!/^[a-z0-9-]{1,80}$/.test(subcategory))){res.status(400).json({error:"Choose a Bazunk category."});return;}
+  const markupType=req.body.markupType==="fixed"?"fixed":"percentage",markupValue=Math.max(0,Number(req.body.markupValue??0));
+  const syncEnabled=req.body.syncEnabled!==false;
+  const user=await db.execute(sql`SELECT name FROM users WHERE lower(email)=lower(${email}) LIMIT 1`).then(r=>r.rows[0] as any);
+  let imported=0,skipped=0;
+  for(const raw of items){
+   const sourceUrl=String(raw.sourceUrl??""),externalId=String(raw.externalId??"").slice(0,200),title=String(raw.title??"").trim().slice(0,500);
+   const sourcePrice=Number(raw.price?.amount),currency=String(raw.price?.currency??"GBP").toUpperCase();
+   if(!/^https:\/\//i.test(sourceUrl)||!externalId||!title||!Number.isFinite(sourcePrice)||sourcePrice<0){skipped++;continue;}
+   let host="";try{host=new URL(sourceUrl).hostname.toLowerCase()}catch{skipped++;continue}
+   if(!host.includes(".")||!sourceUrl.includes("/products/")){skipped++;continue}
+   const exists=await db.execute(sql`SELECT si.id FROM supplier_imports si JOIN listings l ON l.id=si.listing_id WHERE si.supplier_source='shopify-public' AND si.supplier_id=${externalId} AND lower(l.seller_email)=lower(${email}) LIMIT 1`);
+   if(exists.rows.length){skipped++;continue;}
+   const bazunkPrice=Math.round((markupType==="fixed"?sourcePrice+markupValue:sourcePrice*(1+markupValue/100))*100)/100;
+   const priceGbp=(await toGbp(bazunkPrice,currency)).toFixed(2);
+   const image=Array.isArray(raw.images)&&raw.images[0]?.url?String(raw.images[0].url):null;
+   const quantity=raw.availability==="out_of_stock"?0:1,status=quantity?"active":"inactive";
+   const specs=JSON.stringify({source:"Shopify Public",shopify_store:host,shopify_url:sourceUrl,shopify_id:externalId,source_price:sourcePrice,source_currency:currency,markup_type:markupType,markup_value:markupValue,sync_enabled:syncEnabled,variants:Array.isArray(raw.variants)?raw.variants:[]});
+   const listing=await db.execute(sql`INSERT INTO listings(public_id,title,price,price_gbp,currency,category,subcategory,description,condition,image,seller_email,seller_name,specifications,status,quantity,created_at,updated_at)
+    VALUES(${'BZK-SHP-'+randomUUID()},${title},${bazunkPrice},${priceGbp},${currency},${category},${subcategory||null},${String(raw.description??title).slice(0,5000)},'new',${image},${email},${user?.name||email.split("@")[0]},${specs},${status},${quantity},NOW(),NOW()) RETURNING id`).then(r=>r.rows[0] as any);
+   await db.execute(sql`INSERT INTO supplier_imports(listing_id,supplier_source,supplier_id,supplier_url,supplier_price,supplier_currency,markup_type,markup_value,last_synced_at,sync_status,supplier_data,created_at,updated_at)
+    VALUES(${listing.id},'shopify-public',${externalId},${sourceUrl},${sourcePrice},${currency},${markupType},${markupValue},NOW(),${syncEnabled?"ok":"disabled"},${JSON.stringify({store:host,syncEnabled})}::jsonb,NOW(),NOW())`);
+   imported++;
+  }
+  res.json({imported,skipped,message:`Imported ${imported} Shopify product${imported===1?"":"s"} to Bazunk with ${syncEnabled?"sync metadata enabled":"sync disabled"}.`});
+ } catch(err){logger.error({err},"Shopify public import failed");res.status(500).json({error:"Shopify import failed. Existing imports were not duplicated."});}
+});
+
 export default router;
