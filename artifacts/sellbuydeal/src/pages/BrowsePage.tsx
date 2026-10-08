@@ -15,6 +15,8 @@ import { ALL_PRODUCTS } from "@/data/products";
 import { CATEGORIES } from "@/data/categories";
 import { useCurrency } from "@/context/CurrencyContext";
 
+const API_BASE=(import.meta.env.VITE_API_URL||import.meta.env.VITE_API_BASE_URL||"https://bazunk-api.onrender.com").replace(/\/$/,"");
+
 type SortKey = "newest" | "price-asc" | "price-desc" | "views" | "price-lowest";
 
 interface ApiListing {
@@ -262,7 +264,7 @@ export function BrowsePage() {
   const LISTING_BATCH = 24;
 
   useEffect(() => {
-    fetch("/api/listings/category-counts")
+    fetch("${API_BASE}/api/listings/category-counts")
       .then((r) => {
         if (!r.ok) throw new Error(`category counts ${r.status}`);
         return r.json();
@@ -287,7 +289,7 @@ export function BrowsePage() {
     setLoadingListings(true);
     setListingError(null);
     setMoreError(null);
-    fetch(`/api/listings?limit=${LISTING_BATCH}&offset=0`, { signal: controller.signal })
+    fetch(`${API_BASE}/api/listings?limit=${LISTING_BATCH}&offset=0`, { signal: controller.signal })
       .then(async (r) => {
         if (!r.ok) throw new Error("Could not load listings");
         const data: ApiListing[] = await r.json();
@@ -310,7 +312,7 @@ export function BrowsePage() {
     setLoadingMore(true);
     setMoreError(null);
     try {
-      const r = await fetch(`/api/listings?limit=${LISTING_BATCH}&offset=${apiListings.length}`);
+      const r = await fetch(`${API_BASE}/api/listings?limit=${LISTING_BATCH}&offset=${apiListings.length}`);
       if (!r.ok) throw new Error("Could not load more listings");
       const data: ApiListing[] = await r.json();
       if (!Array.isArray(data)) throw new Error("Invalid listings response");
