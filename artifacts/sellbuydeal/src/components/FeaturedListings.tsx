@@ -5,6 +5,8 @@ import { Heart, Eye, CheckCircle2, Flame, ArrowRight, Zap, Star, Crown, Package,
 import { Link } from "wouter";
 import { useCurrency } from "@/context/CurrencyContext";
 
+const API_BASE=(import.meta.env.VITE_API_URL||import.meta.env.VITE_API_BASE_URL||"https://bazunk-api.onrender.com").replace(/\/$/,"");
+
 interface Listing {
   id: number;
   publicId: string;
@@ -79,8 +81,8 @@ export function FeaturedListings() {
     const fetchAll = async () => {
       try {
         const [spotlightRes, recentRes] = await Promise.all([
-          fetch("/api/listings/spotlight"),
-          fetch("/api/listings?limit=16"),
+          fetch("${API_BASE}/api/listings/spotlight"),
+          fetch("${API_BASE}/api/listings?limit=16"),
         ]);
         if (spotlightRes.ok) {
           const data = await spotlightRes.json();
