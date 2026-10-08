@@ -7,7 +7,7 @@ import { CountrySetupModal, COUNTRY_STORAGE_KEY } from "@/components/CountrySetu
 
 export function UserCurrencySync() {
   const { user } = useAuth();
-  const { setCurrency } = useCurrency();
+  const { setCountry } = useCurrency();
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
@@ -20,10 +20,7 @@ export function UserCurrencySync() {
       setShowModal(true);
     } else if (stored !== "SKIP") {
       const currency = countryToCurrency(stored === "OTHER" ? "US" : stored);
-      const savedCurrency = localStorage.getItem("sbd_currency");
-      if (!savedCurrency) {
-        setCurrency(currency);
-      }
+      if (stored !== "OTHER") setCountry(stored);
     }
   }, [user?.email]); // eslint-disable-line react-hooks/exhaustive-deps
 
