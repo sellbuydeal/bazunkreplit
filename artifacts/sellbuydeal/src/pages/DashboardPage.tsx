@@ -2044,7 +2044,8 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/stripe/connect/status/${encodeURIComponent(user.email)}`);
+      const token = await getToken();
+      const res = await fetch(`/api/stripe/connect/status/${encodeURIComponent(user.email)}`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) setStatus(await res.json());
     } finally { setLoading(false); }
   }
@@ -2071,7 +2072,8 @@ function SellerPayoutsPanel({ user }: { user: { email: string; name?: string } }
   async function handleDashboard() {
     setDashLoading(true);
     try {
-      const res = await fetch(`/api/stripe/connect/dashboard-link/${encodeURIComponent(user.email)}`);
+      const token = await getToken();
+      const res = await fetch(`/api/stripe/connect/dashboard-link/${encodeURIComponent(user.email)}`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) { const { url } = await res.json(); window.open(url, "_blank"); }
     } finally { setDashLoading(false); }
   }
