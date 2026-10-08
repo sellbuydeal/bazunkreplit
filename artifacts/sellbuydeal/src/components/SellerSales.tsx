@@ -39,6 +39,34 @@ export function SellerSales() {
   const [busy, setBusy] = useState(false);
   const [dError, setDError] = useState("");
   const [reviewFor, setReviewFor] = useState<SaleRow | null>(null);
+  const [postageOrder,setPostageOrder]=useState<SaleRow|null>(null);
+  const [from,setFrom]=useState({name:"",street1:"",city:"",zip:"",country:"GB"});
+  const [to,setTo]=useState({name:"",street1:"",city:"",zip:"",country:"GB"});
+  const [parcel,setParcel]=useState({length:20,width:15,height:10,weight:500});
+  const [rates,setRates]=useState<any[]>([]);
+  const [shipmentId,setShipmentId]=useState("");
+  const [postageBusy,setPostageBusy]=useState(false);
+  const [postageError,setPostageError]=useState("");
+
+  async function postageRequest(action:string,body:any){
+    if(!postageOrder) throw new Error("No order selected");
+    const token=await session?.getToken();
+    const r=await fetch("/api/orders/"+encodeURIComponent(postageOrder.id)+"/postage/"+action,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify(body)});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(d.error||"Postage request failed");
+    return d;
+  }
+  async function quotePostage(){
+    setPostageBusy(true);setPostageError("");setRates([]);
+    try{const d=await postageRequest("quote",{from,to,parcel});setShipmentId(d.shipmentId);setRates(d.rates||[]);}
+    catch(e:any){setPostageError(e.message||"Could not get postage rates");}finally{setPostageBusy(false);}
+  }
+  async function buyPostage(rateId:string){
+    if(!confirm("Continue to Stripe to pay for this postage label?"))return;
+    setPostageBusy(true);setPostageError("");
+    try{const d=await postageRequest("checkout",{shipmentId,rateId});if(!d.url)throw new Error("Checkout unavailable");window.location.assign(d.url);}
+    catch(e:any){setPostageError(e.message||"Could not start postage payment");setPostageBusy(false);}
+  }
 
   const load = useCallback(async () => {
     if (!user?.email || !session) return;
@@ -123,6 +151,11 @@ export function SellerSales() {
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
                   {canDispatch && (
+                    <button onClick={() => { setPostageOrder(s); setRates([]); setPostageError(""); }} className="px-3 py-2 rounded-lg border border-indigo-300 text-indigo-700 text-xs font-bold">
+                      Buy postage
+                    </button>
+                  )}
+                  {canDispatch && (
                     <button onClick={() => { setDispatching(s); setDError(""); }} className="px-3 py-2 rounded-lg bg-[#4A5CE8] text-white text-xs font-bold flex items-center gap-1.5 hover:opacity-90">
                       <Truck className="w-3.5 h-3.5" /> Mark dispatched
                     </button>
@@ -157,6 +190,39 @@ export function SellerSales() {
               {busy && <Loader2 className="w-4 h-4 animate-spin" />} Confirm dispatch
             </button>
             <p className="text-[11px] text-gray-400 text-center mt-2">The buyer gets a message straight away. Quick dispatch improves your seller profile.</p>
+          </div>
+        </div>
+      )}
+
+      {postageOrder && (
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4" onClick={() => setPostageOrder(null)}>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <div className="flex justify-between gap-3"><div><h3 className="text-xl font-black">Buy postage label</h3><p className="text-sm text-gray-500">Order {postageOrder.id}</p></div><button onClick={()=>setPostageOrder(null)}><X className="w-5 h-5"/></button></div>
+            <p className="text-xs text-gray-500 mt-3 bg-gray-50 rounded-xl p-3">Stripe takes the postage payment first. After payment is confirmed, Bazunk automatically purchases the selected Shippo label and attaches its tracking number to this order.</p>
+            <div className="grid sm:grid-cols-2 gap-4 mt-5">
+              <div><h4 className="font-bold text-sm mb-2">Sender / return address</h4>
+                <input placeholder="Name" className="border rounded-lg p-2 w-full mb-2" value={from.name} onChange={e=>setFrom({...from,name:e.target.value})}/>
+                <input placeholder="Street" className="border rounded-lg p-2 w-full mb-2" value={from.street1} onChange={e=>setFrom({...from,street1:e.target.value})}/>
+                <input placeholder="Town / city" className="border rounded-lg p-2 w-full mb-2" value={from.city} onChange={e=>setFrom({...from,city:e.target.value})}/>
+                <div className="flex gap-2"><input placeholder="Postcode" className="border rounded-lg p-2 w-full" value={from.zip} onChange={e=>setFrom({...from,zip:e.target.value})}/><input aria-label="Sender country" className="border rounded-lg p-2 w-20" value={from.country} onChange={e=>setFrom({...from,country:e.target.value.toUpperCase()})}/></div>
+              </div>
+              <div><h4 className="font-bold text-sm mb-2">Recipient address</h4>
+                <input placeholder="Name" className="border rounded-lg p-2 w-full mb-2" value={to.name} onChange={e=>setTo({...to,name:e.target.value})}/>
+                <input placeholder="Street" className="border rounded-lg p-2 w-full mb-2" value={to.street1} onChange={e=>setTo({...to,street1:e.target.value})}/>
+                <input placeholder="Town / city" className="border rounded-lg p-2 w-full mb-2" value={to.city} onChange={e=>setTo({...to,city:e.target.value})}/>
+                <div className="flex gap-2"><input placeholder="Postcode" className="border rounded-lg p-2 w-full" value={to.zip} onChange={e=>setTo({...to,zip:e.target.value})}/><input aria-label="Recipient country" className="border rounded-lg p-2 w-20" value={to.country} onChange={e=>setTo({...to,country:e.target.value.toUpperCase()})}/></div>
+              </div>
+            </div>
+            <h4 className="font-bold text-sm mt-5">Parcel</h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+              <label className="text-xs">Length cm<input type="number" min="1" className="border rounded-lg p-2 w-full mt-1" value={parcel.length} onChange={e=>setParcel({...parcel,length:Number(e.target.value)})}/></label>
+              <label className="text-xs">Width cm<input type="number" min="1" className="border rounded-lg p-2 w-full mt-1" value={parcel.width} onChange={e=>setParcel({...parcel,width:Number(e.target.value)})}/></label>
+              <label className="text-xs">Height cm<input type="number" min="1" className="border rounded-lg p-2 w-full mt-1" value={parcel.height} onChange={e=>setParcel({...parcel,height:Number(e.target.value)})}/></label>
+              <label className="text-xs">Weight g<input type="number" min="1" className="border rounded-lg p-2 w-full mt-1" value={parcel.weight} onChange={e=>setParcel({...parcel,weight:Number(e.target.value)})}/></label>
+            </div>
+            <button disabled={postageBusy} onClick={quotePostage} className="mt-4 rounded-xl bg-indigo-600 text-white px-4 py-2 font-bold disabled:opacity-50">{postageBusy?"Checking…":"Get postage rates"}</button>
+            {postageError&&<p role="alert" className="text-red-700 mt-3 text-sm">{postageError}</p>}
+            <div className="space-y-2 mt-4">{rates.map(r=><div key={r.id} className="border rounded-xl p-3 flex items-center justify-between gap-3"><div><b>{r.provider} — {r.service}</b><p className="text-sm text-gray-500">{r.days ? r.days+" estimated days" : "Delivery estimate unavailable"}</p></div><button disabled={postageBusy} onClick={()=>buyPostage(r.id)} className="bg-green-600 text-white px-3 py-2 rounded-lg font-bold text-sm disabled:opacity-50">Pay £{Number(r.amount).toFixed(2)}</button></div>)}</div>
           </div>
         </div>
       )}
