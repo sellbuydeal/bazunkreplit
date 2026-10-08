@@ -20,6 +20,8 @@ import { ThemeToggle } from "./ThemeToggle";
 import { useRawSettings } from "@/context/SiteSettingsContext";
 import { featureForHref, isFeatureEnabled } from "@/components/FeatureGate";
 
+const API_BASE=(import.meta.env.VITE_API_URL||import.meta.env.VITE_API_BASE_URL||"https://bazunk-api.onrender.com").replace(/\/$/,"");
+
 const ALL_PRODUCTS: { id: number; title: string; price: number; condition: string; views: number; image: string; category: string }[] = [];
 
 const SELL_OPTIONS: Array<{
@@ -153,7 +155,7 @@ export function Navbar() {
     if (q.length < 2) { setLiveSearchResults([]); return; }
     const timer = window.setTimeout(async () => {
       try {
-        const r = await fetch(`/api/listings?limit=60&offset=0`);
+        const r = await fetch(`${API_BASE}/api/listings?limit=60&offset=0`);
         if (!r.ok) return;
         const rows = await r.json();
         const needle = q.toLowerCase();
