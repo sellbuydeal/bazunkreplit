@@ -581,7 +581,7 @@ export function AdminImportsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 mb-6 w-fit flex-wrap">
-        {(["amazon", "ebay", "aliexpress", "gumtree"] as Tab[]).map(t => (
+        {(["amazon", "ebay", "aliexpress"] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -589,7 +589,7 @@ export function AdminImportsPage() {
               tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {t === "amazon" ? "🛒 Amazon UK" : t === "ebay" ? "🏷️ eBay" : t === "aliexpress" ? "📦 AliExpress" : "📋 Gumtree"}
+            {t === "amazon" ? "🛒 Amazon UK" : t === "ebay" ? "🏷️ eBay" : "📦 AliExpress"}
           </button>
         ))}
       </div>
