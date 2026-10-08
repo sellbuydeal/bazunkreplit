@@ -27,6 +27,8 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 const CARRIERS = ["Royal Mail", "Evri", "DPD", "DHL", "UPS", "Yodel", "Parcelforce", "Other"];
 
 /** Seller dashboard → Sales: see orders, dispatch them, and review buyers. */
+const API_BASE=(import.meta.env.VITE_API_URL||import.meta.env.VITE_API_BASE_URL||"https://bazunk-api.onrender.com").replace(/\/$/,"");
+
 export function SellerSales() {
   const { formatPrice, currency } = useCurrency();
   const { user } = useAuth();
@@ -51,7 +53,7 @@ export function SellerSales() {
   async function postageRequest(action:string,body:any){
     if(!postageOrder) throw new Error("No order selected");
     const token=await session?.getToken();
-    const r=await fetch("/api/orders/"+encodeURIComponent(postageOrder.id)+"/postage/"+action,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify(body)});
+    const r=await fetch(API_BASE+"/api/orders/"+encodeURIComponent(postageOrder.id)+"/postage/"+action,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify(body)});
     const d=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(d.error||"Postage request failed");
     return d;
@@ -72,7 +74,7 @@ export function SellerSales() {
     if (!user?.email || !session) return;
     try {
       const token = await session.getToken();
-      const r = await fetch(`/api/orders/seller`, { headers: { Authorization: `Bearer ${token}` } });
+      const r = await fetch(`${API_BASE}/api/orders/seller`, { headers: { Authorization: `Bearer ${token}` } });
       if (!r.ok) { setError("Couldn't load your sales."); return; }
       setRows(await r.json());
     } catch { setError("Couldn't reach the server."); }
@@ -83,7 +85,7 @@ export function SellerSales() {
     if (!dispatching || !user?.email) return;
     setBusy(true); setDError("");
     try {
-      const r = await fetch(`/api/orders/${dispatching.id}/dispatch`, {
+      const r = await fetch(`${API_BASE}/api/orders/${dispatching.id}/dispatch`, {
         method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${await session?.getToken()}` },
         body: JSON.stringify({ carrier, trackingNumber: tracking }),
       });
