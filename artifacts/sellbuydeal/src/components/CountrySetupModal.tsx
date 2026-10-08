@@ -42,7 +42,7 @@ interface CountrySetupModalProps {
 }
 
 export function CountrySetupModal({ email, onDone }: CountrySetupModalProps) {
-  const { setCurrency } = useCurrency();
+  const { setCountry } = useCurrency();
   const [selected, setSelected] = useState("");
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -60,7 +60,7 @@ export function CountrySetupModal({ email, onDone }: CountrySetupModalProps) {
       localStorage.setItem(COUNTRY_STORAGE_KEY(email), selected);
     } catch {}
     const currency = countryToCurrency(selected);
-    setCurrency(currency);
+    if (selected !== "OTHER") setCountry(selected);
     try {
       localStorage.setItem("sbd_currency", currency);
     } catch {}
