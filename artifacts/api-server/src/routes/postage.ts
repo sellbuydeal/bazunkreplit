@@ -41,7 +41,6 @@ const address=(a:any)=>({
 });
 function valid(a:any){return a.name&&a.street1&&a.city&&a.zip&&/^[A-Z]{2}$/.test(a.country);}
 router.post("/orders/:id/postage/quote",async(req,res)=>{
- if(process.env.SHIPPO_LABEL_PURCHASES_ENABLED!=="true"){res.status(503).json({error:"Postage labels are not yet enabled"});return;}
  try{
   const seller=await email(req);if(!seller){res.status(401).json({error:"Sign in required"});return;}
   const order=(await db.execute(sql`SELECT id,seller_email,status FROM orders WHERE id=${req.params.id}`)).rows[0] as any;
