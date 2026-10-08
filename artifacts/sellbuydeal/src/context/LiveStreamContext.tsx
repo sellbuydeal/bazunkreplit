@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { useAuth } from "@clerk/react";
 import { MOCK_LIVE_SESSIONS, type LiveSession, type FeaturedItem, FEATURED_KEY } from "@/data/livestreams";
+import { useFeature } from "@/components/FeatureGate";
 
 interface LiveStreamContextValue {
   sessions: LiveSession[];
@@ -32,6 +33,7 @@ function loadFeaturedMap(): Record<string, FeaturedItem> {
 
 export function LiveStreamProvider({ children }: { children: ReactNode }) {
   const { getToken } = useAuth();
+  const liveEnabled = useFeature("live");
   const [userSessions, setUserSessions] = useState<LiveSession[]>(loadSessions);
   const [remoteSessions, setRemoteSessions] = useState<LiveSession[]>([]);
   const [mySession, setMySession] = useState<LiveSession | null>(loadMySession);
@@ -68,18 +70,19 @@ export function LiveStreamProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
+    if (!liveEnabled) { setRemoteSessions([]); return; }
     let cancelled = false;
-    const load = () => fetch("/api/live/sessions").then(r => r.json()).then(d => { if (!cancelled && Array.isArray(d.sessions)) setRemoteSessions(d.sessions); }).catch(() => {});
+    const load = () => fetch("/api/live/sessions").then(r => r.ok ? r.json() : null).then(d => { if (!cancelled && Array.isArray(d?.sessions)) setRemoteSessions(d.sessions); }).catch(() => {});
     void load();
     const timer = setInterval(() => void load(), 10000);
     return () => { cancelled = true; clearInterval(timer); };
-  }, []);
+  }, [liveEnabled]);
 
-  const sessions: LiveSession[] = [
+  const sessions: LiveSession[] = liveEnabled ? [
     ...MOCK_LIVE_SESSIONS,
     ...userSessions.filter((u) => !MOCK_LIVE_SESSIONS.find((m) => m.id === u.id)),
     ...remoteSessions.filter((r) => !userSessions.some((u) => u.id === r.id) && !MOCK_LIVE_SESSIONS.some((m) => m.id === r.id)),
-  ];
+  ] : [];
 
   const liveSessions = sessions.filter((s) => s.isLive);
 
