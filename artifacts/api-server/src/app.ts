@@ -71,10 +71,13 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// No route reads Clerk auth server-side, and clerkMiddleware throws on EVERY
-// request when CLERK_SECRET_KEY is missing — so only mount it when configured.
-if (process.env.CLERK_SECRET_KEY && process.env.CLERK_PUBLISHABLE_KEY) {
+// Seller/account routes use getAuth(req), so Clerk middleware must be mounted
+// whenever the server-side Clerk secret is configured. The publishable key is
+// a frontend concern and must not disable API authentication.
+if (process.env.CLERK_SECRET_KEY) {
   app.use(clerkMiddleware());
+} else {
+  logger.warn("CLERK_SECRET_KEY is missing; authenticated marketplace API routes will return 401/500 until configured");
 }
 
 app.use("/api", router);
