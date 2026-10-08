@@ -2,6 +2,7 @@
 import { logger } from "./lib/logger.js";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { createHmac } from "node:crypto";
 
 const FROM = process.env.EMAIL_FROM ?? "Bazunk <onboarding@resend.dev>";
 const SITE = process.env.PUBLIC_BASE_URL ?? "https://bazunk-web.onrender.com";
@@ -24,7 +25,11 @@ export async function sendWelcomeEmail(email:string,name?:string):Promise<void>{
   await send(email,t.subject,base(`<h2>${esc(t.subject)}</h2>${t.bodyHtml}<p><a class="btn" href="${SITE}/dashboard">Open Dashboard</a></p>`));
 }
 
+function tokenFor(email:string):string { const secret=process.env.EMAIL_PREFERENCES_SECRET||process.env.SESSION_SECRET; if(!secret)return "";const data=Buffer.from(email.toLowerCase().trim()).toString("base64url");return data+"."+createHmac("sha256",secret).update(data).digest("base64url"); }
 async function send(to: string, subject: string, html: string): Promise<void> {
+  const token=tokenFor(to);
+  if(token){const url=`${SITE}/settings/notifications?token=${encodeURIComponent(token)}`;html=html.replace("</body>",`<div style="max-width:560px;margin:0 auto 20px;text-align:center;font:12px Arial;color:#777"><a href="${url}">Manage notifications</a> · <a href="${url}&unsubscribe=marketing">Unsubscribe from marketing</a></div></body>`);}
+
   try {
     if (!process.env.RESEND_API_KEY) {
       logger.warn({ to, subject }, "RESEND_API_KEY not set — email skipped");
@@ -67,7 +72,7 @@ function base(content: string): string {
 <div class="wrap">
   <div class="header"><span class="logo">Baz<span>unk</span></span></div>
   <div class="body">${content}</div>
-  <div class="footer">© ${new Date().getFullYear()} Bazunk · UK Peer-to-Peer Marketplace</div>
+  <div class="footer">© ${new Date().getFullYear()} Bazunk · UK Peer-to-Peer Marketplace<br><a href="${SITE}/terms">Terms &amp; Conditions</a> · <a href="${SITE}/privacy">Privacy Policy</a></div>
 </div>
 </body></html>`;
 }
