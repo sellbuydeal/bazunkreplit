@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
+const API_BASE=(import.meta.env.VITE_API_URL||import.meta.env.VITE_API_BASE_URL||"https://bazunk-api.onrender.com").replace(/\/$/,"");
+
 export interface SiteSettings {
   site_name: string;
   site_tagline: string;
@@ -77,7 +79,7 @@ export function SiteSettingsProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     const loadSettings = () => {
-      fetch("/api/settings/public", { cache: "no-store" })
+      fetch(`${API_BASE}/api/settings/public`, { cache: "no-store" })
         .then(r => r.ok ? r.json() : {})
         .then((data: Record<string, string>) => {
           setSettings({ ...DEFAULTS, ...data });
