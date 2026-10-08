@@ -112,6 +112,19 @@ export async function fulfillPostage(sessionId:string){
   await db.execute(sql`UPDATE shippo_label_orders SET status='needs_review',error='Label purchase failed or result uncertain; review before retry/refund',updated_at=NOW() WHERE id=${id}`);
  }
 }
+router.get("/shipping/seller",async(req,res)=>{
+ try{
+  const seller=await email(req);if(!seller){res.status(401).json({error:"Sign in required"});return;}
+  await table();
+  const rows=await db.execute(sql`SELECT o.id,o.item_title,o.item_image,o.status,o.buyer_email,o.address,o.created_at,o.shipped_at,o.delivered_at,
+    o.tracking_number,o.carrier,o.tracking_status,o.tracking_last_event,o.tracking_updated_at,o.tracking_eta,
+    (SELECT r.status FROM returns r WHERE r.order_id=o.id ORDER BY r.created_at DESC LIMIT 1) return_status,
+    l.id label_id,l.status label_status,l.label_url,l.amount_pence label_amount_pence,l.currency label_currency,l.created_at label_created_at,l.error label_error
+   FROM orders o LEFT JOIN LATERAL (SELECT * FROM shippo_label_orders s WHERE s.order_id=o.id AND LOWER(s.seller_email)=LOWER(${seller}) ORDER BY s.created_at DESC LIMIT 1) l ON TRUE
+   WHERE LOWER(o.seller_email)=LOWER(${seller}) AND o.status<>'cancelled' ORDER BY o.created_at DESC LIMIT 300`);
+  res.json(rows.rows);
+ }catch(err){logger.error({err},"Seller shipping feed failed");res.status(500).json({error:"Failed to load shipments"});}
+});
 router.get("/orders/:id/postage",async(req,res)=>{
  const seller=await email(req);if(!seller){res.status(401).json({error:"Sign in required"});return;}
  await table();
