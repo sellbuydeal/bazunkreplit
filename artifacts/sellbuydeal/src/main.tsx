@@ -11,7 +11,7 @@ import "./index.css";
 // API service. Set VITE_API_URL on the frontend's Render service (Environment
 // tab) to enable this; if it's unset, fetch behaves exactly as before, so
 // local dev (where Vite's own /api proxy, if any, still works) is unaffected.
-const API_BASE = import.meta.env.VITE_API_URL as string | undefined;
+// Keep the main Bazunk admin/site on its existing same-origin API routing.\n// Importers that need the marketplace API use their own explicit API base.\nconst API_BASE = undefined;
 
 if (API_BASE) {
   const base = API_BASE.replace(/\/$/, "");
