@@ -6,7 +6,7 @@ import {
   Heart, ShoppingCart, Tag, ChevronDown, LogOut,
   LayoutDashboard, Menu, Home, Grid3X3, List, Newspaper, MessageSquare,
   Gavel, Zap, Gift, Package, Radio, Handshake, Info,
-  Trophy, MoreHorizontal, Film, Flame, ArrowDownToLine, ShieldCheck,
+  Trophy, MoreHorizontal, Film, Flame, ArrowDownToLine, ShieldCheck, Database,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +75,7 @@ const MORE_NAV = [
   { href: "/support",           label: "Support",          icon: HelpCircle,      color: "text-sky-600",     bg: "bg-sky-50" },
   { href: "/importers",         label: "Importers",        icon: ArrowDownToLine, color: "text-[#4A5CE8]",   bg: "bg-blue-50" },
   { href: "/videos",            label: "Bazunk Promo Videos", icon: Film,          color: "text-blue-600",    bg: "bg-blue-50" },
+  { href: "https://data.bazunk.com", label: "Bazunk Data Platform", icon: Database, color: "text-indigo-600", bg: "bg-indigo-50", external: true },
 ];
 
 const MOBILE_NAV_LINKS = [
@@ -330,8 +331,11 @@ export function Navbar() {
                     transition={{ duration: 0.15 }}
                     className="absolute left-0 top-[calc(100%+8px)] w-60 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 py-1.5"
                   >
-                    {MORE_NAV.filter(x => visibleHref(x.href)).map(({ href, label, icon: Icon, color, bg }) => {
-                      const active = location === href;
+                    {MORE_NAV.filter(x => x.external || visibleHref(x.href)).map(({ href, label, icon: Icon, color, bg, external }) => {
+                      const active = !external && location === href;
+                      const itemClass = `flex items-center gap-3 px-3 py-2 text-sm transition-colors ${active ? "text-[#4A5CE8] font-semibold bg-[#4A5CE8]/5" : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"}`;
+                      const content = <><span className={`w-8 h-8 rounded-lg ${bg} flex items-center justify-center flex-shrink-0`}><Icon className={`w-4 h-4 ${color}`} /></span>{label}</>;
+                      if (external) return <a key={href} href={href} target="_blank" rel="noopener noreferrer" onClick={() => setMoreOpen(false)} className={itemClass}>{content}</a>;
                       return (
                         <Link
                           key={href}
