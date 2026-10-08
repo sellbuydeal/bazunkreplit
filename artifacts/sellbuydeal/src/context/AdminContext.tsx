@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 
 const ADMIN_TOKEN_KEY = "sbd_admin_token";
-const API_BASE = "";
+const API_BASE = "https://bazunk-api.onrender.com";
 const apiUrl = (path: string) => path.startsWith("/api/") ? `${API_BASE}${path}` : path;
 
 interface AdminContextValue {
