@@ -78,13 +78,6 @@ const SIDEBAR_CATEGORIES: SidebarCategory[] = [
     ],
   },
   {
-    id: "importers", label: "Importers", icon: ArrowDownToLine,
-    gradient: "from-[#1A1D2E] to-slate-600", bg: "bg-[#1A1D2E]",
-    items: [
-      { id: "open-importers", label: "Product Importers", icon: ShoppingBag, iconBg: "bg-[#4A5CE8]" },
-    ],
-  },
-  {
     id: "finance", label: "Finance", icon: CreditCard,
     gradient: "from-emerald-500 to-teal-500", bg: "bg-emerald-500",
     items: [
