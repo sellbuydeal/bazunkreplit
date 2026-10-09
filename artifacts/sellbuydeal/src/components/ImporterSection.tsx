@@ -110,7 +110,9 @@ export function ImportModal({ onClose, onSuccess, userEmail, userName, initialUr
       if (data.title) setTitle(data.title);
       if (data.description) setDescription(data.description);
       if (data.imageUrl) setImageUrl(data.imageUrl);
-      if (data.supplierPrice && data.currency === "USD") setSupplierPriceUsd(String(data.supplierPrice));
+      // Do not retain a USD price from a previously previewed product.
+      setSupplierPriceUsd(data.supplierPrice && data.currency === "USD" ? String(data.supplierPrice) : "");
+
       setSupplierCurrency(data.currency || "USD");
       setLastPreviewUrl(productUrl);
       setPreviewNotice(data.currency && data.currency !== "USD" ? "Supplier price is in " + data.currency + ". Please enter the verified USD equivalent before importing." : "Product details retrieved. Review the information before importing.");
@@ -129,7 +131,7 @@ export function ImportModal({ onClose, onSuccess, userEmail, userName, initialUr
   const bazunkPreview = usd > 0 ? calcBazunkPrice(usd, markupType, mv) : null;
 
   const subcategories = SITE_CATEGORIES.find(c => c.slug === category)?.subcategories ?? [];
-  const canSubmit = url.trim() && title.trim() && usd > 0 && !!category && !loading;
+  const canSubmit = url.trim() && title.trim() && usd > 0 && !!category && !loading && !previewLoading;
 
   async function handleImport() {
     setError("");
