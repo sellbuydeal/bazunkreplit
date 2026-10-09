@@ -1110,6 +1110,67 @@ router.get("/admin/aliexpress-product-preview", async (req, res) => {
   }
 });
 
+// POST /api/admin/import-aliexpress-product — authenticated, reviewed single-product import.
+router.post("/admin/import-aliexpress-product", async (req, res) => {
+  const body = req.body ?? {};
+  const rawUrl = String(body.url ?? "").trim();
+  let url: URL;
+  try { url = new URL(rawUrl); } catch { res.status(400).json({ error: "Invalid product URL" }); return; }
+  const id = url.pathname.match(/^\/item\/(\d{10,20})(?:\.html)?\/?$/i)?.[1];
+  if (url.protocol !== "https:" || !/^(?:[a-z0-9-]+\.)*aliexpress\.com$/i.test(url.hostname) || !id) {
+    res.status(400).json({ error: "Valid AliExpress item URL required" }); return;
+  }
+  const title = String(body.title ?? "").trim().slice(0, 500);
+  const description = String(body.description ?? "").trim().slice(0, 10000);
+  const imageUrl = String(body.imageUrl ?? "").trim();
+  const priceUsd = Number(body.supplierPriceUsd);
+  const markupType = String(body.markupType ?? "percentage");
+  const markupValue = Number(body.markupValue);
+  const category = String(body.category ?? "").trim();
+  const subcategory = String(body.subcategory ?? "").trim();
+  const condition = String(body.condition ?? "new");
+  const sellerEmail = String(body.sellerEmail ?? "").trim();
+  if (!title || !category || !Number.isFinite(priceUsd) || priceUsd <= 0 ||
+      !Number.isFinite(markupValue) || markupValue < 0 || markupValue > 1000 ||
+      !["percentage", "fixed"].includes(markupType) || !["new","like new","good","fair","poor"].includes(condition)) {
+    res.status(400).json({ error: "Check title, category, USD supplier price, markup and condition" }); return;
+  }
+  if (imageUrl) {
+    try { const image = new URL(imageUrl); if (image.protocol !== "https:") throw new Error(); }
+    catch { res.status(400).json({ error: "Image URL must be HTTPS" }); return; }
+  }
+  const seller = await db.execute(sql`SELECT email,name FROM users WHERE email = ${sellerEmail} LIMIT 1`)
+    .then(r => r.rows[0] as {email:string;name:string|null}|undefined);
+  if (!seller) { res.status(400).json({ error: "Select an existing seller" }); return; }
+  const duplicate = await db.execute(sql`SELECT si.id FROM supplier_imports si JOIN listings l ON l.id=si.listing_id WHERE si.supplier_source='aliexpress' AND si.supplier_id=${id} AND l.seller_email=${sellerEmail} LIMIT 1`);
+  if (duplicate.rows.length) { res.status(409).json({ error: "Product already imported for this seller" }); return; }
+  let rate: number;
+  try {
+    const response = await fetch("https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP", { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) throw new Error("FX unavailable");
+    const data = await response.json() as {rates?:{GBP?:number}};
+    rate = Number(data.rates?.GBP);
+    if (!Number.isFinite(rate) || rate <= 0) throw new Error("Invalid FX rate");
+  } catch { res.status(503).json({ error: "Verified USD/GBP rate unavailable. No listing created." }); return; }
+  const baseGbp = priceUsd * rate;
+  const sellingPrice = Math.round((markupType === "fixed" ? baseGbp + markupValue : baseGbp * (1 + markupValue / 100)) * 100) / 100;
+  const specs = JSON.stringify({source:"AliExpress",aliexpress_id:id,aliexpress_url:rawUrl,source_price:priceUsd,source_currency:"USD",exchange_rate_to_gbp:rate,markup_type:markupType,markup_value:markupValue,source_sync:true});
+  try {
+    const inserted = await db.execute(sql`INSERT INTO listings
+      (title,price,price_gbp,currency,category,subcategory,description,condition,image,seller_email,seller_name,specifications,status,created_at,updated_at)
+      VALUES (${title},${sellingPrice},${sellingPrice},'GBP',${category},${subcategory || null},${description || title},${condition},${imageUrl || null},${seller.email},${seller.name ?? seller.email.split("@")[0]},${specs},'active',NOW(),NOW()) RETURNING id`);
+    const listingId = Number((inserted.rows[0] as {id:number}).id);
+    await db.execute(sql`UPDATE listings SET public_id=${"BZL-"+listingId} WHERE id=${listingId}`);
+    await db.execute(sql`INSERT INTO supplier_imports
+      (listing_id,supplier_source,supplier_id,supplier_url,supplier_price,supplier_currency,markup_type,markup_value,last_synced_at,sync_status)
+      VALUES (${listingId},'aliexpress',${id},${rawUrl},${priceUsd},'USD',${markupType},${markupValue},NOW(),'ok')`);
+    res.status(201).json({ listingId, sellingPrice, currency:"GBP", supplierPriceUsd:priceUsd });
+  } catch (error) {
+    logger.error({error,id}, "Reviewed AliExpress product import failed");
+    res.status(500).json({error:"Unable to save AliExpress listing and supplier tracking"});
+  }
+});
+
 // POST /api/admin/import-selected-aliexpress — server-side verified bulk listing creation
 router.post("/admin/import-selected-aliexpress", async (req, res) => {
   const base = process.env.ALIEXPRESS_SCRAPER_URL, token = process.env.ALIEXPRESS_SCRAPER_TOKEN;
