@@ -1051,7 +1051,7 @@ router.get("/admin/search-aliexpress", async (req, res) => {
         sales: 0, url: String(p.sourceUrl ?? "")
       })).filter((p: any) => /^\d{10,}$/.test(p.id));
       res.setHeader("Cache-Control", "no-store");
-      res.json({ products, page, source: "bazunk-scraper" }); return;
+      res.json({ products, page, source: "bazunk-scraper", discovered: Number(data.discovered ?? 0), complete: Number(data.complete ?? products.length), diagnostic: products.length ? null : "Scraper returned no complete products. AliExpress may be serving a page without extractable product data." }); return;
     } catch (err) {
       logger.error({ err }, "AliExpress scraper search failed");
       res.status(502).json({ error: "AliExpress scraper unavailable." }); return;
