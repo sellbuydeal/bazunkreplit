@@ -180,6 +180,10 @@ export function AdminImportsPage() {
   const [aliUrls, setAliUrls] = useState("");
   const [aliQueued, setAliQueued] = useState<string[]>([]);
   const [aliSelected, setAliSelected] = useState<Set<string>>(new Set());
+  const [aliActiveUrl, setAliActiveUrl] = useState("");
+  const [aliMarkup, setAliMarkup] = useState("30");
+  const [aliShipping, setAliShipping] = useState("0");
+  const [aliNotice, setAliNotice] = useState("");
 
   const PAGE_SIZE = 50;
 
@@ -1358,34 +1362,33 @@ export function AdminImportsPage() {
         {tab === "aliexpress" && (
           <motion.div key="ali" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-5">
             <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-              <div className="border-b border-gray-100 px-5 py-4 flex items-center gap-3">
+              <div className="border-b border-gray-100 p-4 sm:p-5 flex items-center gap-3">
                 <div className="rounded-xl bg-orange-500 p-2 text-white"><Search className="w-5 h-5"/></div>
-                <div><h2 className="font-black text-gray-900">AliExpress product selector</h2><p className="text-sm text-gray-500">Add product URLs, choose which to transfer and import to a seller's store.</p></div>
+                <div><h2 className="font-black text-gray-900">Find AliExpress products</h2><p className="text-sm text-gray-500">Paste one or more product links to prepare an import, just like eBay and Amazon.</p></div>
               </div>
-              <div className="p-5 space-y-4">
-                <label className="block text-sm font-bold text-gray-700">AliExpress product links (one per line)</label>
-                <textarea rows={3} value={aliUrls} onChange={e=>setAliUrls(e.target.value)} placeholder="https://www.aliexpress.com/item/100500....html" className={inputCls+" w-full min-h-24"} />
+              <div className="p-4 sm:p-5 space-y-3">
+                <label className="block text-sm font-bold text-gray-700">Product URLs · up to 50</label>
+                <textarea rows={3} value={aliUrls} onChange={e=>setAliUrls(e.target.value)} placeholder="Paste AliExpress item links here, one per line" className={inputCls+" w-full min-h-24 break-all"} />
                 <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-white font-bold text-sm" onClick={()=>{
-                  const links=aliUrls.split(/\s|,/).map(v=>v.trim()).filter(v=>{try{const u=new URL(v);const host=u.hostname.toLowerCase();return u.protocol==="https:"&&(host==="aliexpress.com"||host.endsWith(".aliexpress.com"))&&u.pathname.includes("/item/")}catch{return false}}).slice(0,50);
-                  setAliQueued([...new Set(links)]);setAliSelected(new Set(links));
-                }}><Search className="w-4 h-4"/>Prepare URL selection</button>
-                <p className="text-xs text-gray-500">This selector prepares URLs. Product details still need to be entered in the import form; automated AliExpress search and bulk fetching are not yet connected.</p>
+                  const links=aliUrls.split(/[\\s,]+/).map(v=>v.trim()).filter(Boolean).map(v=>{try{const u=new URL(v);const host=u.hostname.toLowerCase();const id=u.pathname.match(/\\/item\\/(\\d{10,})(?:\\.html)?/i)?.[1];return u.protocol==="https:"&&(host==="aliexpress.com"||host.endsWith(".aliexpress.com"))&&id?`https://www.aliexpress.com/item/${id}.html`:null}catch{return null}}).filter((v):v is string=>Boolean(v));
+                  const unique=[...new Set(links)].slice(0,50);setAliQueued(unique);setAliSelected(new Set(unique));setAliNotice(unique.length?`${unique.length} valid product link(s) ready. Select a product to enter or review its details.`:"No valid AliExpress product URLs found. Paste an item URL ending in a product ID.");
+                }}><Search className="w-4 h-4"/>Prepare products</button>
+                {aliNotice&&<p role="status" className="text-sm text-gray-600">{aliNotice}</p>}
               </div>
             </div>
-            {aliQueued.length>0&&<div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
-              <div className="flex flex-wrap justify-between items-center gap-3"><div><h3 className="font-black text-gray-900">Select products</h3><p className="text-sm text-gray-500">{aliSelected.size} of {aliQueued.length} URLs selected</p></div><div className="flex gap-2"><button type="button" className="border rounded-lg px-3 py-2 text-sm" onClick={()=>setAliSelected(new Set(aliQueued))}>Select all</button><button type="button" className="border rounded-lg px-3 py-2 text-sm" onClick={()=>setAliSelected(new Set())}>Clear</button></div></div>
-              <div className="space-y-2 max-h-72 overflow-y-auto">{aliQueued.map((url,i)=><label key={url} className="flex gap-3 items-center rounded-xl border border-gray-200 px-3 py-3 text-sm"><input type="checkbox" checked={aliSelected.has(url)} onChange={e=>setAliSelected(prev=>{const n=new Set(prev);e.target.checked?n.add(url):n.delete(url);return n})}/><span className="flex-1 truncate text-gray-700">{i+1}. {url}</span><a href={url} target="_blank" rel="noreferrer" className="text-indigo-600" aria-label="Open AliExpress product"><ExternalLink className="w-4 h-4"/></a></label>)}</div>
+            {aliQueued.length>0&&<div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
+              <div className="flex flex-wrap justify-between items-center gap-3"><div><h3 className="font-black text-gray-900">Choose products</h3><p className="text-sm text-gray-500">{aliSelected.size} of {aliQueued.length} selected</p></div><div className="flex gap-2"><button type="button" className="border rounded-lg px-3 py-2 text-sm" onClick={()=>setAliSelected(new Set(aliQueued))}>Select all</button><button type="button" className="border rounded-lg px-3 py-2 text-sm" onClick={()=>setAliSelected(new Set())}>Clear</button></div></div>
+              <div className="space-y-2 max-h-80 overflow-y-auto">{aliQueued.map((url,i)=><div key={url} className="flex flex-wrap sm:flex-nowrap gap-3 items-center rounded-xl border border-gray-200 p-3 text-sm"><input aria-label={`Select product ${i+1}`} type="checkbox" checked={aliSelected.has(url)} onChange={e=>setAliSelected(prev=>{const n=new Set(prev);e.target.checked?n.add(url):n.delete(url);return n})}/><span className="min-w-0 flex-1 truncate text-gray-700">Product #{url.match(/\\/(\\d+)\\.html/)?.[1]??i+1}</span><a href={url} target="_blank" rel="noreferrer" className="text-indigo-600" aria-label="Open AliExpress product"><ExternalLink className="w-4 h-4"/></a><button type="button" onClick={()=>{setAliActiveUrl(url);setAliModalOpen(true)}} className="rounded-lg bg-orange-50 px-3 py-2 font-bold text-orange-700 hover:bg-orange-100">Review & import</button></div>)}</div>
             </div>}
-            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5 shadow-sm space-y-4">
               <h3 className="font-black text-gray-900">Import settings</h3>
-              <label className="block text-sm font-bold text-gray-700">Import into this seller's store</label>
-              <select value={aliSeller} onChange={e=>setAliSeller(e.target.value)} className={inputCls+" w-full"}>
-                {users.length===0?<option value={aliSeller}>{aliSeller}</option>:users.map(u=><option key={u.email} value={u.email}>{u.name?`${u.name} (${u.email})`:u.email}</option>)}
-              </select>
-              <button onClick={()=>setAliModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-white font-bold text-sm hover:bg-orange-600"><Plus className="w-4 h-4"/>Open AliExpress import form</button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-gray-700 mb-2">Destination seller</label><select value={aliSeller} onChange={e=>setAliSeller(e.target.value)} className={inputCls+" w-full"}>{users.length===0?<option value={aliSeller}>{aliSeller}</option>:users.map(u=><option key={u.email} value={u.email}>{u.name?`${u.name} (${u.email})`:u.email}</option>)}</select></div>
+              <div><label className="block text-sm font-bold text-gray-700 mb-2">Default markup (%)</label><input type="number" min="0" max="1000" step="1" value={aliMarkup} onChange={e=>setAliMarkup(e.target.value)} className={inputCls+" w-full"}/></div></div>
+              <p className="text-xs text-gray-500">AliExpress product details are not yet automatically retrieved. Each product must be reviewed before listing; the markup default is passed to the import form.</p>
+              <button onClick={()=>{setAliActiveUrl(aliQueued.find(u=>aliSelected.has(u))??"");setAliModalOpen(true)}} className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-white font-bold text-sm hover:bg-orange-600"><Plus className="w-4 h-4"/>Import a product</button>
               {aliDone>0&&<p className="text-sm text-green-700">{aliDone} product(s) imported this session.</p>}
             </div>
-            {aliModalOpen&&<ImportModal onClose={()=>setAliModalOpen(false)} onSuccess={()=>setAliDone(n=>n+1)} userEmail={aliSeller} userName={users.find(u=>u.email===aliSeller)?.name??""}/>}
+            {aliModalOpen&&<ImportModal key={aliActiveUrl} initialUrl={aliActiveUrl} initialMarkup={aliMarkup} onClose={()=>setAliModalOpen(false)} onSuccess={()=>{setAliDone(n=>n+1);setAliSelected(prev=>{const next=new Set(prev);next.delete(aliActiveUrl);return next})}} userEmail={aliSeller} userName={users.find(u=>u.email===aliSeller)?.name??""}/>}
           </motion.div>
         )}
 
