@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, Search, Zap,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useAdmin } from "@/context/AdminContext";
 import { CATEGORIES as SITE_CATEGORIES } from "@/data/categories";
 
 interface SupplierImport {
@@ -83,6 +84,7 @@ interface ImportModalProps {
 const CONDITIONS = ["new", "like new", "good", "fair", "poor"];
 
 export function ImportModal({ onClose, onSuccess, userEmail, userName, initialUrl = "", initialMarkup = "30" }: ImportModalProps) {
+  const { authFetch } = useAdmin();
   const [url, setUrl] = useState(initialUrl);
   const [title, setTitle] = useState("");
   const [supplierPriceUsd, setSupplierPriceUsd] = useState("");
@@ -102,7 +104,7 @@ export function ImportModal({ onClose, onSuccess, userEmail, userName, initialUr
     setPreviewLoading(true);
     setPreviewNotice("");
     try {
-      const response = await fetch("/api/admin/aliexpress-product-preview?url=" + encodeURIComponent(productUrl.trim()), { credentials: "include" });
+      const response = await authFetch("/api/admin/aliexpress-product-preview?url=" + encodeURIComponent(productUrl.trim()));
       const data = await response.json() as {error?:string;title?:string;description?:string;imageUrl?:string;supplierPrice?:number;currency?:string};
       if (!response.ok) throw new Error(data.error || "Product details unavailable");
       if (data.title) setTitle(data.title);
@@ -115,8 +117,8 @@ export function ImportModal({ onClose, onSuccess, userEmail, userName, initialUr
     } catch (error) {
       setPreviewNotice((error instanceof Error ? error.message : "Preview unavailable") + " Enter missing fields manually.");
     } finally { setPreviewLoading(false); }
-  }, []);
-  useEffect(() => { if (initialUrl) void fetchPreview(initialUrl); }, [initialUrl, fetchPreview]);
+  }, [authFetch]);
+  useEffect(() => { if (initialUrl) void fetchPreview(initialUrl); }, [initialUrl]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
