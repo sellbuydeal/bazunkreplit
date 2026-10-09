@@ -1033,6 +1033,31 @@ router.patch("/admin/listings/:id/image", async (req, res) => {
 
 // AliExpress keyword search — authenticated admin only; RapidAPI key stays server-side.
 router.get("/admin/search-aliexpress", async (req, res) => {
+  // Prefer Bazunk's independent scraper service when configured.
+  if (process.env.ALIEXPRESS_SCRAPER_URL && process.env.ALIEXPRESS_SCRAPER_TOKEN) {
+    const q = String(req.query.q ?? "").trim().slice(0, 120);
+    const page = Math.min(100, Math.max(1, Number.parseInt(String(req.query.page ?? "1"), 10) || 1));
+    if (!q) { res.status(400).json({ error: "Search keywords are required." }); return; }
+    try {
+      const base = new URL(process.env.ALIEXPRESS_SCRAPER_URL);
+      const url = new URL("/v1/aliexpress/search", base);
+      url.searchParams.set("q", q); url.searchParams.set("page", String(page));
+      const upstream = await fetch(url, { headers: { Authorization: "Bearer " + process.env.ALIEXPRESS_SCRAPER_TOKEN }, signal: AbortSignal.timeout(20000) });
+      if (!upstream.ok) { res.status(502).json({ error: "AliExpress scraper returned HTTP " + upstream.status }); return; }
+      const data = await upstream.json() as any;
+      const products = (Array.isArray(data.items) ? data.items : []).map((p: any) => ({
+        id: String(p.externalId ?? ""), title: String(p.title ?? ""), priceUsd: Number(p.price?.amount ?? 0),
+        image: String(p.images?.[0]?.url ?? ""), rating: Number(p.rating ?? 0),
+        sales: 0, url: String(p.sourceUrl ?? "")
+      })).filter((p: any) => /^\d{10,}$/.test(p.id));
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ products, page, source: "bazunk-scraper" }); return;
+    } catch (err) {
+      logger.error({ err }, "AliExpress scraper search failed");
+      res.status(502).json({ error: "AliExpress scraper unavailable." }); return;
+    }
+  }
+
   const apiKey = process.env.RAPIDAPI_KEY;
   if (!apiKey) { res.status(503).json({ error: "Configure RAPIDAPI_KEY on the API server first." }); return; }
   const q = String(req.query.q ?? "").trim().slice(0, 120);
