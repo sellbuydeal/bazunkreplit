@@ -137,13 +137,11 @@ export function ImportModal({ onClose, onSuccess, userEmail, userName, initialUr
     setError("");
     setLoading(true);
     try {
-      const r = await fetch("/api/supplier/import", {
+      const r = await authFetch("/api/admin/import-aliexpress-product", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: url.trim(),
           sellerEmail: userEmail,
-          sellerName: userName || null,
           title: title.trim(),
           supplierPriceUsd: usd,
           imageUrl: imageUrl.trim() || null,
