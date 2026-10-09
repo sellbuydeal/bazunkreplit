@@ -1384,6 +1384,17 @@ router.get("/admin/importer-control", async (_req, res) => {
   }
 });
 
+
+// A source search result can omit quantity; never mistake missing data for one unit.
+function ebayStockFromSummary(item:Record<string,unknown>):number|null {
+ const availability=item.availability as Record<string,unknown>|undefined;
+ const raw=availability?.estimatedAvailableQuantity ?? availability?.availableQuantity ?? item.estimatedAvailableQuantity ?? item.availableQuantity ?? item.quantity;
+ if(raw!==undefined&&raw!==null&&raw!==""&&Number.isSafeInteger(Number(raw))&&Number(raw)>=0)return Number(raw);
+ const status=String(availability?.availabilityStatus??item.availabilityStatus??"").toUpperCase();
+ if(["OUT_OF_STOCK","SOLD_OUT","UNAVAILABLE"].includes(status))return 0;
+ return null;
+}
+
 // ── eBay routes ──────────────────────────────────────────────────────────────
 
 // GET /api/admin/search-ebay — search eBay UK or US
@@ -1451,6 +1462,7 @@ router.get("/admin/search-ebay", async (req, res) => {
           seller_username: String(seller.username ?? ""),
           seller_feedback: String(seller.feedbackPercentage ?? ""),
           condition:       String(p.condition ?? ""),
+          available_quantity: ebayStockFromSummary(p),
           ebay_url:        `${ebayBase}/itm/${p.legacyItemId}`,
           country,
           categories:      categoryNames,
@@ -1479,7 +1491,7 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
   interface SelectedEbay {
     item_id: string; title: string; price: number; currency: "GBP" | "USD";
     image: string | null; ebay_url: string; condition: string;
-    seller_username?: string; seller_feedback?: string;
+    seller_username?: string; seller_feedback?: string; available_quantity?: number|null;
     categories?: string[]; shipping_label?: string | null; shipping_type?: string;
     original_price?: string | null; discount_pct?: string | null;
     buying_options?: string[]; item_location?: string | null;
@@ -1522,6 +1534,7 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
       ebay_price: p.price, ebay_currency: currency, ebay_site: site,
       shipping: shippingAmt, markup_pct: markupPct, min_profit: minProfit, official_store: true,
       official_store_name: "Bazunk Official Store", source_last_checked: new Date().toISOString(),
+      source_stock_quantity: p.available_quantity ?? null, stock_quantity_verified: p.available_quantity != null,
     });
 
     const sym = p.currency === "GBP" ? "£" : "$";
@@ -1546,11 +1559,11 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
 
     await db.execute(sql`
       INSERT INTO listings (public_id, title, price, price_gbp, currency, category, subcategory,
-        description, condition, image, seller_email, seller_name, specifications, status, created_at, updated_at)
+        description, condition, image, seller_email, seller_name, specifications, status, quantity, created_at, updated_at)
       VALUES (
         ${publicId}, ${p.title}, ${bazunkPrice}, ${bazunkPrice}, ${currency},
         ${category}, ${subcategory}, ${description}, ${condNorm},
-        ${image}, ${sellerEmail}, ${SELLER_NAME}, ${specs}, 'active', NOW(), NOW()
+        ${image}, ${sellerEmail}, ${SELLER_NAME}, ${specs}, ${p.available_quantity===0?'inactive':'active'}, ${p.available_quantity==null?1:Math.max(0,Math.floor(p.available_quantity))}, NOW(), NOW()
       )
     `);
     await db.execute(sql`UPDATE listings SET seller_username = 'Bazunk Official Store' WHERE public_id = ${publicId}`);
