@@ -1048,7 +1048,7 @@ router.get("/admin/search-aliexpress", async (req, res) => {
       const products=(Array.isArray(data.items)?data.items:[]).map((p:any)=>({
         id:String(p.externalId??""),title:String(p.title??""),priceUsd:Number(p.price?.amount??0),
         image:String(p.images?.[0]?.url??""),rating:Number(p.rating??0),sales:0,url:String(p.sourceUrl??"")
-      })).filter((p:any)=>/^\\d{10,20}$/.test(p.id)&&p.priceUsd>0&&p.title);
+      })).filter((p:any)=>/^\d{10,20}$/.test(p.id)&&p.priceUsd>0&&p.title);
       res.setHeader("Cache-Control","no-store");
       res.json({products,page,source:"aliexpress-official",discovered:data.items?.length??0,complete:products.length,diagnostic:products.length?null:"Official AliExpress API returned no complete priced products."});return;
     }catch(error){logger.warn({error},"Official AliExpress search failed");res.status(502).json({error:"Official AliExpress search is temporarily unavailable."});return;}
