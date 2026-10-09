@@ -1043,19 +1043,46 @@ router.get("/admin/search-aliexpress", async (req, res) => {
       const url = new URL("/v1/aliexpress/search", base);
       url.searchParams.set("q", q); url.searchParams.set("page", String(page));
       let upstream: Response | undefined;
-      for (let attempt = 0; attempt < 2; attempt++) {
+      let lastFailure = "";
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          upstream = await fetch(url, { headers: { Authorization: "Bearer " + process.env.ALIEXPRESS_SCRAPER_TOKEN }, signal: AbortSignal.timeout(25000) });
-          if (upstream.ok || ![502, 503, 504].includes(upstream.status) || attempt === 1) break;
-          logger.warn({ status: upstream.status, attempt }, "Retrying transient AliExpress scraper gateway error");
+          // Render free instances can sleep. Wake the service first on a gateway failure.
+          upstream = await fetch(url, { headers: { Authorization: "Bearer " + process.env.ALIEXPRESS_SCRAPER_TOKEN }, signal: AbortSignal.timeout(45000) });
+          if (upstream.ok || ![502, 503, 504].includes(upstream.status)) break;
+          const gatewayText = await upstream.text().catch(() => "");
+          lastFailure = gatewayText.slice(0, 400);
+          logger.warn({ status: upstream.status, attempt: attempt + 1, body: lastFailure }, "AliExpress scraper gateway returned an error");
         } catch (error) {
-          if (attempt === 1) throw error;
-          logger.warn({ error }, "Retrying AliExpress scraper connection");
+          lastFailure = error instanceof Error ? error.message : String(error);
+          logger.warn({ attempt: attempt + 1, error: lastFailure }, "AliExpress scraper connection failed");
+          if (attempt === 2) throw error;
         }
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        if (attempt < 2) {
+          try {
+            const health = new URL("/health", base);
+            await fetch(health, { signal: AbortSignal.timeout(20000) });
+          } catch (error) {
+            logger.warn({ error }, "AliExpress scraper wake-up health check failed");
+          }
+          await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+        }
       }
       if (!upstream) throw new Error("Scraper returned no response");
-      if (!upstream.ok) { const body = await upstream.json().catch(() => null) as {detail?:unknown}|null; const reason = typeof body?.detail === "string" ? body.detail.slice(0, 240) : "No upstream detail"; logger.warn({ status: upstream.status, reason }, "AliExpress scraper search rejected"); res.status(502).json({ error: `AliExpress scraper HTTP ${upstream.status}: ${reason}` }); return; }
+      if (!upstream.ok) {
+        let reason = "Scraper gateway unavailable or service starting";
+        if (lastFailure) {
+          try {
+            const body = JSON.parse(lastFailure) as {detail?:unknown;error?:unknown};
+            if (typeof body.detail === "string") reason = body.detail.slice(0, 240);
+            else if (typeof body.error === "string") reason = body.error.slice(0, 240);
+          } catch {
+            if (upstream.status < 500) reason = lastFailure.slice(0, 180);
+          }
+        }
+        logger.warn({ status: upstream.status, reason, upstreamHost: base.hostname }, "AliExpress scraper search rejected");
+        res.status(502).json({ error: `AliExpress scraper HTTP ${upstream.status}: ${reason}. Check scraper service availability in Render.` });
+        return;
+      }
       const data = await upstream.json() as any;
       const products = (Array.isArray(data.items) ? data.items : []).map((p: any) => ({
         id: String(p.externalId ?? ""), title: String(p.title ?? ""), priceUsd: Number(p.price?.amount ?? 0),
