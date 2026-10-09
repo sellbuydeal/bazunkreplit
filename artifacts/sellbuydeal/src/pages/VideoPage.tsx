@@ -18,10 +18,18 @@ export default function VideoPage() {
     <div className="min-h-screen bg-slate-50">
       <Navbar />
       <main className="max-w-6xl mx-auto px-4 py-12 sm:py-16">
-        <div className="rounded-3xl bg-gradient-to-br from-blue-700 via-indigo-700 to-purple-700 p-8 sm:p-12 text-white mb-10">
-          <Film className="w-10 h-10 text-yellow-300 mb-4" />
-          <h1 className="text-3xl sm:text-5xl font-black mb-3">Bazunk Promo Videos</h1>
-          <p className="text-blue-100 text-lg">Meet the marketplace. Enjoy the adverts.</p>
+        <div className="relative isolate overflow-hidden rounded-[1.7rem] bg-gradient-to-r from-fuchsia-600 via-indigo-700 to-sky-500 px-6 py-7 sm:px-9 sm:py-8 text-white mb-8 shadow-lg">
+          <div aria-hidden="true" className="pointer-events-none absolute -left-16 -top-28 h-56 w-72 rounded-full bg-pink-400/50 blur-2xl" />
+          <div aria-hidden="true" className="pointer-events-none absolute right-0 -bottom-24 h-48 w-72 rounded-full bg-cyan-300/50 blur-2xl" />
+          <div aria-hidden="true" className="pointer-events-none absolute left-1/2 -top-24 h-40 w-56 rounded-full bg-blue-400/30 blur-3xl" />
+          <div className="relative flex items-center gap-5 sm:gap-7">
+            <div className="shrink-0 rounded-2xl border border-white/30 bg-white/15 p-3 shadow-lg backdrop-blur-sm"><Film className="h-8 w-8 text-white" aria-hidden="true" /></div>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">Bazunk <span className="text-amber-300">Promo Videos</span></h1>
+              <p className="mt-1 text-sm sm:text-base text-white/90">Meet the marketplace. Enjoy the adverts.</p>
+            </div>
+            <div aria-hidden="true" className="hidden sm:flex shrink-0 h-20 w-20 rotate-[-9deg] items-center justify-center rounded-3xl bg-slate-950/65 ring-4 ring-white/20 shadow-xl"><Play className="h-10 w-10 fill-white text-white" /></div>
+          </div>
         </div>
         <div className="grid gap-8 md:grid-cols-2">
           {videos.map(video => (
