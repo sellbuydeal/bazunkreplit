@@ -127,6 +127,7 @@ export function AdminImportsPage() {
 
   // ── eBay state ────────────────────────────────────────────────
   const [ebaySite, setEbaySite]             = useState<EbaySite>("uk");
+  const [amazonSite, setAmazonSite] = useState<EbaySite>("uk");
   const [ebayQuery, setEbayQuery]           = useState("");
   const [ebayPage, setEbayPage]             = useState(1);
   const [ebaySearching, setEbaySearching]   = useState(false);
@@ -202,7 +203,7 @@ export function AdminImportsPage() {
     setLoadingList(true);
     try {
       const params = new URLSearchParams({
-        source: "amazon",
+        source: amazonSite === "uk" ? "amazon-uk" : "amazon-us",
         limit: String(PAGE_SIZE),
         offset: String(page * PAGE_SIZE),
         ...(tableSearch ? { search: tableSearch } : {}),
@@ -216,7 +217,7 @@ export function AdminImportsPage() {
     } finally {
       setLoadingList(false);
     }
-  }, [authFetch, page, tableSearch]);
+  }, [authFetch, page, tableSearch, amazonSite]);
 
   useEffect(() => { loadListings(); }, [loadListings]);
 
@@ -377,7 +378,7 @@ export function AdminImportsPage() {
   const loadEbayListings = useCallback(async () => {
     setEbayLoadingList(true);
     try {
-      const r = await authFetch(`/api/admin/listings?source=ebay&limit=${PAGE_SIZE}&offset=${ebayListPage * PAGE_SIZE}${ebayTableSearch ? `&search=${encodeURIComponent(ebayTableSearch)}` : ""}`);
+      const r = await authFetch(`/api/admin/listings?source=ebay-${ebaySite}&limit=${PAGE_SIZE}&offset=${ebayListPage * PAGE_SIZE}${ebayTableSearch ? `&search=${encodeURIComponent(ebayTableSearch)}` : ""}`);
       if (r.ok) {
         const d = await r.json() as { listings: AmazonListing[]; total: number };
         setEbayListings(d.listings ?? []);
@@ -386,7 +387,7 @@ export function AdminImportsPage() {
     } finally {
       setEbayLoadingList(false);
     }
-  }, [authFetch, ebayListPage, ebayTableSearch]);
+  }, [authFetch, ebayListPage, ebayTableSearch, ebaySite]);
 
   useEffect(() => { if (tab === "ebay") loadEbayListings(); }, [tab, loadEbayListings]);
 
@@ -594,6 +595,7 @@ export function AdminImportsPage() {
         ))}
       </div>
 
+      {tab === "amazon" && <div className="flex gap-2 mb-4"><button className={amazonSite==="uk"?"font-bold underline":"opacity-70"} onClick={()=>{setAmazonSite("uk");setPage(0)}}>🇬🇧 Amazon UK imports</button><button className={amazonSite==="us"?"font-bold underline":"opacity-70"} onClick={()=>{setAmazonSite("us");setPage(0)}}>🇺🇸 Amazon USA imports</button></div>}
       <AnimatePresence mode="wait">
         {tab === "amazon" && (
           <motion.div key="amazon" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-5">
@@ -967,8 +969,8 @@ export function AdminImportsPage() {
                               <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{specs.asin ?? "—"}</code>
                             </td>
                             <td className="px-4 py-3">
-                              {specs.amazon_url && (
-                                <a href={specs.amazon_url} target="_blank" rel="noopener noreferrer"
+                              {(specs.amazon_url || specs.asin) && (
+                                <a href={specs.amazon_url || `https://${amazonSite==="us"?"www.amazon.com":"www.amazon.co.uk"}/dp/${encodeURIComponent(specs.asin!)}`} target="_blank" rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-xs font-bold hover:bg-amber-100 transition-colors">
                                   Amazon <ExternalLink className="w-3 h-3" />
                                 </a>
@@ -1332,8 +1334,8 @@ export function AdminImportsPage() {
                               </span>
                             </td>
                             <td className="px-4 py-3">
-                              {specs.ebay_url && (
-                                <a href={specs.ebay_url} target="_blank" rel="noopener noreferrer"
+                              {(specs.ebay_url || specs.item_id) && (
+                                <a href={specs.ebay_url || `https://www.ebay.${specs.ebay_site==="us"?"com":"co.uk"}/itm/${encodeURIComponent(specs.item_id!)}`} target="_blank" rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors">
                                   eBay <ExternalLink className="w-3 h-3" />
                                 </a>
