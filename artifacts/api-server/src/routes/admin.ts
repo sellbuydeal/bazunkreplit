@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { syncAllImports } from "../lib/syncJob.js";
 import { attachStripePaymentAmounts } from "../lib/adminPaymentRevenue.js";
 import { sql } from "drizzle-orm";
 import { createHmac } from "crypto";
@@ -1300,11 +1301,34 @@ router.delete("/admin/clear-amazon-imports", async (req, res) => {
 });
 
 
+// Run the tracked public eBay/AliExpress importer sync with admin authentication.
+router.post("/admin/importer-control/sync-tracked", async (_req,res)=>{
+ try {const result=await syncAllImports();res.json(result)}catch(err){logger.error({err},"Admin tracked importer sync failed");res.status(500).json({error:"Tracked importer sync failed"});}
+});
+
+// Admin listing-level import overrides. Saved alongside the source so sync retains them.
+router.patch("/admin/importer-control/listings/:id",async(req,res)=>{
+ const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<=0){res.status(400).json({error:"Invalid listing"});return;}
+ const {condition,shipsFrom,shipsTo,markupPct}=req.body||{};
+ const allowed=["new","used","refurbished","open-box","for-parts"];
+ if(condition!==undefined&&!allowed.includes(String(condition))){res.status(400).json({error:"Invalid condition"});return;}
+ if([shipsFrom,shipsTo].some(v=>v!==undefined&&(typeof v!=="string"||v.length>100))){res.status(400).json({error:"Invalid shipping region"});return;}
+ if(markupPct!==undefined&&(!Number.isFinite(Number(markupPct))||Number(markupPct)<0||Number(markupPct)>1000)){res.status(400).json({error:"Invalid markup"});return;}
+ try{const rows=await db.execute(sql`SELECT id,specifications FROM listings WHERE id=${id} AND (specifications LIKE '%"source":"Amazon UK"%' OR specifications LIKE '%"source":"eBay UK"%' OR specifications LIKE '%"source":"eBay US"%') LIMIT 1`);if(!rows.rows.length){res.status(404).json({error:"Imported listing not found"});return;}
+ const specs=JSON.parse(String((rows.rows[0] as any).specifications||"{}"));
+ if(condition!==undefined)specs.condition_override=condition;
+ if(shipsFrom!==undefined)specs.ships_from=shipsFrom.trim();
+ if(shipsTo!==undefined)specs.ships_to=shipsTo.trim();
+ if(markupPct!==undefined)specs.markup_pct=Number(markupPct);
+ await db.execute(sql`UPDATE listings SET specifications=${JSON.stringify(specs)},condition=COALESCE(${condition===undefined?null:condition},condition),updated_at=NOW() WHERE id=${id}`);
+ res.json({ok:true});}catch(err){logger.error({err},"Importer settings update failed");res.status(500).json({error:"Could not update import settings"});}
+});
+
 // GET /api/admin/importer-control — operational overview for Amazon/eBay/AliExpress imports
 router.get("/admin/importer-control", async (_req, res) => {
   try {
     const listingRows = await db.execute(sql`
-      SELECT id, public_id, title, status, price, specifications, updated_at
+      SELECT id, public_id, title, status, price, condition, quantity, specifications, updated_at
       FROM listings
       WHERE specifications LIKE '%"source":"Amazon UK"%'
          OR specifications LIKE '%"source":"eBay UK"%'
@@ -1376,6 +1400,7 @@ router.get("/admin/importer-control", async (_req, res) => {
         productsNeedingAttention: alerts.length,
       },
       alerts: alerts.slice(0, 200),
+      importedListings: listingRows.slice(0, 200).map(row=>{let settings:Record<string,unknown>={};try{settings=JSON.parse(String(row.specifications||"{}"));}catch{}return {id:row.id,title:row.title,publicId:row.public_id,condition:row.condition,quantity:row.quantity,status:row.status,source:settings.source,shipsFrom:settings.ships_from||"",shipsTo:settings.ships_to||"",markupPct:settings.markup_pct??35};}),
       note: 'Usage shown here is Bazunk-tracked importer activity, not RapidAPI billing/quota usage.',
     });
   } catch (err) {
