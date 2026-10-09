@@ -202,7 +202,7 @@ export function AdminImportsPage() {
     setLoadingList(true);
     try {
       const params = new URLSearchParams({
-        imported: "1",
+        source: "amazon",
         limit: String(PAGE_SIZE),
         offset: String(page * PAGE_SIZE),
         ...(tableSearch ? { search: tableSearch } : {}),
