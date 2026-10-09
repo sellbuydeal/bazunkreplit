@@ -1042,7 +1042,19 @@ router.get("/admin/search-aliexpress", async (req, res) => {
       const base = new URL(process.env.ALIEXPRESS_SCRAPER_URL);
       const url = new URL("/v1/aliexpress/search", base);
       url.searchParams.set("q", q); url.searchParams.set("page", String(page));
-      const upstream = await fetch(url, { headers: { Authorization: "Bearer " + process.env.ALIEXPRESS_SCRAPER_TOKEN }, signal: AbortSignal.timeout(20000) });
+      let upstream: Response | undefined;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          upstream = await fetch(url, { headers: { Authorization: "Bearer " + process.env.ALIEXPRESS_SCRAPER_TOKEN }, signal: AbortSignal.timeout(25000) });
+          if (upstream.ok || ![502, 503, 504].includes(upstream.status) || attempt === 1) break;
+          logger.warn({ status: upstream.status, attempt }, "Retrying transient AliExpress scraper gateway error");
+        } catch (error) {
+          if (attempt === 1) throw error;
+          logger.warn({ error }, "Retrying AliExpress scraper connection");
+        }
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+      if (!upstream) throw new Error("Scraper returned no response");
       if (!upstream.ok) { const body = await upstream.json().catch(() => null) as {detail?:unknown}|null; const reason = typeof body?.detail === "string" ? body.detail.slice(0, 240) : "No upstream detail"; logger.warn({ status: upstream.status, reason }, "AliExpress scraper search rejected"); res.status(502).json({ error: `AliExpress scraper HTTP ${upstream.status}: ${reason}` }); return; }
       const data = await upstream.json() as any;
       const products = (Array.isArray(data.items) ? data.items : []).map((p: any) => ({
