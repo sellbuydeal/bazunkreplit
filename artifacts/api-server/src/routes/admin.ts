@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { syncAllImports } from "../lib/syncJob.js";
 import { attachStripePaymentAmounts } from "../lib/adminPaymentRevenue.js";
 import { sql } from "drizzle-orm";
 import { createHmac } from "crypto";
@@ -1299,6 +1300,11 @@ router.delete("/admin/clear-amazon-imports", async (req, res) => {
   }
 });
 
+
+// Run the tracked public eBay/AliExpress importer sync with admin authentication.
+router.post("/admin/importer-control/sync-tracked", async (_req,res)=>{
+ try {const result=await syncAllImports();res.json(result)}catch(err){logger.error({err},"Admin tracked importer sync failed");res.status(500).json({error:"Tracked importer sync failed"});}
+});
 
 // GET /api/admin/importer-control — operational overview for Amazon/eBay/AliExpress imports
 router.get("/admin/importer-control", async (_req, res) => {
