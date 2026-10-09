@@ -1366,7 +1366,7 @@ export function AdminImportsPage() {
                 <label className="block text-sm font-bold text-gray-700">AliExpress product links (one per line)</label>
                 <textarea rows={3} value={aliUrls} onChange={e=>setAliUrls(e.target.value)} placeholder="https://www.aliexpress.com/item/100500....html" className={inputCls+" w-full min-h-24"} />
                 <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-white font-bold text-sm" onClick={()=>{
-                  const links=aliUrls.split(/[\\s,]+/).map(v=>v.trim()).filter(v=>{try{const u=new URL(v);return u.protocol==="https:"&&/(^|\\.)aliexpress\\.[a-z.]+$/i.test(u.hostname)&&/\\/item\\//.test(u.pathname)}catch{return false}}).slice(0,50);
+                  const links=aliUrls.split(/\s|,/).map(v=>v.trim()).filter(v=>{try{const u=new URL(v);const host=u.hostname.toLowerCase();return u.protocol==="https:"&&(host==="aliexpress.com"||host.endsWith(".aliexpress.com"))&&u.pathname.includes("/item/")}catch{return false}}).slice(0,50);
                   setAliQueued([...new Set(links)]);setAliSelected(new Set(links));
                 }}><Search className="w-4 h-4"/>Prepare URL selection</button>
                 <p className="text-xs text-gray-500">This selector prepares URLs. Product details still need to be entered in the import form; automated AliExpress search and bulk fetching are not yet connected.</p>
