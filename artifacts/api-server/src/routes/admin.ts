@@ -1414,6 +1414,17 @@ router.get("/admin/importer-control", async (_req, res) => {
   }
 });
 
+
+// A source search result can omit quantity; never mistake missing data for one unit.
+function ebayStockFromSummary(item:Record<string,unknown>):number|null {
+ const availability=item.availability as Record<string,unknown>|undefined;
+ const raw=availability?.estimatedAvailableQuantity ?? availability?.availableQuantity ?? item.estimatedAvailableQuantity ?? item.availableQuantity ?? item.quantity;
+ if(raw!==undefined&&raw!==null&&raw!==""&&Number.isSafeInteger(Number(raw))&&Number(raw)>=0)return Number(raw);
+ const status=String(availability?.availabilityStatus??item.availabilityStatus??"").toUpperCase();
+ if(["OUT_OF_STOCK","SOLD_OUT","UNAVAILABLE"].includes(status))return 0;
+ return null;
+}
+
 // ── eBay routes ──────────────────────────────────────────────────────────────
 
 // GET /api/admin/search-ebay — search eBay UK or US
@@ -1481,6 +1492,7 @@ router.get("/admin/search-ebay", async (req, res) => {
           seller_username: String(seller.username ?? ""),
           seller_feedback: String(seller.feedbackPercentage ?? ""),
           condition:       String(p.condition ?? ""),
+          available_quantity: ebayStockFromSummary(p),
           ebay_url:        `${ebayBase}/itm/${p.legacyItemId}`,
           country,
           categories:      categoryNames,
@@ -1509,7 +1521,7 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
   interface SelectedEbay {
     item_id: string; title: string; price: number; currency: "GBP" | "USD";
     image: string | null; ebay_url: string; condition: string;
-    seller_username?: string; seller_feedback?: string;
+    seller_username?: string; seller_feedback?: string; available_quantity?: number|null;
     categories?: string[]; shipping_label?: string | null; shipping_type?: string;
     original_price?: string | null; discount_pct?: string | null;
     buying_options?: string[]; item_location?: string | null;
@@ -1552,6 +1564,7 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
       ebay_price: p.price, ebay_currency: currency, ebay_site: site,
       shipping: shippingAmt, markup_pct: markupPct, min_profit: minProfit, official_store: true,
       official_store_name: "Bazunk Official Store", source_last_checked: new Date().toISOString(),
+      source_stock_quantity: p.available_quantity ?? null, stock_quantity_verified: p.available_quantity != null,
     });
 
     const sym = p.currency === "GBP" ? "£" : "$";
@@ -1576,11 +1589,11 @@ router.post("/admin/import-selected-ebay", async (req, res) => {
 
     await db.execute(sql`
       INSERT INTO listings (public_id, title, price, price_gbp, currency, category, subcategory,
-        description, condition, image, seller_email, seller_name, specifications, status, created_at, updated_at)
+        description, condition, image, seller_email, seller_name, specifications, status, quantity, created_at, updated_at)
       VALUES (
         ${publicId}, ${p.title}, ${bazunkPrice}, ${bazunkPrice}, ${currency},
         ${category}, ${subcategory}, ${description}, ${condNorm},
-        ${image}, ${sellerEmail}, ${SELLER_NAME}, ${specs}, 'active', NOW(), NOW()
+        ${image}, ${sellerEmail}, ${SELLER_NAME}, ${specs}, ${p.available_quantity===0?'inactive':'active'}, ${p.available_quantity==null?1:Math.max(0,Math.floor(p.available_quantity))}, NOW(), NOW()
       )
     `);
     await db.execute(sql`UPDATE listings SET seller_username = 'Bazunk Official Store' WHERE public_id = ${publicId}`);
@@ -1597,14 +1610,14 @@ router.post("/admin/sync-ebay-prices", async (req, res) => {
   if (!apiKey) { res.status(503).json({ error: "RapidAPI key not set — add it at the top of Admin → Importers." }); return; }
 
   const rows = await db.execute(sql`
-    SELECT id, specifications FROM listings
+    SELECT id, specifications, quantity, status FROM listings
     WHERE (specifications LIKE '%"source":"eBay UK"%' OR specifications LIKE '%"source":"eBay US"%')
-      AND status = 'active'
-  `).then(r => r.rows as { id: number; specifications: string }[]);
+      AND status IN ('active','inactive')
+  `).then(r => r.rows as { id: number; specifications: string; quantity:number; status:string }[]);
 
   if (!rows.length) { res.json({ updated: 0, unchanged: 0, errors: 0, message: "No eBay imports found" }); return; }
 
-  let updated = 0, unchanged = 0, errors = 0;
+  let updated = 0, unchanged = 0, errors = 0, stockUpdated = 0, stockUnknown = 0;
   const BATCH = 5;
 
   for (let i = 0; i < rows.length; i += BATCH) {
@@ -1628,13 +1641,16 @@ router.post("/admin/sync-ebay-prices", async (req, res) => {
 
         const data     = await resp.json() as Record<string, unknown>;
         const results  = (data?.itemSummaries as Record<string, unknown>[]) ?? [];
-        const match    = results.find(p => String(p.legacyItemId) === itemId) ?? results[0];
+        const match    = results.find(p => String(p.legacyItemId) === itemId);
         if (!match) { errors++; return; }
 
         const priceObj     = (match.price as Record<string, unknown>) ?? {};
         const newEbayPrice = parseFloat(String(priceObj.value ?? "").replace(/[^0-9.]/g, ""));
         if (!newEbayPrice || newEbayPrice <= 0) { errors++; return; }
-        if (Math.abs(newEbayPrice - oldPrice) < 0.01) { unchanged++; return; }
+        const sourceQty=ebayStockFromSummary(match);
+        if(sourceQty===null)stockUnknown++;
+        const priceUnchanged=Math.abs(newEbayPrice-oldPrice)<0.01;
+        if(priceUnchanged && (sourceQty===null || (sourceQty===Number(row.quantity) && row.status===(sourceQty===0?"inactive":"active")))){unchanged++;return;}
 
         const landedCost = newEbayPrice + shipping;
         const newBazunkPrice = Math.round(Math.max(landedCost * (1 + markupPct / 100), landedCost + minProfit) * 100) / 100;
@@ -1643,18 +1659,19 @@ router.post("/admin/sync-ebay-prices", async (req, res) => {
           const pausedSpecs = JSON.stringify({ ...specs, source_price_anomaly: true, source_last_checked: new Date().toISOString(), proposed_source_price: newEbayPrice });
           await db.execute(sql`UPDATE listings SET status='paused', specifications=${pausedSpecs}, updated_at=NOW() WHERE id=${row.id}`); errors++; return;
         }
-        const newSpecs = JSON.stringify({ ...specs, ebay_price: newEbayPrice, source_price_anomaly: false, source_last_checked: new Date().toISOString() });
+        const newSpecs = JSON.stringify({ ...specs, ebay_price: newEbayPrice, source_price_anomaly: false, source_last_checked: new Date().toISOString(), ...(sourceQty===null?{}:{source_stock_quantity:sourceQty,stock_quantity_verified:true}) });
+        if(sourceQty!==null && (sourceQty!==Number(row.quantity)||row.status!==(sourceQty===0?"inactive":"active")))stockUpdated++;
         await db.execute(sql`
           UPDATE listings SET price = ${newBazunkPrice}, price_gbp = ${newBazunkPrice},
-            specifications = ${newSpecs}, updated_at = NOW() WHERE id = ${row.id}
+            specifications = ${newSpecs}, quantity = ${sourceQty===null?row.quantity:sourceQty}, status = ${sourceQty===null?row.status:sourceQty===0?"inactive":"active"}, updated_at = NOW() WHERE id = ${row.id}
         `);
         updated++;
       } catch { errors++; }
     }));
   }
 
-  logger.info({ updated, unchanged, errors }, "eBay price sync complete");
-  res.json({ updated, unchanged, errors, message: `Synced ${rows.length}: ${updated} updated, ${unchanged} unchanged, ${errors} errors` });
+  logger.info({ updated, unchanged, errors, stockUpdated, stockUnknown }, "eBay price and stock sync complete");
+  res.json({ updated, unchanged, errors, stockUpdated, stockUnknown, message: `Synced ${rows.length}: ${updated} updated, ${unchanged} unchanged, ${errors} errors; ${stockUpdated} stock quantities updated, ${stockUnknown} without a reported stock count` });
 });
 
 // POST /api/admin/sync-ebay-details — re-fetch eBay titles & descriptions
