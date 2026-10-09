@@ -9,12 +9,14 @@ import { UserEbayImporterSection } from "@/components/UserEbayImporterSection";
 import { ImporterSection } from "@/components/ImporterSection";
 import { OfferUpManualImporter } from "@/components/OfferUpManualImporter";
 import { ShopifyPublicImporter } from "@/components/ShopifyPublicImporter";
+import { WooCommercePublicImporter } from "@/components/WooCommercePublicImporter";
 
-type Source="ebay"|"amazon"|"aliexpress"|"shopify"|"offerup";
+type Source="ebay"|"amazon"|"aliexpress"|"shopify"|"offerup"|"woocommerce";
 const info:any={
  ebay:{name:"eBay",subtitle:"UK & USA",method:"Public URL data or third-party RapidAPI",gradient:"from-blue-600 to-cyan-400",api:"https://rapidapi.com/mahmudulhasandev/api/real-time-ebay-data"},
  amazon:{name:"Amazon",subtitle:"Product importer",method:"Third-party API (RapidAPI)",gradient:"from-orange-500 to-yellow-400",api:"https://rapidapi.com/letscrape-6bRBa3QguO5/api/real-time-amazon-data"},
  aliexpress:{name:"AliExpress",subtitle:"Global products",method:"Third-party API (RapidAPI)",gradient:"from-rose-600 to-orange-400",api:"https://rapidapi.com/ecommdatahub/api/aliexpress-datahub"},
+ woocommerce:{name:"WooCommerce",subtitle:"Store API",method:"Official WooCommerce public Store API",gradient:"from-purple-600 to-indigo-500",api:""},
  offerup:{name:"OfferUp",subtitle:"USA classifieds",method:"Seller-assisted (no scraper or API)",gradient:"from-sky-600 to-indigo-500",api:""},
  shopify:{name:"Shopify",subtitle:"Store, collection & product URLs",method:"Official Shopify Storefront API (tokenless)",gradient:"from-green-600 to-emerald-400",api:""}
 };
@@ -47,7 +49,7 @@ export function ImporterWorkspacePage(){
     <p style={{color:"#dbeafe"}} className="text-sm mt-1">Search inventory through your connected marketplace API.</p>
    </button>
   </div>{ebayMode==="url"?<FreeEbayImporter/>:<>{ready?<UserEbayImporterSection/>:<Connection/>}</>}</>}
-  {source==="offerup"?<OfferUpManualImporter/>:source==="shopify"?<ShopifyPublicImporter/>:source!=="ebay"&&(ready?(source==="amazon"?<UserAmazonImporterSection/>:<ImporterSection/>):<Connection/>)}
+  {source==="woocommerce"?<WooCommercePublicImporter/>:source==="offerup"?<OfferUpManualImporter/>:source==="shopify"?<ShopifyPublicImporter/>:source!=="ebay"&&(ready?(source==="amazon"?<UserAmazonImporterSection/>:<ImporterSection/>):<Connection/>)}
  </div></div>;
  function Connection(){return <div className="rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-sm"><div className="flex gap-3"><KeyRound className="w-6 h-6 text-indigo-600"/><div className="flex-1"><h2 className="text-xl font-black">Connect RapidAPI</h2>{status?.bazunk?<p className="mt-2 text-green-700"><CheckCircle2 className="inline w-4 h-4 mr-1"/>Bazunk server credentials are connected.</p>:<><p className="text-sm text-gray-500 mt-1">Connect your RapidAPI key to use this search importer.</p><div className="flex flex-col sm:flex-row gap-2 mt-4"><input type="password" value={key} onChange={e=>setKey(e.target.value)} placeholder={status?.masked||"Paste X-RapidAPI-Key"} className="flex-1 border rounded-xl px-3 py-2"/><button onClick={connect} disabled={!key||busy} className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-black disabled:opacity-40">{busy?"Connecting…":"Connect"}</button></div></>}{msg&&<p className="text-sm mt-3">{msg}</p>}<a href={cfg.api} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-blue-600 font-bold mt-4">Open required API <ExternalLink className="w-4 h-4"/></a>{!ready&&!status?.bazunk&&<p className="mt-3 text-xs text-gray-500"><AlertCircle className="inline w-3.5 h-3.5 mr-1"/>API provider plans and request charges are controlled by RapidAPI/provider.</p>}</div></div></div>}
 }
