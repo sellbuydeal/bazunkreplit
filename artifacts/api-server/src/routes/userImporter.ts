@@ -1,3 +1,4 @@
+import { browseShopify } from "../lib/shopifyPublic.js";
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -423,15 +424,7 @@ router.post("/user/import-ebay", async (req, res) => {
 router.post("/user/shopify-public/preview", async (req,res)=>{
  const email=await requestEmail(req);if(!email){res.status(401).json({error:"Sign in to import Shopify products."});return;}
  try{
-  const raw=String(req.body.url??"").trim();const u=new URL(/^https?:\/\//i.test(raw)?raw:`https://${raw}`);
-  if(u.protocol!=="https:"||!u.hostname.includes(".")||u.username||u.password){res.status(400).json({error:"Enter a valid HTTPS Shopify store URL."});return;}
-  const host=u.hostname.toLowerCase();if(host==="localhost"||host.endsWith(".local")||/^\d+(\.\d+){3}$/.test(host)){res.status(400).json({error:"Private/local hosts are not allowed."});return;}
-  const product=u.pathname.match(/^\/products\/([^/?#]+)/),collection=u.pathname.match(/^\/collections\/([^/?#]+)/);
-  const endpoint=`https://${host}${product?`/products/${encodeURIComponent(product[1])}.js`:collection?`/collections/${encodeURIComponent(collection[1])}/products.json?limit=100`:"/products.json?limit=100"}`;
-  const r=await fetch(endpoint,{headers:{accept:"application/json"},redirect:"error",signal:AbortSignal.timeout(12000)});
-  if(!r.ok)throw new Error(`Shopify storefront returned ${r.status}`);const j:any=await r.json();const rows=product?[j]:(j.products??[]);
-  const items=rows.slice(0,100).map((p:any)=>{const variants=Array.isArray(p.variants)?p.variants:[],v=variants[0],amount=Number(v?.price??0);return{provider:"shopify",externalId:String(p.handle||p.id),sourceUrl:`https://${host}/products/${p.handle}`,title:String(p.title||"Shopify product"),description:String(p.body_html||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim(),brand:p.vendor||undefined,category:p.product_type||undefined,price:{amount:Number.isFinite(amount)?amount:0,currency:String(req.body.currency||"GBP").toUpperCase()},images:(p.images??[]).map((x:any)=>({url:typeof x==="string"?x:String(x.src||"")})).filter((x:any)=>/^https:\/\//.test(x.url)),variants:variants.map((x:any)=>({id:String(x.id),name:String(x.title||"Default"),value:String(x.title||"Default"),available:x.available!==false,price:{amount:Number(x.price||0),currency:String(req.body.currency||"GBP").toUpperCase()}})),availability:variants.some((x:any)=>x.available!==false)?"in_stock":"out_of_stock"}});
-  res.json({store:host,kind:product?"product":collection?"collection":"store",items});
+  res.json(await browseShopify(String(req.body.url ?? "")));
  }catch(e){res.status(422).json({error:e instanceof Error?e.message:"Could not read this Shopify storefront."});}
 });
 
@@ -443,31 +436,48 @@ router.post("/user/import-shopify-public", async (req, res) => {
   if(!items.length||items.length>100){res.status(400).json({error:"Choose between 1 and 100 Shopify products."});return;}
   const category=String(req.body.category??""),subcategory=String(req.body.subcategory??"");
   if(!/^[a-z0-9-]{1,80}$/.test(category)||(subcategory&&!/^[a-z0-9-]{1,80}$/.test(subcategory))){res.status(400).json({error:"Choose a Bazunk category."});return;}
-  const markupType=req.body.markupType==="fixed"?"fixed":"percentage",markupValue=Math.max(0,Number(req.body.markupValue??0));
+  const markupType=req.body.markupType==="fixed"?"fixed":"percentage",markupValue=Number(req.body.markupValue??0);
+  if (!Number.isFinite(markupValue) || markupValue < 0 || markupValue > 999999) { res.status(400).json({error:"Enter a valid non-negative markup."}); return; }
   const syncEnabled=req.body.syncEnabled!==false;
-  const user=await db.execute(sql`SELECT name FROM users WHERE lower(email)=lower(${email}) LIMIT 1`).then(r=>r.rows[0] as any);
+  // Validate source identities before opening the transaction. Source data is re-read;
+  // the cross-site handoff is a selection, never authority for prices or stock.
+  const products = [];
+  try {
+  for (const raw of items) {
+   const result = await browseShopify(String(raw.sourceUrl ?? ""));
+   if (result.kind !== "product" || result.items[0]?.externalId !== String(raw.externalId)) { res.status(400).json({error:"Invalid Shopify product selection"}); return; }
+   products.push(result.items[0]);
+  }
+  } catch (err) { res.status(422).json({error:err instanceof Error ? err.message : "Could not verify selected Shopify products."}); return; }
+  const result = await db.transaction(async tx => {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${email}))`);
+  const user=await tx.execute(sql`SELECT name FROM users WHERE lower(email)=lower(${email}) LIMIT 1`).then(r=>r.rows[0] as any);
   let imported=0,skipped=0;
-  for(const raw of items){
+  for(const raw of products){
    const sourceUrl=String(raw.sourceUrl??""),externalId=String(raw.externalId??"").slice(0,200),title=String(raw.title??"").trim().slice(0,500);
    const sourcePrice=Number(raw.price?.amount),currency=String(raw.price?.currency??"GBP").toUpperCase();
    if(!/^https:\/\//i.test(sourceUrl)||!externalId||!title||!Number.isFinite(sourcePrice)||sourcePrice<0){skipped++;continue;}
    let host="";try{host=new URL(sourceUrl).hostname.toLowerCase()}catch{skipped++;continue}
    if(!host.includes(".")||!sourceUrl.includes("/products/")){skipped++;continue}
-   const exists=await db.execute(sql`SELECT si.id FROM supplier_imports si JOIN listings l ON l.id=si.listing_id WHERE si.supplier_source='shopify-public' AND si.supplier_id=${externalId} AND lower(l.seller_email)=lower(${email}) LIMIT 1`);
+   const exists=await tx.execute(sql`SELECT si.id FROM supplier_imports si JOIN listings l ON l.id=si.listing_id WHERE si.supplier_source='shopify-public' AND si.supplier_url=${sourceUrl} AND lower(l.seller_email)=lower(${email}) LIMIT 1`);
    if(exists.rows.length){skipped++;continue;}
    const bazunkPrice=Math.round((markupType==="fixed"?sourcePrice+markupValue:sourcePrice*(1+markupValue/100))*100)/100;
    const priceGbp=(await toGbp(bazunkPrice,currency)).toFixed(2);
    const image=Array.isArray(raw.images)&&raw.images[0]?.url?String(raw.images[0].url):null;
    const quantity=raw.availability==="out_of_stock"?0:1,status=quantity?"active":"inactive";
    const specs=JSON.stringify({source:"Shopify Public",shopify_store:host,shopify_url:sourceUrl,shopify_id:externalId,source_price:sourcePrice,source_currency:currency,markup_type:markupType,markup_value:markupValue,sync_enabled:syncEnabled,variants:Array.isArray(raw.variants)?raw.variants:[]});
-   const listing=await db.execute(sql`INSERT INTO listings(public_id,title,price,price_gbp,currency,category,subcategory,description,condition,image,seller_email,seller_name,specifications,status,quantity,created_at,updated_at)
+   const listing=await tx.execute(sql`INSERT INTO listings(public_id,title,price,price_gbp,currency,category,subcategory,description,condition,image,seller_email,seller_name,specifications,status,quantity,created_at,updated_at)
     VALUES(${'BZK-SHP-'+randomUUID()},${title},${bazunkPrice},${priceGbp},${currency},${category},${subcategory||null},${String(raw.description??title).slice(0,5000)},'new',${image},${email},${user?.name||email.split("@")[0]},${specs},${status},${quantity},NOW(),NOW()) RETURNING id`).then(r=>r.rows[0] as any);
-   await db.execute(sql`INSERT INTO supplier_imports(listing_id,supplier_source,supplier_id,supplier_url,supplier_price,supplier_currency,markup_type,markup_value,last_synced_at,sync_status,supplier_data,created_at,updated_at)
-    VALUES(${listing.id},'shopify-public',${externalId},${sourceUrl},${sourcePrice},${currency},${markupType},${markupValue},NOW(),${syncEnabled?"ok":"disabled"},${JSON.stringify({store:host,syncEnabled})}::jsonb,NOW(),NOW())`);
+   await tx.execute(sql`INSERT INTO supplier_imports(listing_id,supplier_source,supplier_id,supplier_url,supplier_price,supplier_currency,markup_type,markup_value,last_synced_at,sync_status,supplier_data,created_at,updated_at)
+    VALUES(${listing.id},'shopify-public',${externalId},${sourceUrl},${sourcePrice},${currency},${markupType},${markupValue},NOW(),${syncEnabled?"ok":"disabled"},${JSON.stringify({store:host,syncEnabled,variants:raw.variants})}::jsonb,NOW(),NOW())`);
    imported++;
   }
-  res.json({imported,skipped,message:`Imported ${imported} Shopify product${imported===1?"":"s"} to Bazunk with ${syncEnabled?"sync metadata enabled":"sync disabled"}.`});
+  return {imported,skipped};
+  });
+  const {imported,skipped} = result;
+  res.json({imported,skipped,message:`Imported ${imported} Shopify product${imported===1?"":"s"} to Bazunk with ${syncEnabled?"automatic price/availability sync enabled":"sync disabled"}.`});
  } catch(err){logger.error({err},"Shopify public import failed");res.status(500).json({error:"Shopify import failed. Existing imports were not duplicated."});}
 });
 
 export default router;
+

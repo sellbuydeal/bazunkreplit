@@ -18,6 +18,13 @@ const info:any={
 };
 export function ImporterWorkspacePage(){
  const [,params]=useRoute("/importers/:source"); const source=(params?.source||"ebay") as Source; const cfg=info[source];
+ // Retain Data Platform selection while the marketplace user signs in.
+ useEffect(() => {
+  const handoff = new URLSearchParams(window.location.search).get("handoff");
+  if (source === "shopify" && handoff && handoff.length <= 18000) {
+   sessionStorage.setItem("bazunk_shopify_handoff", handoff);
+  }
+ }, [source]);
  const {user}=useAuth(); const {getToken}=useClerkAuth(); const [status,setStatus]=useState<any>(null); const [key,setKey]=useState(""); const [msg,setMsg]=useState(""); const [busy,setBusy]=useState(false); const [ebayMode,setEbayMode]=useState<"url"|"search">("url");
  const af=async(url:string,init:RequestInit={})=>{const t=await getToken();return fetch(url,{...init,headers:{"Content-Type":"application/json",...(init.headers||{}),...(t?{Authorization:`Bearer ${t}`}:{})}})};
  const load=async()=>{try{const r=await af("/api/user/rapidapi");if(r.ok)setStatus(await r.json())}catch{}}; useEffect(()=>{if(user)void load()},[user?.email]);
@@ -42,3 +49,4 @@ export function ImporterWorkspacePage(){
  </div></div>;
  function Connection(){return <div className="rounded-3xl border bg-white dark:bg-slate-900 p-6 shadow-sm"><div className="flex gap-3"><KeyRound className="w-6 h-6 text-indigo-600"/><div className="flex-1"><h2 className="text-xl font-black">Connect RapidAPI</h2>{status?.bazunk?<p className="mt-2 text-green-700"><CheckCircle2 className="inline w-4 h-4 mr-1"/>Bazunk server credentials are connected.</p>:<><p className="text-sm text-gray-500 mt-1">Connect your RapidAPI key to use this search importer.</p><div className="flex flex-col sm:flex-row gap-2 mt-4"><input type="password" value={key} onChange={e=>setKey(e.target.value)} placeholder={status?.masked||"Paste X-RapidAPI-Key"} className="flex-1 border rounded-xl px-3 py-2"/><button onClick={connect} disabled={!key||busy} className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-black disabled:opacity-40">{busy?"Connecting…":"Connect"}</button></div></>}{msg&&<p className="text-sm mt-3">{msg}</p>}<a href={cfg.api} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-blue-600 font-bold mt-4">Open required API <ExternalLink className="w-4 h-4"/></a>{!ready&&!status?.bazunk&&<p className="mt-3 text-xs text-gray-500"><AlertCircle className="inline w-3.5 h-3.5 mr-1"/>API provider plans and request charges are controlled by RapidAPI/provider.</p>}</div></div></div>}
 }
+

@@ -1,3 +1,4 @@
+import { browseShopify } from "./shopifyPublic.js";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "./logger.js";
@@ -36,6 +37,7 @@ export async function syncAllImports(): Promise<{ synced: number; errors: number
   const rows = await db.execute(sql`
     SELECT si.id, si.listing_id AS "listingId", si.supplier_id AS "supplierId", si.supplier_source AS "supplierSource", si.markup_type AS "markupType", si.markup_value AS "markupValue", si.supplier_url AS "supplierUrl", si.supplier_data AS "supplierData", l.seller_email AS "sellerEmail"
     FROM supplier_imports si JOIN listings l ON l.id=si.listing_id
+    WHERE si.sync_status <> 'disabled' AND COALESCE(si.supplier_data->>'syncEnabled','true') <> 'false'
     ORDER BY si.last_synced_at ASC NULLS FIRST
   `);
 
@@ -56,6 +58,27 @@ export async function syncAllImports(): Promise<{ synced: number; errors: number
 
 async function syncRow(row: ImportRow): Promise<{ ok: boolean; error?: string }> {
   try {
+    if (row.supplierSource === "shopify-public") {
+      const settings = row.supplierData ?? {};
+      if (settings.syncEnabled === false) return { ok: false, error: "Sync disabled" };
+      const result = await browseShopify(row.supplierUrl);
+      if (result.kind !== "product" || !result.items[0]) throw new Error("Shopify product not found");
+      const product = result.items[0];
+      const markup = Number(row.markupValue);
+      if (!Number.isFinite(markup) || markup < 0) throw new Error("Invalid saved Shopify markup");
+      const price = Math.round((row.markupType === "fixed" ? product.price.amount + markup : product.price.amount * (1 + markup / 100)) * 100) / 100;
+      const priceGbp = (await toGbp(price, product.price.currency)).toFixed(2);
+      const quantity = product.availability === "out_of_stock" ? 0 : 1;
+      await db.transaction(async tx => {
+        await tx.execute(sql`UPDATE listings SET price=${price},price_gbp=${priceGbp},currency=${product.price.currency},quantity=${quantity},
+          status=CASE WHEN status IN ('active','inactive') THEN ${quantity ? "active" : "inactive"} ELSE status END,
+          updated_at=NOW() WHERE id=${row.listingId}`);
+        await tx.execute(sql`UPDATE supplier_imports SET supplier_price=${product.price.amount},supplier_currency=${product.price.currency},
+          last_synced_at=NOW(),sync_status='ok',sync_error=NULL,supplier_data=${JSON.stringify({...settings,variants:product.variants,availability:product.availability})}::jsonb,
+          updated_at=NOW() WHERE id=${row.id}`);
+      });
+      return {ok:true};
+    }
     if (row.supplierSource === "ebay-public") {
       const settings = row.supplierData ?? {};
       if (settings.syncEnabled === false) return { ok: false, error: "Sync disabled" };
@@ -130,3 +153,4 @@ export function startSyncJob(): void {
     );
   }, SYNC_INTERVAL_MS);
 }
+
