@@ -1102,6 +1102,52 @@ router.get("/admin/search-aliexpress", async (req, res) => {
   }
 });
 
+// POST /api/admin/import-selected-aliexpress — server-side verified bulk listing creation
+router.post("/admin/import-selected-aliexpress", async (req, res) => {
+  const base = process.env.ALIEXPRESS_SCRAPER_URL, token = process.env.ALIEXPRESS_SCRAPER_TOKEN;
+  if (!base || !token) { res.status(503).json({ error: "AliExpress scraper not configured" }); return; }
+  const ids = Array.isArray(req.body?.ids) ? [...new Set(req.body.ids.map((v: unknown) => String(v)))] as string[] : [];
+  if (!ids.length || ids.length > 30 || ids.some(id => !/^\\d{10,20}$/.test(id))) {
+    res.status(400).json({ error: "Select 1–30 valid AliExpress product IDs" }); return;
+  }
+  const markup = Number(req.body?.markup ?? 35), shipping = Number(req.body?.shipping ?? 0);
+  if (!Number.isFinite(markup) || markup < 0 || markup > 1000 || !Number.isFinite(shipping) || shipping < 0 || shipping > 10000) {
+    res.status(400).json({ error: "Invalid markup or shipping amount" }); return;
+  }
+  const sellerEmail = String(req.body?.sellerEmail ?? "").trim();
+  const seller = await db.execute(sql`SELECT email, name FROM users WHERE email = ${sellerEmail} LIMIT 1`)
+    .then(r => r.rows[0] as {email:string;name:string|null}|undefined);
+  if (!seller) { res.status(400).json({ error: "Select an existing destination seller" }); return; }
+  const results: {id:string;status:string;reason?:string}[] = [];
+  for (const id of ids) {
+    try {
+      const exists = await db.execute(sql`SELECT id FROM listings WHERE specifications LIKE ${'%"aliexpress_id":"' + id + '"%'} LIMIT 1`);
+      if (exists.rows.length) { results.push({id,status:"skipped",reason:"Already imported"}); continue; }
+      const url = new URL("/v1/aliexpress/products/" + id, base);
+      const response = await fetch(url, { headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(20000) });
+      if (!response.ok) throw new Error("Scraper HTTP " + response.status);
+      const p = await response.json() as any;
+      const price = Number(p.price?.amount);
+      const currency = String(p.price?.currency ?? "");
+      if (!p.title || !Number.isFinite(price) || price <= 0) throw new Error("Title or price unavailable");
+      if (currency !== "GBP") throw new Error("Source currency " + currency + " is not GBP; conversion required before listing");
+      if (p.availability === "out_of_stock") throw new Error("Product out of stock");
+      const bazPrice = Math.round((price * (1 + markup / 100) + shipping) * 100) / 100;
+      const specs = JSON.stringify({ source:"AliExpress", aliexpress_id:id, aliexpress_url:p.sourceUrl,
+        source_price:price, source_currency:currency, markup_pct:markup, shipping_gbp:shipping,
+        source_sync:true, last_synced_at:new Date().toISOString(), source_availability:p.availability });
+      const publicId = "BZK-ALI-" + id;
+      await db.execute(sql`INSERT INTO listings
+        (public_id,title,price,price_gbp,currency,category,description,condition,image,seller_email,seller_name,specifications,status,created_at,updated_at)
+        VALUES (${publicId},${String(p.title).slice(0,500)},${bazPrice},${bazPrice},'GBP','other',
+        ${String(p.description ?? p.title).slice(0,10000)},'new',${p.images?.[0]?.url ?? null},
+        ${seller.email},${seller.name ?? seller.email.split("@")[0]},${specs},'active',NOW(),NOW())`);
+      results.push({id,status:"imported"});
+    } catch (error) { results.push({id,status:"failed",reason:error instanceof Error ? error.message : "Import failed"}); }
+  }
+  res.json({ imported:results.filter(r=>r.status==="imported").length, results });
+});
+
 // GET /api/admin/search-amazon — search Amazon UK and return raw results for admin to browse
 router.get("/admin/search-amazon", async (req, res) => {
   const apiKey = process.env.RAPIDAPI_KEY;
