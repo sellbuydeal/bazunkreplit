@@ -117,7 +117,19 @@ router.post("/supplier/import", async (req, res) => {
     return;
   }
 
-  const bazunkPrice = calculateBazunkPrice(supplierPriceUsd, markupType, markupValue);
+  // Never use the historical fixed USD/GBP assumption for a new import.
+  let usdToGbp: number;
+  try {
+    const fxResponse = await fetch("https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP", { signal: AbortSignal.timeout(8000) });
+    if (!fxResponse.ok) throw new Error("FX service unavailable");
+    const fx = await fxResponse.json() as { rates?: { GBP?: number } };
+    usdToGbp = Number(fx.rates?.GBP);
+    if (!Number.isFinite(usdToGbp) || usdToGbp <= 0) throw new Error("Invalid USD/GBP exchange rate");
+  } catch {
+    res.status(503).json({ error: "Current USD/GBP exchange rate unavailable. Please retry later; no listing was created." });
+    return;
+  }
+  const bazunkPrice = calculateBazunkPrice(supplierPriceUsd, markupType, markupValue, usdToGbp);
 
   const [listing] = (await db.execute(sql`
     INSERT INTO listings (title, price, category, subcategory, description, condition, image, seller_email, seller_name, status)
