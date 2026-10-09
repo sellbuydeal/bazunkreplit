@@ -1031,6 +1031,43 @@ router.patch("/admin/listings/:id/image", async (req, res) => {
   }
 });
 
+// AliExpress keyword search — authenticated admin only; RapidAPI key stays server-side.
+router.get("/admin/search-aliexpress", async (req, res) => {
+  const apiKey = process.env.RAPIDAPI_KEY;
+  if (!apiKey) { res.status(503).json({ error: "Configure RAPIDAPI_KEY on the API server first." }); return; }
+  const q = String(req.query.q ?? "").trim().slice(0, 120);
+  const page = Math.min(100, Math.max(1, Number.parseInt(String(req.query.page ?? "1"), 10) || 1));
+  if (!q) { res.status(400).json({ error: "Search keywords are required." }); return; }
+  try {
+    const params = new URLSearchParams({ q, page: String(page), currency: "USD", locale: "en_US", region: "GB" });
+    const response = await fetch("https://aliexpress-datahub.p.rapidapi.com/item_search_2?" + params, {
+      headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": "aliexpress-datahub.p.rapidapi.com" },
+      signal: AbortSignal.timeout(18000),
+    });
+    if (!response.ok) { res.status(502).json({ error: rapidApiErrorMessage("AliExpress", response.status) }); return; }
+    const payload = await response.json() as any;
+    const result = payload?.result ?? payload;
+    const code = result?.status?.code;
+    if (code && String(code) !== "200") { res.status(502).json({ error: "AliExpress search provider returned an error (" + code + ")." }); return; }
+    const list = result?.resultList ?? result?.items ?? payload?.resultList ?? [];
+    if (!Array.isArray(list)) { res.status(502).json({ error: "AliExpress search returned an unexpected response." }); return; }
+    const products = list.map((entry: any) => {
+      const item = entry?.item ?? entry;
+      const rawUrl = String(item?.itemUrl ?? item?.productUrl ?? item?.url ?? "");
+      const id = String(item?.itemId ?? item?.productId ?? item?.product_id ?? rawUrl.match(/\/item\/(\d+)/)?.[1] ?? "");
+      if (!/^\d{10,}$/.test(id)) return null;
+      const price = Number.parseFloat(String(item?.promotionPrice ?? item?.salePrice ?? item?.price ?? 0).replace(/[^0-9.]/g, ""));
+      const image = String(item?.image ?? item?.imageUrl ?? item?.imagePath ?? "");
+      return { id, title: String(item?.title ?? item?.subject ?? "").slice(0, 240), priceUsd: Number.isFinite(price) ? price : 0, image: image.startsWith("//") ? "https:" + image : image, rating: Number(item?.averageStarRate ?? item?.rating ?? 0) || 0, sales: Number(item?.sales ?? 0) || 0, url: "https://www.aliexpress.com/item/" + id + ".html" };
+    }).filter((p: any) => p && p.title);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ products, page });
+  } catch (err) {
+    logger.error({ err }, "AliExpress search failed");
+    res.status(502).json({ error: "AliExpress search is temporarily unavailable. Check provider access and try again." });
+  }
+});
+
 // GET /api/admin/search-amazon — search Amazon UK and return raw results for admin to browse
 router.get("/admin/search-amazon", async (req, res) => {
   const apiKey = process.env.RAPIDAPI_KEY;
