@@ -978,6 +978,9 @@ router.get("/admin/listings", async (req, res) => {
     const offset = parseInt(req.query.offset as string) || 0;
     const search = (req.query.search as string) ?? "";
     const imported = req.query.imported as string;
+    const source = String(req.query.source ?? "").toLowerCase();
+    const sourceFilter = source === "amazon-uk" ? sql`(specifications LIKE '%"source":"Amazon UK"%' OR (public_id LIKE 'BZK-AMZ-%' AND specifications NOT LIKE '%"source":"Amazon US"%'))` : source === "amazon-us" ? sql`(specifications LIKE '%"source":"Amazon US"%' OR public_id LIKE 'BZK-AMZ-US-%')` : source === "ebay-uk" ? sql`(specifications LIKE '%"source":"eBay UK"%' OR public_id LIKE 'BZK-EBY-UK-%')` : source === "ebay-us" ? sql`(specifications LIKE '%"source":"eBay US"%' OR public_id LIKE 'BZK-EBY-US-%')` : source === "amazon" ? sql`(specifications LIKE '%"source":"Amazon UK"%' OR specifications LIKE '%"source":"Amazon US"%' OR public_id LIKE 'BZK-AMZ-%')` : source === "ebay" ? sql`(specifications LIKE '%"source":"eBay UK"%' OR specifications LIKE '%"source":"eBay US"%' OR public_id LIKE 'BZK-EBY-%')` : sql`TRUE`;
+
     // imported=1 → superdeals account (all imports), imported=0 → user listings
     const importedFilter = imported === "1"
       ? sql`seller_email = 'bazunkdeals@gmail.com'`
@@ -992,6 +995,7 @@ router.get("/admin/listings", async (req, res) => {
       FROM listings
       WHERE (${search ? sql`(title ILIKE ${'%' + search + '%'} OR public_id ILIKE ${'%' + search + '%'} OR seller_email ILIKE ${'%' + search + '%'})` : sql`TRUE`})
       AND (${importedFilter})
+      AND (${sourceFilter})
       ORDER BY created_at DESC
       LIMIT ${limit} OFFSET ${offset}
     `).then(r => r.rows);
@@ -1000,6 +1004,7 @@ router.get("/admin/listings", async (req, res) => {
       SELECT COUNT(*) AS cnt FROM listings
       WHERE (${search ? sql`(title ILIKE ${'%' + search + '%'} OR public_id ILIKE ${'%' + search + '%'} OR seller_email ILIKE ${'%' + search + '%'})` : sql`TRUE`})
       AND (${importedFilter})
+      AND (${sourceFilter})
     `).then(r => r.rows as { cnt: string }[]);
 
     res.json({ listings: rows, total: parseInt(cnt) });
