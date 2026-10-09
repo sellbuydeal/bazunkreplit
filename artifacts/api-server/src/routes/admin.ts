@@ -1073,6 +1073,43 @@ router.get("/admin/search-aliexpress", async (req, res) => {
   res.status(503).json({ error: "Bazunk AliExpress Scraper Engine is not configured. RapidAPI has been retired." });
 });
 
+// GET /api/admin/aliexpress-product-preview — fetch verified supplier details for the import modal.
+router.get("/admin/aliexpress-product-preview", async (req, res) => {
+  const raw = String(req.query.url ?? "");
+  let parsed: URL;
+  try { parsed = new URL(raw); } catch { res.status(400).json({ error: "Enter a valid AliExpress product URL" }); return; }
+  const host = parsed.hostname.toLowerCase();
+  const id = parsed.pathname.match(/^\/item\/(\d{10,20})(?:\.html)?\/?$/i)?.[1];
+  if (parsed.protocol !== "https:" || !(host === "aliexpress.com" || host.endsWith(".aliexpress.com")) || !id) {
+    res.status(400).json({ error: "A valid AliExpress item URL is required" }); return;
+  }
+  const base = process.env.ALIEXPRESS_SCRAPER_URL;
+  const token = process.env.ALIEXPRESS_SCRAPER_TOKEN;
+  if (!base || !token) { res.status(503).json({ error: "AliExpress scraper is not configured" }); return; }
+  try {
+    const endpoint = new URL("/v1/aliexpress/products/" + id, base);
+    const upstream = await fetch(endpoint, { headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(25000) });
+    if (!upstream.ok) {
+      const detail = await upstream.json().catch(() => null) as {detail?:unknown}|null;
+      const reason = typeof detail?.detail === "string" ? detail.detail.slice(0, 200) : "Supplier product data unavailable";
+      res.status(502).json({ error: reason }); return;
+    }
+    const product = await upstream.json() as any;
+    const amount = Number(product.price?.amount);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      id, title: String(product.title ?? ""), description: String(product.description ?? ""),
+      imageUrl: String(product.images?.[0]?.url ?? ""),
+      supplierPrice: Number.isFinite(amount) && amount > 0 ? amount : null,
+      currency: String(product.price?.currency ?? "").toUpperCase(),
+      sourceUrl: String(product.sourceUrl ?? raw),
+    });
+  } catch (error) {
+    logger.warn({ error }, "AliExpress product preview failed");
+    res.status(502).json({ error: "Unable to retrieve AliExpress product details. You can still enter them manually." });
+  }
+});
+
 // POST /api/admin/import-selected-aliexpress — server-side verified bulk listing creation
 router.post("/admin/import-selected-aliexpress", async (req, res) => {
   const base = process.env.ALIEXPRESS_SCRAPER_URL, token = process.env.ALIEXPRESS_SCRAPER_TOKEN;
