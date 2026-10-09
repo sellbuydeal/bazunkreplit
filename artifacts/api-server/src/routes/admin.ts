@@ -1328,7 +1328,7 @@ router.patch("/admin/importer-control/listings/:id",async(req,res)=>{
 router.get("/admin/importer-control", async (_req, res) => {
   try {
     const listingRows = await db.execute(sql`
-      SELECT id, public_id, title, status, price, specifications, updated_at
+      SELECT id, public_id, title, status, price, condition, quantity, specifications, updated_at
       FROM listings
       WHERE specifications LIKE '%"source":"Amazon UK"%'
          OR specifications LIKE '%"source":"eBay UK"%'
@@ -1400,6 +1400,7 @@ router.get("/admin/importer-control", async (_req, res) => {
         productsNeedingAttention: alerts.length,
       },
       alerts: alerts.slice(0, 200),
+      importedListings: listingRows.slice(0, 200).map(row=>{let settings:Record<string,unknown>={};try{settings=JSON.parse(String(row.specifications||"{}"));}catch{}return {id:row.id,title:row.title,publicId:row.public_id,condition:row.condition,quantity:row.quantity,status:row.status,source:settings.source,shipsFrom:settings.ships_from||"",shipsTo:settings.ships_to||"",markupPct:settings.markup_pct??35};}),
       note: 'Usage shown here is Bazunk-tracked importer activity, not RapidAPI billing/quota usage.',
     });
   } catch (err) {
