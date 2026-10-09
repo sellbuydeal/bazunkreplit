@@ -1033,6 +1033,26 @@ router.patch("/admin/listings/:id/image", async (req, res) => {
 
 // AliExpress keyword search — authenticated admin only; RapidAPI key stays server-side.
 router.get("/admin/search-aliexpress", async (req, res) => {
+  // Prefer official AliExpress through Bazunk Platform Core; never fall back silently to scraping.
+  if (process.env.BAZUNK_DATA_API_URL && process.env.BAZUNK_DATA_INTERNAL_TOKEN) {
+    const q = String(req.query.q ?? "").trim().slice(0,120);
+    const page = Math.min(100,Math.max(1,Number(req.query.page ?? 1) || 1));
+    if (!q) { res.status(400).json({error:"Search keywords are required."}); return; }
+    try {
+      const endpoint = new URL("/internal/aliexpress/search",process.env.BAZUNK_DATA_API_URL);
+      endpoint.searchParams.set("q",q); endpoint.searchParams.set("page",String(page));
+      endpoint.searchParams.set("currency","USD"); endpoint.searchParams.set("country","GB");
+      const response=await fetch(endpoint,{headers:{Authorization:"Bearer "+process.env.BAZUNK_DATA_INTERNAL_TOKEN},signal:AbortSignal.timeout(25000)});
+      if(!response.ok){res.status(502).json({error:"Official AliExpress API request failed ("+response.status+"). Check Platform Core permissions and logs."});return;}
+      const data=await response.json() as any;
+      const products=(Array.isArray(data.items)?data.items:[]).map((p:any)=>({
+        id:String(p.externalId??""),title:String(p.title??""),priceUsd:Number(p.price?.amount??0),
+        image:String(p.images?.[0]?.url??""),rating:Number(p.rating??0),sales:0,url:String(p.sourceUrl??"")
+      })).filter((p:any)=>/^\\d{10,20}$/.test(p.id)&&p.priceUsd>0&&p.title);
+      res.setHeader("Cache-Control","no-store");
+      res.json({products,page,source:"aliexpress-official",discovered:data.items?.length??0,complete:products.length,diagnostic:products.length?null:"Official AliExpress API returned no complete priced products."});return;
+    }catch(error){logger.warn({error},"Official AliExpress search failed");res.status(502).json({error:"Official AliExpress search is temporarily unavailable."});return;}
+  }
   // Prefer Bazunk's independent scraper service when configured.
   if (process.env.ALIEXPRESS_SCRAPER_URL && process.env.ALIEXPRESS_SCRAPER_TOKEN) {
     const q = String(req.query.q ?? "").trim().slice(0, 120);
@@ -1109,6 +1129,17 @@ router.get("/admin/aliexpress-product-preview", async (req, res) => {
   const id = parsed.pathname.match(/^\/item\/(\d{10,20})(?:\.html)?\/?$/i)?.[1];
   if (parsed.protocol !== "https:" || !(host === "aliexpress.com" || host.endsWith(".aliexpress.com")) || !id) {
     res.status(400).json({ error: "A valid AliExpress item URL is required" }); return;
+  }
+  if (process.env.BAZUNK_DATA_API_URL && process.env.BAZUNK_DATA_INTERNAL_TOKEN) {
+    try {
+      const endpoint=new URL("/internal/aliexpress/products/"+id,process.env.BAZUNK_DATA_API_URL);
+      const response=await fetch(endpoint,{headers:{Authorization:"Bearer "+process.env.BAZUNK_DATA_INTERNAL_TOKEN},signal:AbortSignal.timeout(25000)});
+      if(!response.ok){res.status(502).json({error:"Official AliExpress product lookup failed ("+response.status+")"});return;}
+      const p=await response.json() as any;
+      const price=Number(p.price?.amount);
+      res.setHeader("Cache-Control","no-store");
+      res.json({id,title:String(p.title??""),description:String(p.description??""),imageUrl:String(p.images?.[0]?.url??""),supplierPrice:Number.isFinite(price)&&price>0?price:null,currency:String(p.price?.currency??""),sourceUrl:String(p.sourceUrl??raw)});return;
+    }catch(error){logger.warn({error},"Official AliExpress preview failed");res.status(502).json({error:"Official AliExpress product lookup unavailable."});return;}
   }
   const base = process.env.ALIEXPRESS_SCRAPER_URL;
   const token = process.env.ALIEXPRESS_SCRAPER_TOKEN;
@@ -1214,8 +1245,10 @@ router.post("/admin/import-aliexpress-product", async (req, res) => {
 
 // POST /api/admin/import-selected-aliexpress — server-side verified bulk listing creation
 router.post("/admin/import-selected-aliexpress", async (req, res) => {
-  const base = process.env.ALIEXPRESS_SCRAPER_URL, token = process.env.ALIEXPRESS_SCRAPER_TOKEN;
-  if (!base || !token) { res.status(503).json({ error: "AliExpress scraper not configured" }); return; }
+  const official = Boolean(process.env.BAZUNK_DATA_API_URL && process.env.BAZUNK_DATA_INTERNAL_TOKEN);
+  const base = official ? process.env.BAZUNK_DATA_API_URL : process.env.ALIEXPRESS_SCRAPER_URL;
+  const token = official ? process.env.BAZUNK_DATA_INTERNAL_TOKEN : process.env.ALIEXPRESS_SCRAPER_TOKEN;
+  if (!base || !token) { res.status(503).json({error:"AliExpress product provider not configured"});return; }
   const ids = Array.isArray(req.body?.ids) ? [...new Set(req.body.ids.map((v: unknown) => String(v)))] as string[] : [];
   if (!ids.length || ids.length > 30 || ids.some(id => !/^\d{10,20}$/.test(id))) {
     res.status(400).json({ error: "Select 1–30 valid AliExpress product IDs" }); return;
@@ -1244,9 +1277,9 @@ router.post("/admin/import-selected-aliexpress", async (req, res) => {
     try {
       const exists = await db.execute(sql`SELECT id FROM listings WHERE specifications LIKE ${'%"aliexpress_id":"' + id + '"%'} LIMIT 1`);
       if (exists.rows.length) { results.push({id,status:"skipped",reason:"Already imported"}); continue; }
-      const url = new URL("/v1/aliexpress/products/" + id, base);
+      const url = new URL((official ? "/internal/aliexpress/products/" : "/v1/aliexpress/products/") + id, base);
       const response = await fetch(url, { headers: { Authorization: "Bearer " + token }, signal: AbortSignal.timeout(20000) });
-      if (!response.ok) throw new Error("Scraper HTTP " + response.status);
+      if (!response.ok) throw new Error("AliExpress source HTTP " + response.status);
       const p = await response.json() as any;
       const price = Number(p.price?.amount);
       const currency = String(p.price?.currency ?? "");
