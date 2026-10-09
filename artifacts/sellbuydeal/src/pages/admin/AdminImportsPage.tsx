@@ -184,6 +184,11 @@ export function AdminImportsPage() {
   const [aliMarkup, setAliMarkup] = useState("30");
   const [aliShipping, setAliShipping] = useState("0");
   const [aliNotice, setAliNotice] = useState("");
+  const [aliQuery, setAliQuery] = useState("");
+  const [aliPage, setAliPage] = useState(1);
+  const [aliSearching, setAliSearching] = useState(false);
+  const [aliSearchError, setAliSearchError] = useState("");
+  const [aliProducts, setAliProducts] = useState<Array<{id:string;title:string;priceUsd:number;image:string;rating:number;sales:number;url:string}>>([]);
 
   const PAGE_SIZE = 50;
 
@@ -1361,6 +1366,22 @@ export function AdminImportsPage() {
 
         {tab === "aliexpress" && (
           <motion.div key="ali" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-5">
+            <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5 space-y-4">
+              <div><h2 className="font-black text-gray-900">Search AliExpress</h2><p className="text-sm text-gray-500">Find products by keyword, preview prices and choose items to import.</p></div>
+              <form className="flex flex-col sm:flex-row gap-2" onSubmit={async e=>{e.preventDefault();if(!aliQuery.trim())return;setAliSearching(true);setAliSearchError("");setAliProducts([]);setAliPage(1);try{const response=await authFetch("/api/admin/search-aliexpress?q="+encodeURIComponent(aliQuery.trim())+"&page=1");const data=await response.json();if(!response.ok)throw new Error(data.error??"Search failed");setAliProducts(data.products??[])}catch(err){setAliSearchError(err instanceof Error?err.message:"Search failed")}finally{setAliSearching(false)}}}>
+                <input aria-label="Search AliExpress products" value={aliQuery} onChange={e=>setAliQuery(e.target.value)} placeholder="e.g. wireless earbuds, garden lights…" className={inputCls+" min-w-0 flex-1"}/>
+                <button disabled={aliSearching||!aliQuery.trim()} className="rounded-xl bg-orange-500 px-5 py-2.5 font-bold text-white disabled:opacity-50">{aliSearching?"Searching…":"Search products"}</button>
+              </form>
+              {aliSearchError&&<p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{aliSearchError}</p>}
+              {aliProducts.length>0&&<>
+                <p className="text-sm text-gray-500">{aliProducts.length} results · Page {aliPage}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">{aliProducts.map(p=><div key={p.id} className="min-w-0 rounded-xl border border-gray-200 p-3 flex flex-col gap-2">
+                  <div className="flex gap-3">{p.image?<img src={p.image} alt="" className="h-20 w-20 shrink-0 rounded-lg object-contain" loading="lazy"/>:<div className="h-20 w-20 shrink-0 rounded-lg bg-gray-100"/>}<div className="min-w-0"><p className="text-sm font-semibold text-gray-900 line-clamp-3">{p.title}</p><p className="mt-1 text-sm font-bold text-orange-600">{p.priceUsd>0?"$"+p.priceUsd.toFixed(2):"Price unavailable"}</p><p className="text-xs text-gray-500">{p.rating>0?p.rating.toFixed(1)+" ★":""} {p.sales>0?" · "+p.sales+" sold":""}</p></div></div>
+                  <div className="mt-auto flex items-center justify-between gap-2"><a href={p.url} target="_blank" rel="noreferrer" className="text-xs text-indigo-600">View source ↗</a><button type="button" onClick={()=>{setAliActiveUrl(p.url);setAliModalOpen(true)}} className="rounded-lg bg-orange-500 px-3 py-2 text-xs font-bold text-white">Review & import</button></div>
+                </div>)}</div>
+                <button type="button" disabled={aliSearching} onClick={async()=>{setAliSearching(true);setAliSearchError("");try{const next=aliPage+1;const response=await authFetch("/api/admin/search-aliexpress?q="+encodeURIComponent(aliQuery.trim())+"&page="+next);const data=await response.json();if(!response.ok)throw new Error(data.error??"Search failed");setAliProducts(data.products??[]);setAliPage(next)}catch(err){setAliSearchError(err instanceof Error?err.message:"Search failed")}finally{setAliSearching(false)}}} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold">Next page</button>
+              </>}
+            </div>
             <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
               <div className="border-b border-gray-100 p-4 sm:p-5 flex items-center gap-3">
                 <div className="rounded-xl bg-orange-500 p-2 text-white"><Search className="w-5 h-5"/></div>
