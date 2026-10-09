@@ -177,6 +177,9 @@ export function AdminImportsPage() {
   const [aliSeller, setAliSeller] = useState("bazunkdeals@gmail.com");
   const [aliModalOpen, setAliModalOpen] = useState(false);
   const [aliDone, setAliDone] = useState(0);
+  const [aliUrls, setAliUrls] = useState("");
+  const [aliQueued, setAliQueued] = useState<string[]>([]);
+  const [aliSelected, setAliSelected] = useState<Set<string>>(new Set());
 
   const PAGE_SIZE = 50;
 
@@ -1353,39 +1356,36 @@ export function AdminImportsPage() {
         )}
 
         {tab === "aliexpress" && (
-          <motion.div key="ali" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 max-w-lg mx-auto mt-8">
-              <div className="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl">📦</span>
+          <motion.div key="ali" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-5">
+            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+              <div className="border-b border-gray-100 px-5 py-4 flex items-center gap-3">
+                <div className="rounded-xl bg-orange-500 p-2 text-white"><Search className="w-5 h-5"/></div>
+                <div><h2 className="font-black text-gray-900">AliExpress product selector</h2><p className="text-sm text-gray-500">Add product URLs, choose which to transfer and import to a seller's store.</p></div>
               </div>
-              <h2 className="font-black text-gray-900 text-lg mb-2 text-center">AliExpress Importer</h2>
-              <p className="text-sm text-gray-500 mb-5 text-center">
-                Paste an AliExpress product link, choose the category (same list as Direct Sale), set your markup and import it
-                into the store of the seller below. Prices re-sync automatically.
-              </p>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Import into this seller's store</label>
-              <select value={aliSeller} onChange={e => setAliSeller(e.target.value)}
-                className={inputCls + " w-full mb-4"}>
-                {users.length === 0
-                  ? <option value={aliSeller}>{aliSeller}</option>
-                  : users.map(u => <option key={u.email} value={u.email}>{u.name ? `${u.name} (${u.email})` : u.email}</option>)}
-              </select>
-              <button onClick={() => setAliModalOpen(true)}
-                className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#F26B21] text-white font-bold text-sm hover:bg-[#e0601d] transition-colors">
-                <Plus className="w-4 h-4" /> Import an AliExpress product
-              </button>
-              {aliDone > 0 && (
-                <p className="mt-3 text-sm text-green-600 text-center">{aliDone} product{aliDone === 1 ? "" : "s"} imported this session.</p>
-              )}
+              <div className="p-5 space-y-4">
+                <label className="block text-sm font-bold text-gray-700">AliExpress product links (one per line)</label>
+                <textarea rows={3} value={aliUrls} onChange={e=>setAliUrls(e.target.value)} placeholder="https://www.aliexpress.com/item/100500....html" className={inputCls+" w-full min-h-24"} />
+                <button type="button" className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-white font-bold text-sm" onClick={()=>{
+                  const links=aliUrls.split(/[\\s,]+/).map(v=>v.trim()).filter(v=>{try{const u=new URL(v);return u.protocol==="https:"&&/(^|\\.)aliexpress\\.[a-z.]+$/i.test(u.hostname)&&/\\/item\\//.test(u.pathname)}catch{return false}}).slice(0,50);
+                  setAliQueued([...new Set(links)]);setAliSelected(new Set(links));
+                }}><Search className="w-4 h-4"/>Prepare URL selection</button>
+                <p className="text-xs text-gray-500">This selector prepares URLs. Product details still need to be entered in the import form; automated AliExpress search and bulk fetching are not yet connected.</p>
+              </div>
             </div>
-            {aliModalOpen && (
-              <ImportModal
-                onClose={() => setAliModalOpen(false)}
-                onSuccess={() => setAliDone(n => n + 1)}
-                userEmail={aliSeller}
-                userName={users.find(u => u.email === aliSeller)?.name ?? ""}
-              />
-            )}
+            {aliQueued.length>0&&<div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+              <div className="flex flex-wrap justify-between items-center gap-3"><div><h3 className="font-black text-gray-900">Select products</h3><p className="text-sm text-gray-500">{aliSelected.size} of {aliQueued.length} URLs selected</p></div><div className="flex gap-2"><button type="button" className="border rounded-lg px-3 py-2 text-sm" onClick={()=>setAliSelected(new Set(aliQueued))}>Select all</button><button type="button" className="border rounded-lg px-3 py-2 text-sm" onClick={()=>setAliSelected(new Set())}>Clear</button></div></div>
+              <div className="space-y-2 max-h-72 overflow-y-auto">{aliQueued.map((url,i)=><label key={url} className="flex gap-3 items-center rounded-xl border border-gray-200 px-3 py-3 text-sm"><input type="checkbox" checked={aliSelected.has(url)} onChange={e=>setAliSelected(prev=>{const n=new Set(prev);e.target.checked?n.add(url):n.delete(url);return n})}/><span className="flex-1 truncate text-gray-700">{i+1}. {url}</span><a href={url} target="_blank" rel="noreferrer" className="text-indigo-600" aria-label="Open AliExpress product"><ExternalLink className="w-4 h-4"/></a></label>)}</div>
+            </div>}
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-4">
+              <h3 className="font-black text-gray-900">Import settings</h3>
+              <label className="block text-sm font-bold text-gray-700">Import into this seller's store</label>
+              <select value={aliSeller} onChange={e=>setAliSeller(e.target.value)} className={inputCls+" w-full"}>
+                {users.length===0?<option value={aliSeller}>{aliSeller}</option>:users.map(u=><option key={u.email} value={u.email}>{u.name?`${u.name} (${u.email})`:u.email}</option>)}
+              </select>
+              <button onClick={()=>setAliModalOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-white font-bold text-sm hover:bg-orange-600"><Plus className="w-4 h-4"/>Open AliExpress import form</button>
+              {aliDone>0&&<p className="text-sm text-green-700">{aliDone} product(s) imported this session.</p>}
+            </div>
+            {aliModalOpen&&<ImportModal onClose={()=>setAliModalOpen(false)} onSuccess={()=>setAliDone(n=>n+1)} userEmail={aliSeller} userName={users.find(u=>u.email===aliSeller)?.name??""}/>}
           </motion.div>
         )}
 
