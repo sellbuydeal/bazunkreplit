@@ -1142,8 +1142,6 @@ router.post("/admin/import-aliexpress-product", async (req, res) => {
   const seller = await db.execute(sql`SELECT email,name FROM users WHERE email = ${sellerEmail} LIMIT 1`)
     .then(r => r.rows[0] as {email:string;name:string|null}|undefined);
   if (!seller) { res.status(400).json({ error: "Select an existing seller" }); return; }
-  const duplicate = await db.execute(sql`SELECT si.id FROM supplier_imports si JOIN listings l ON l.id=si.listing_id WHERE si.supplier_source='aliexpress' AND si.supplier_id=${id} AND l.seller_email=${sellerEmail} LIMIT 1`);
-  if (duplicate.rows.length) { res.status(409).json({ error: "Product already imported for this seller" }); return; }
   let rate: number;
   try {
     const response = await fetch("https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP", { signal: AbortSignal.timeout(8000) });
@@ -1156,18 +1154,34 @@ router.post("/admin/import-aliexpress-product", async (req, res) => {
   const sellingPrice = Math.round((markupType === "fixed" ? baseGbp + markupValue : baseGbp * (1 + markupValue / 100)) * 100) / 100;
   const specs = JSON.stringify({source:"AliExpress",aliexpress_id:id,aliexpress_url:rawUrl,source_price:priceUsd,source_currency:"USD",exchange_rate_to_gbp:rate,markup_type:markupType,markup_value:markupValue,source_sync:true});
   try {
-    const inserted = await db.execute(sql`INSERT INTO listings
-      (title,price,price_gbp,currency,category,subcategory,description,condition,image,seller_email,seller_name,specifications,status,created_at,updated_at)
-      VALUES (${title},${sellingPrice},${sellingPrice},'GBP',${category},${subcategory || null},${description || title},${condition},${imageUrl || null},${seller.email},${seller.name ?? seller.email.split("@")[0]},${specs},'active',NOW(),NOW()) RETURNING id`);
-    const listingId = Number((inserted.rows[0] as {id:number}).id);
-    await db.execute(sql`UPDATE listings SET public_id=${"BZL-"+listingId} WHERE id=${listingId}`);
-    await db.execute(sql`INSERT INTO supplier_imports
-      (listing_id,supplier_source,supplier_id,supplier_url,supplier_price,supplier_currency,markup_type,markup_value,last_synced_at,sync_status)
-      VALUES (${listingId},'aliexpress',${id},${rawUrl},${priceUsd},'USD',${markupType},${markupValue},NOW(),'ok')`);
+    const listingId = await db.transaction(async (tx) => {
+      // Serialise imports of this supplier product for this seller, even across requests.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${sellerEmail}), hashtext(${id}))`);
+      const duplicate = await tx.execute(sql`SELECT si.id FROM supplier_imports si
+        JOIN listings l ON l.id = si.listing_id
+        WHERE si.supplier_source = 'aliexpress' AND si.supplier_id = ${id}
+          AND l.seller_email = ${sellerEmail} LIMIT 1`);
+      if (duplicate.rows.length) {
+        throw new Error("ALIEXPRESS_ALREADY_IMPORTED");
+      }
+      const inserted = await tx.execute(sql`INSERT INTO listings
+        (title,price,price_gbp,currency,category,subcategory,description,condition,image,seller_email,seller_name,specifications,status,created_at,updated_at)
+        VALUES (${title},${sellingPrice},${sellingPrice},'GBP',${category},${subcategory || null},${description || title},${condition},${imageUrl || null},${seller.email},${seller.name ?? seller.email.split("@")[0]},${specs},'active',NOW(),NOW()) RETURNING id`);
+      const newId = Number((inserted.rows[0] as {id:number}).id);
+      await tx.execute(sql`UPDATE listings SET public_id = ${"BZL-" + newId} WHERE id = ${newId}`);
+      await tx.execute(sql`INSERT INTO supplier_imports
+        (listing_id,supplier_source,supplier_id,supplier_url,supplier_price,supplier_currency,markup_type,markup_value,last_synced_at,sync_status)
+        VALUES (${newId},'aliexpress',${id},${rawUrl},${priceUsd},'USD',${markupType},${markupValue},NOW(),'ok')`);
+      return newId;
+    });
     res.status(201).json({ listingId, sellingPrice, currency:"GBP", supplierPriceUsd:priceUsd });
   } catch (error) {
-    logger.error({error,id}, "Reviewed AliExpress product import failed");
-    res.status(500).json({error:"Unable to save AliExpress listing and supplier tracking"});
+    if (error instanceof Error && error.message === "ALIEXPRESS_ALREADY_IMPORTED") {
+      res.status(409).json({ error: "Product already imported for this seller" });
+      return;
+    }
+    logger.error({error,id}, "Reviewed AliExpress product import transaction failed");
+    res.status(500).json({error:"Unable to save AliExpress listing and supplier tracking; no partial listing was committed"});
   }
 });
 
