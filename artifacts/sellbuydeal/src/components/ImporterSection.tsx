@@ -93,6 +93,30 @@ export function ImportModal({ onClose, onSuccess, userEmail, userName, initialUr
   const [description, setDescription] = useState("");
   const [markupType, setMarkupType] = useState<"percentage" | "fixed">("percentage");
   const [markupValue, setMarkupValue] = useState(initialMarkup);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewNotice, setPreviewNotice] = useState("");
+  const [supplierCurrency, setSupplierCurrency] = useState("USD");
+  const [lastPreviewUrl, setLastPreviewUrl] = useState("");
+  const fetchPreview = useCallback(async (productUrl: string) => {
+    if (!productUrl.trim()) return;
+    setPreviewLoading(true);
+    setPreviewNotice("");
+    try {
+      const response = await fetch("/api/admin/aliexpress-product-preview?url=" + encodeURIComponent(productUrl.trim()), { credentials: "include" });
+      const data = await response.json() as {error?:string;title?:string;description?:string;imageUrl?:string;supplierPrice?:number;currency?:string};
+      if (!response.ok) throw new Error(data.error || "Product details unavailable");
+      if (data.title) setTitle(data.title);
+      if (data.description) setDescription(data.description);
+      if (data.imageUrl) setImageUrl(data.imageUrl);
+      if (data.supplierPrice && data.currency === "USD") setSupplierPriceUsd(String(data.supplierPrice));
+      setSupplierCurrency(data.currency || "USD");
+      setLastPreviewUrl(productUrl);
+      setPreviewNotice(data.currency && data.currency !== "USD" ? "Supplier price is in " + data.currency + ". Please enter the verified USD equivalent before importing." : "Product details retrieved. Review the information before importing.");
+    } catch (error) {
+      setPreviewNotice((error instanceof Error ? error.message : "Preview unavailable") + " Enter missing fields manually.");
+    } finally { setPreviewLoading(false); }
+  }, []);
+  useEffect(() => { if (initialUrl) void fetchPreview(initialUrl); }, [initialUrl, fetchPreview]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -197,6 +221,10 @@ export function ImportModal({ onClose, onSuccess, userEmail, userName, initialUr
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">AliExpress Product URL <span className="text-red-400">*</span></label>
               <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://www.aliexpress.com/item/1005007123456789.html" className={inputCls} />
+              <button type="button" disabled={previewLoading || !url.trim()} onClick={() => void fetchPreview(url)} className="mt-2 rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{previewLoading ? "Fetching product details…" : lastPreviewUrl === url ? "Refresh product details" : "Fetch product details"}</button>
+              {previewNotice && <p role="status" className="mt-2 text-xs text-gray-600">{previewNotice}</p>}
+              {imageUrl && <img src={imageUrl} alt="Supplier product preview" className="mt-2 h-28 w-28 rounded-lg border object-contain" />}
+
             </div>
 
             {/* Title */}
