@@ -1066,7 +1066,7 @@ router.post("/admin/import-selected-aliexpress", async (req, res) => {
   const base = process.env.ALIEXPRESS_SCRAPER_URL, token = process.env.ALIEXPRESS_SCRAPER_TOKEN;
   if (!base || !token) { res.status(503).json({ error: "AliExpress scraper not configured" }); return; }
   const ids = Array.isArray(req.body?.ids) ? [...new Set(req.body.ids.map((v: unknown) => String(v)))] as string[] : [];
-  if (!ids.length || ids.length > 30 || ids.some(id => !/^\\d{10,20}$/.test(id))) {
+  if (!ids.length || ids.length > 30 || ids.some(id => !/^\d{10,20}$/.test(id))) {
     res.status(400).json({ error: "Select 1–30 valid AliExpress product IDs" }); return;
   }
   const markup = Number(req.body?.markup ?? 35), shipping = Number(req.body?.shipping ?? 0);
