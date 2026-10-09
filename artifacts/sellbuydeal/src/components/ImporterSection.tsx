@@ -76,12 +76,14 @@ interface ImportModalProps {
   onSuccess: () => void;
   userEmail: string;
   userName: string;
+  initialUrl?: string;
+  initialMarkup?: string;
 }
 
 const CONDITIONS = ["new", "like new", "good", "fair", "poor"];
 
-export function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportModalProps) {
-  const [url, setUrl] = useState("");
+export function ImportModal({ onClose, onSuccess, userEmail, userName, initialUrl = "", initialMarkup = "30" }: ImportModalProps) {
+  const [url, setUrl] = useState(initialUrl);
   const [title, setTitle] = useState("");
   const [supplierPriceUsd, setSupplierPriceUsd] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -90,7 +92,7 @@ export function ImportModal({ onClose, onSuccess, userEmail, userName }: ImportM
   const [condition, setCondition] = useState("new");
   const [description, setDescription] = useState("");
   const [markupType, setMarkupType] = useState<"percentage" | "fixed">("percentage");
-  const [markupValue, setMarkupValue] = useState("30");
+  const [markupValue, setMarkupValue] = useState(initialMarkup);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
