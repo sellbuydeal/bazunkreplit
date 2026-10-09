@@ -1072,8 +1072,17 @@ router.get("/admin/search-aliexpress", async (req, res) => {
     if (!response.ok) { res.status(502).json({ error: rapidApiErrorMessage("AliExpress", response.status) }); return; }
     const payload = await response.json() as any;
     const result = payload?.result ?? payload;
-    const code = result?.status?.code;
-    if (code && String(code) !== "200") { res.status(502).json({ error: "AliExpress search provider returned an error (" + code + ")." }); return; }
+    const code = result?.status?.code ?? payload?.status?.code;
+    const providerMessage = String(result?.status?.msg ?? result?.status?.message ?? payload?.status?.msg ?? payload?.message ?? "").slice(0, 300);
+    if (code != null && String(code) !== "200") {
+      logger.warn({ providerCode: String(code), providerMessage }, "AliExpress search provider rejected request");
+      res.status(502).json({
+        error: "AliExpress DataHub search failed (provider code " + code + ")" + (providerMessage ? ": " + providerMessage : "."),
+        providerCode: String(code),
+        hint: "Check AliExpress DataHub subscription, endpoint access and required search parameters in RapidAPI. This is an upstream response, not a Bazunk product-search result."
+      });
+      return;
+    }
     const list = result?.resultList ?? result?.items ?? payload?.resultList ?? [];
     if (!Array.isArray(list)) { res.status(502).json({ error: "AliExpress search returned an unexpected response." }); return; }
     const products = list.map((entry: any) => {
