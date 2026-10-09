@@ -1077,6 +1077,17 @@ router.post("/admin/import-selected-aliexpress", async (req, res) => {
   const seller = await db.execute(sql`SELECT email, name FROM users WHERE email = ${sellerEmail} LIMIT 1`)
     .then(r => r.rows[0] as {email:string;name:string|null}|undefined);
   if (!seller) { res.status(400).json({ error: "Select an existing destination seller" }); return; }
+  // Resolve currency conversion once per batch; never assume USD and GBP are equivalent.
+  const fxRates: Record<string, number> = { GBP: 1 };
+  try {
+    const fxResponse = await fetch("https://api.frankfurter.dev/v1/latest?base=GBP", { signal: AbortSignal.timeout(8000) });
+    if (fxResponse.ok) {
+      const fx = await fxResponse.json() as { rates?: Record<string, number> };
+      for (const [currency, gbpToCurrency] of Object.entries(fx.rates ?? {})) {
+        if (Number.isFinite(gbpToCurrency) && gbpToCurrency > 0) fxRates[currency] = 1 / gbpToCurrency;
+      }
+    }
+  } catch (error) { logger.warn({ error }, "AliExpress currency rate service unavailable"); }
   const results: {id:string;status:string;reason?:string}[] = [];
   for (const id of ids) {
     try {
@@ -1089,11 +1100,12 @@ router.post("/admin/import-selected-aliexpress", async (req, res) => {
       const price = Number(p.price?.amount);
       const currency = String(p.price?.currency ?? "");
       if (!p.title || !Number.isFinite(price) || price <= 0) throw new Error("Title or price unavailable");
-      if (currency !== "GBP") throw new Error("Source currency " + currency + " is not GBP; conversion required before listing");
+      const gbpRate = fxRates[currency];
+      if (!gbpRate) throw new Error("No verified GBP exchange rate for " + currency + "; import skipped");
       if (p.availability === "out_of_stock") throw new Error("Product out of stock");
-      const bazPrice = Math.round((price * (1 + markup / 100) + shipping) * 100) / 100;
+      const bazPrice = Math.round((price * gbpRate * (1 + markup / 100) + shipping) * 100) / 100;
       const specs = JSON.stringify({ source:"AliExpress", aliexpress_id:id, aliexpress_url:p.sourceUrl,
-        source_price:price, source_currency:currency, markup_pct:markup, shipping_gbp:shipping,
+        source_price:price, source_currency:currency, exchange_rate_to_gbp:gbpRate, markup_pct:markup, shipping_gbp:shipping,
         source_sync:true, last_synced_at:new Date().toISOString(), source_availability:p.availability });
       const publicId = "BZK-ALI-" + id;
       await db.execute(sql`INSERT INTO listings
